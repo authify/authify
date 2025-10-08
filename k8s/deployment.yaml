@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authify
+  namespace: authify
+  labels:
+    app: authify
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: authify
+  template:
+    metadata:
+      labels:
+        app: authify
+      annotations:
+        # Prometheus scraping annotations (for basic Prometheus without Operator)
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9568"
+        prometheus.io/path: "/metrics"
+    spec:
+      initContainers:
+        - name: migrate
+          image: ghcr.io/your-org/authify:latest  # Change this to your image
+          command: ["/app/bin/authify"]
+          args: ["eval", "Authify.Release.migrate"]
+          envFrom:
+            - configMapRef:
+                name: authify-config
+            - secretRef:
+                name: authify-secrets
+      containers:
+        - name: authify
+          image: ghcr.io/your-org/authify:latest  # Change this to your image
+          ports:
+            - containerPort: 4000
+              name: http
+              protocol: TCP
+            - containerPort: 9568
+              name: metrics
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: authify-config
+            - secretRef:
+                name: authify-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

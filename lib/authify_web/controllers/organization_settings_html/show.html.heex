@@ -1,0 +1,151 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@user}
+      organization={@organization}
+      current_page="organization_settings"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">
+        <%= if @organization.slug == "authify-global" do %>
+          Authify Global Settings
+        <% else %>
+          Organization Settings
+        <% end %>
+      </h1>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-building"></i> Organization Profile
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-sm-3">
+                <h6 class="mb-0">Organization Name</h6>
+              </div>
+              <div class="col-sm-9 text-secondary">
+                {@organization.name}
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-sm-3">
+                <h6 class="mb-0">Slug</h6>
+              </div>
+              <div class="col-sm-9 text-secondary">
+                {@organization.slug}
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-sm-3">
+                <h6 class="mb-0">Status</h6>
+              </div>
+              <div class="col-sm-9">
+                <%= if @organization.active do %>
+                  <span class="badge bg-success">Active</span>
+                <% else %>
+                  <span class="badge bg-warning">Inactive</span>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-4">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-sliders"></i> Configuration
+            </h5>
+          </div>
+          <div class="card-body">
+            <p class="text-muted mb-3">
+              <%= if @organization.slug == "authify-global" do %>
+                Configure system-wide settings that affect all organizations.
+              <% else %>
+                Configure organization-specific feature settings.
+              <% end %>
+            </p>
+
+            <div class="d-grid gap-2 mb-0">
+              <a
+                href={~p"/#{@current_organization.slug}/settings/configuration"}
+                class="btn btn-outline-primary"
+              >
+                <i class="bi bi-sliders"></i>
+                <%= if @organization.slug == "authify-global" do %>
+                  Manage Global Settings
+                <% else %>
+                  Manage Configuration
+                <% end %>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <%= unless @organization.slug == "authify-global" do %>
+          <div class="card mt-4">
+            <div class="card-header">
+              <h5 class="card-title mb-0">
+                <i class="bi bi-key"></i> Management API Access
+              </h5>
+            </div>
+            <div class="card-body">
+              <p class="text-muted mb-3">
+                Configure programmatic access to Authify's Management API for automation, integrations, and service accounts.
+              </p>
+
+              <div class="d-grid gap-2 mb-3">
+                <a
+                  href={~p"/#{@current_organization.slug}/settings/management-api"}
+                  class="btn btn-outline-primary"
+                >
+                  <i class="bi bi-gear"></i> Manage API Access
+                </a>
+              </div>
+
+              <div class="row text-center">
+                <div class="col-6">
+                  <div class="border-end">
+                    <h6 class="fw-bold text-primary mb-1">{@management_api_count}</h6>
+                    <small class="text-muted">Active Applications</small>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <h6 class="fw-bold text-success mb-1">{@management_api_count}</h6>
+                  <small class="text-muted">API Tokens</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> Organization Information
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-2">Manage your organization profile:</p>
+            <ul class="small mb-0">
+              <li>Update organization details and description</li>
+              <li>Set contact information for users</li>
+              <li>Add your website URL for branding</li>
+              <li>Upload a logo (coming soon)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

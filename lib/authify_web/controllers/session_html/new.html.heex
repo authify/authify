@@ -1,0 +1,90 @@
+<.auth_layout>
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+      <div class="card shadow">
+        <div class="card-body p-5">
+          <div class="text-center mb-4">
+            <img
+              src="/images/logo-no-text.svg"
+              alt="Authify"
+              width="64"
+              height="64"
+              class="mb-3"
+            />
+            <h1 class="h3 mb-3 fw-normal">Sign In</h1>
+            <p class="text-muted">
+              Welcome back to Authify
+            </p>
+          </div>
+
+          <.form
+            for={%{}}
+            as={:login}
+            action={~p"/login"}
+            method="post"
+            class="needs-validation"
+            novalidate
+          >
+            <div class="mb-3">
+              <label for="login_organization_slug" class="form-label">Organization</label>
+              <input
+                type="text"
+                name="login[organization_slug]"
+                id="login_organization_slug"
+                class="form-control"
+                placeholder="acme-corp"
+                value={@org_slug}
+                required
+              />
+              <div class="form-text">
+                Enter your organization's slug
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="login_email" class="form-label">Email Address</label>
+              <input
+                type="email"
+                name="login[email]"
+                id="login_email"
+                class="form-control"
+                placeholder="john@acme.com"
+                required
+              />
+            </div>
+
+            <div class="mb-3">
+              <label for="login_password" class="form-label">Password</label>
+              <input
+                type="password"
+                name="login[password]"
+                id="login_password"
+                class="form-control"
+                required
+              />
+            </div>
+
+            <div class="d-grid">
+              <button type="submit" class="btn btn-primary btn-lg">
+                Sign In
+              </button>
+            </div>
+          </.form>
+
+          <div class="text-center mt-4">
+            <p class="text-muted small mb-2">
+              <a href={~p"/password_reset/new"} class="text-decoration-none">
+                Forgot your password?
+              </a>
+            </p>
+            <%= if @allow_org_registration do %>
+              <p class="text-muted small">
+                Need an organization? <a href="/signup">Create one here</a>
+              </p>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</.auth_layout>

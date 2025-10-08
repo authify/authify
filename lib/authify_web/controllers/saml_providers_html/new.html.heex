@@ -1,0 +1,60 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@current_user}
+      organization={@organization}
+      current_page="saml_providers"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Create SAML Service Provider</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@current_organization.slug}/saml_providers"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left"></i> Back to SAML Providers
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-plus-circle"></i> Service Provider Information
+            </h5>
+          </div>
+          <div class="card-body">
+            <.service_provider_form
+              changeset={@changeset}
+              action={~p"/#{@current_organization.slug}/saml_providers"}
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> About SAML Service Providers
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-2">SAML service providers allow:</p>
+            <ul class="small mb-0">
+              <li>Single sign-on (SSO) for external applications</li>
+              <li>Secure assertion-based authentication</li>
+              <li>Centralized identity management</li>
+              <li>Standards-based integration</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

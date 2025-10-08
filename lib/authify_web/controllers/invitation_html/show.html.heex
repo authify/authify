@@ -1,0 +1,120 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar user={@user} organization={@organization} current_page="invitations" />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Invitation Details</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@current_organization.slug}/invitations"}
+            class="btn btn-sm btn-outline-secondary"
+          >
+            <i class="bi bi-arrow-left"></i> Back to Invitations
+          </a>
+        </div>
+      </div>
+    </div>
+    
+<!-- Invitation Details -->
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-envelope"></i> Invitation Information
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-sm-3">
+                <strong>Email Address:</strong>
+              </div>
+              <div class="col-sm-9">
+                {@invitation.email}
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-sm-3">
+                <strong>Role:</strong>
+              </div>
+              <div class="col-sm-9">
+                <span class={"badge #{if @invitation.role == "admin", do: "bg-primary", else: "bg-secondary"}"}>
+                  {String.capitalize(@invitation.role)}
+                </span>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-sm-3">
+                <strong>Status:</strong>
+              </div>
+              <div class="col-sm-9">
+                <%= cond do %>
+                  <% Authify.Accounts.Invitation.accepted?(@invitation) -> %>
+                    <span class="badge bg-success">Accepted</span>
+                  <% Authify.Accounts.Invitation.expired?(@invitation) -> %>
+                    <span class="badge bg-danger">Expired</span>
+                  <% true -> %>
+                    <span class="badge bg-warning">Pending</span>
+                <% end %>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-sm-3">
+                <strong>Invited By:</strong>
+              </div>
+              <div class="col-sm-9">
+                {Authify.Accounts.User.full_name(@invitation.invited_by)}
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-sm-3">
+                <strong>Invited On:</strong>
+              </div>
+              <div class="col-sm-9">
+                {Calendar.strftime(@invitation.inserted_at, "%B %d, %Y at %I:%M %p")}
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-sm-3">
+                <strong>Expires On:</strong>
+              </div>
+              <div class="col-sm-9">
+                {Calendar.strftime(@invitation.expires_at, "%B %d, %Y at %I:%M %p")}
+              </div>
+            </div>
+
+            <%= if @invitation.accepted_at do %>
+              <div class="row mb-3">
+                <div class="col-sm-3">
+                  <strong>Accepted On:</strong>
+                </div>
+                <div class="col-sm-9">
+                  {Calendar.strftime(@invitation.accepted_at, "%B %d, %Y at %I:%M %p")}
+                </div>
+              </div>
+            <% end %>
+
+            <%= if Authify.Accounts.Invitation.pending?(@invitation) do %>
+              <div class="mt-4">
+                <div class="alert alert-info">
+                  <i class="bi bi-info-circle"></i>
+                  <strong>Invitation Link:</strong> <br />
+                  <small class="font-monospace">{url(~p"/invite/#{@invitation.token}")}</small>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>
+
+<.logout_modal />

@@ -1,0 +1,257 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@current_user}
+      organization={@current_organization}
+      current_page="certificates"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Generate New Certificate</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <a
+          href={~p"/#{@current_organization.slug}/certificates"}
+          class="btn btn-outline-secondary btn-sm"
+        >
+          <i class="bi bi-arrow-left"></i> Back to Certificates
+        </a>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <.form :let={f} for={@changeset} action={~p"/#{@current_organization.slug}/certificates"}>
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">
+                <i class="bi bi-plus-circle"></i> Certificate Details
+              </h5>
+            </div>
+            <div class="card-body">
+              <%= if @changeset.action do %>
+                <div class="alert alert-danger">
+                  <h6>Oops, something went wrong! Please check the errors below.</h6>
+                </div>
+              <% end %>
+
+              <div class="mb-3">
+                <.input
+                  field={f[:name]}
+                  type="text"
+                  label="Certificate Name"
+                  placeholder="My SAML Signing Certificate"
+                  required
+                />
+                <div class="form-text">A descriptive name for this certificate</div>
+              </div>
+
+              <.bootstrap_select
+                field={f[:usage]}
+                label="Usage"
+                options={usage_options()}
+                help_text="What this certificate will be used for"
+                required
+              />
+
+              <div class="mb-3">
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="generate_new"
+                    name="certificate[generate_new]"
+                    value="true"
+                    checked
+                  />
+                  <label class="form-check-label" for="generate_new">
+                    <strong>Generate new certificate automatically</strong>
+                  </label>
+                </div>
+                <div class="form-text">
+                  Recommended: Let Authify generate a secure certificate and private key pair
+                </div>
+              </div>
+
+              <div id="manual-certificate-fields" style="display: none;">
+                <div class="alert alert-warning">
+                  <i class="bi bi-exclamation-triangle"></i>
+                  <strong>Advanced:</strong>
+                  Only use manual certificate input if you have an existing certificate that matches a private key.
+                </div>
+
+                <div class="mb-3">
+                  <.input
+                    field={f[:certificate]}
+                    type="textarea"
+                    label="Certificate (PEM Format)"
+                    rows="8"
+                  />
+                  <div class="form-text">
+                    Paste your certificate in PEM format (-----BEGIN CERTIFICATE-----)
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <.input
+                    field={f[:private_key]}
+                    type="textarea"
+                    label="Private Key (PEM Format)"
+                    rows="8"
+                  />
+                  <div class="form-text">
+                    Paste your private key in PEM format (-----BEGIN PRIVATE KEY-----)
+                  </div>
+                </div>
+
+                <div class="alert alert-info">
+                  <i class="bi bi-info-circle"></i>
+                  <strong>Note:</strong>
+                  The expiration date will be automatically extracted from your certificate.
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <.input
+                  field={f[:is_active]}
+                  type="checkbox"
+                  label="Activate immediately"
+                  checked
+                />
+                <div class="form-text">
+                  Make this certificate active for signing SAML responses
+                </div>
+              </div>
+            </div>
+            <div class="card-footer">
+              <.button type="submit" class="btn btn-primary">
+                <i class="bi bi-shield-plus"></i> Generate Certificate
+              </.button>
+              <a
+                href={~p"/#{@current_organization.slug}/certificates"}
+                class="btn btn-outline-secondary ms-2"
+              >
+                Cancel
+              </a>
+            </div>
+          </div>
+        </.form>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> Certificate Generation
+            </h6>
+          </div>
+          <div class="card-body">
+            <h6>
+              Automatic Generation <span class="badge bg-success">Recommended</span>
+            </h6>
+            <p class="small mb-3">
+              Authify will generate a 2048-bit RSA certificate with SHA-256 signing.
+              The certificate will be valid for 365 days and use your organization's name.
+            </p>
+
+            <h6>Manual Input</h6>
+            <p class="small mb-3">
+              Advanced users can provide their own certificate and private key.
+              Ensure the certificate and private key match and are in PEM format.
+            </p>
+
+            <h6>Security</h6>
+            <p class="small mb-0">
+              Private keys are encrypted using AES-256-GCM with PBKDF2 key derivation
+              before being stored in the database.
+            </p>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-shield-check"></i> Certificate Usage
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <div class="d-flex align-items-start">
+                <i class="bi bi-check-circle-fill text-success me-2 mt-1"></i>
+                <div>
+                  <strong>SAML Signing</strong>
+                  <p class="small text-muted mb-0">
+                    Signs SAML responses and assertions sent to service providers. Required for most SAML integrations.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="mb-3">
+              <div class="d-flex align-items-start">
+                <i class="bi bi-lock-fill text-primary me-2 mt-1"></i>
+                <div>
+                  <strong>SAML Encryption</strong>
+                  <p class="small text-muted mb-0">
+                    Encrypts sensitive data in SAML responses for enhanced security.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="mb-0">
+              <div class="d-flex align-items-start">
+                <i class="bi bi-key-fill text-info me-2 mt-1"></i>
+                <div>
+                  <strong>OAuth Signing</strong>
+                  <p class="small text-muted mb-0">
+                    Signs OAuth tokens and JWT responses for secure token validation.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-calendar-check"></i> Certificate Lifecycle
+            </h6>
+          </div>
+          <div class="card-body">
+            <ul class="small mb-0">
+              <li class="mb-2">
+                <strong>Before Expiration:</strong>
+                Generate a new certificate 30 days before expiry
+              </li>
+              <li class="mb-2">
+                <strong>Activation:</strong> Only one certificate can be active at a time
+              </li>
+              <li>
+                <strong>Service Providers:</strong>
+                Update SP configurations when rotating certificates
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const generateCheckbox = document.getElementById('generate_new');
+        const manualFields = document.getElementById('manual-certificate-fields');
+
+        function toggleManualFields() {
+          if (generateCheckbox.checked) {
+            manualFields.style.display = 'none';
+          } else {
+            manualFields.style.display = 'block';
+          }
+        }
+
+        generateCheckbox.addEventListener('change', toggleManualFields);
+        toggleManualFields(); // Initial state
+      });
+    </script>
+  </:main>
+</.two_column_layout>

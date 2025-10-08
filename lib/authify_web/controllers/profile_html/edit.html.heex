@@ -1,0 +1,196 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@user}
+      organization={@organization}
+      current_page="profile"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Edit Profile</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@current_organization.slug}/profile"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left"></i> Back to Profile
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-pencil"></i> Profile Information
+            </h5>
+          </div>
+          <div class="card-body">
+            <.form
+              for={@changeset}
+              action={~p"/#{@current_organization.slug}/profile"}
+              method="patch"
+              id="profile-form"
+            >
+              <%= if @changeset.action do %>
+                <div class="alert alert-danger">
+                  <p>Oops, something went wrong! Please check the errors below.</p>
+                </div>
+              <% end %>
+
+              <div class="mb-3">
+                <label for="user_first_name" class="form-label">First Name</label>
+                <input
+                  type="text"
+                  name="user[first_name]"
+                  id="user_first_name"
+                  class="form-control"
+                  value={
+                    Map.get(@changeset.changes, :first_name) ||
+                      Map.get(@changeset.data, :first_name) || ""
+                  }
+                />
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :first_name) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_last_name" class="form-label">Last Name</label>
+                <input
+                  type="text"
+                  name="user[last_name]"
+                  id="user_last_name"
+                  class="form-control"
+                  value={
+                    Map.get(@changeset.changes, :last_name) ||
+                      Map.get(@changeset.data, :last_name) || ""
+                  }
+                />
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :last_name) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_username" class="form-label">Username</label>
+                <input
+                  type="text"
+                  name="user[username]"
+                  id="user_username"
+                  class="form-control"
+                  value={
+                    Map.get(@changeset.changes, :username) ||
+                      Map.get(@changeset.data, :username) || ""
+                  }
+                />
+                <div class="form-text">
+                  Your username must be unique within this organization.
+                </div>
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :username) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_email" class="form-label">Email Address</label>
+                <input
+                  type="email"
+                  name="user[email]"
+                  id="user_email"
+                  class="form-control"
+                  value={
+                    Map.get(@changeset.changes, :email) ||
+                      Map.get(@changeset.data, :email) || ""
+                  }
+                  required
+                />
+                <div class="form-text">
+                  Changing your email address will require verification.
+                </div>
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :email) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_theme_preference" class="form-label">
+                  <i class="bi bi-palette"></i> Theme Preference
+                </label>
+                <select
+                  name="user[theme_preference]"
+                  id="user_theme_preference"
+                  class="form-select"
+                >
+                  <% current_theme =
+                    Map.get(@changeset.changes, :theme_preference) ||
+                      Map.get(@changeset.data, :theme_preference) || "auto" %>
+                  <option value="auto" selected={current_theme == "auto"}>
+                    Auto (Follow System)
+                  </option>
+                  <option value="light" selected={current_theme == "light"}>Light Mode</option>
+                  <option value="dark" selected={current_theme == "dark"}>Dark Mode</option>
+                </select>
+                <div class="form-text">
+                  Choose how Authify appears. Auto mode follows your system preference.
+                </div>
+                <%= for {msg, _} <-
+                      (Keyword.get_values(@changeset.errors, :theme_preference) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-check-circle"></i> Save Changes
+                </button>
+              </div>
+            </.form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> Profile Tips
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-2">Keep your profile up to date:</p>
+            <ul class="small mb-0">
+              <li>Use your real name for better collaboration</li>
+              <li>Keep your email address current</li>
+              <li>Changes to email require verification</li>
+              <li>All fields are optional except email</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-shield-check"></i> Password
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-2">
+              To change your password, use the dedicated password change form.
+            </p>
+            <a
+              href={~p"/#{@current_organization.slug}/profile/password"}
+              class="btn btn-outline-primary btn-sm"
+            >
+              <i class="bi bi-key"></i> Change Password
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

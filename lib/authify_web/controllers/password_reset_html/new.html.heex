@@ -1,0 +1,57 @@
+<div class="container-fluid">
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+      <div class="card shadow">
+        <div class="card-header text-center">
+          <h4 class="mb-0">Forgot Your Password?</h4>
+        </div>
+        <div class="card-body">
+          <p class="text-muted mb-4">
+            Enter your email address and we'll send you a link to reset your password.
+          </p>
+
+          <.form for={%{}} action={~p"/password_reset"} method="post" id="password-reset-form">
+            <div class="mb-3">
+              <label for="password_reset_email" class="form-label">Email Address</label>
+              <input
+                type="email"
+                name="password_reset[email]"
+                id="password_reset_email"
+                class="form-control"
+                placeholder="Enter your email address"
+                required
+                autocomplete="email"
+              />
+            </div>
+
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-envelope"></i> Send Reset Link
+              </button>
+            </div>
+          </.form>
+
+          <hr />
+
+          <div class="text-center">
+            <p class="mb-0">
+              Remember your password?
+              <a href={~p"/login"} class="text-decoration-none">
+                Sign in
+              </a>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center mt-3">
+        <small class="text-muted">
+          Don't have an account?
+          <a href={~p"/signup"} class="text-decoration-none">
+            Create an organization
+          </a>
+        </small>
+      </div>
+    </div>
+  </div>
+</div>

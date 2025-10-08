@@ -1,0 +1,207 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@user}
+      organization={@organization}
+      current_page="profile"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">My Profile</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a href={~p"/#{@current_organization.slug}/profile/edit"} class="btn btn-primary btn-sm">
+            <i class="bi bi-pencil"></i> Edit Profile
+          </a>
+          <a
+            href={~p"/#{@current_organization.slug}/profile/password"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-key"></i> Change Password
+          </a>
+          <a
+            href={~p"/#{@current_organization.slug}/profile/personal-access-tokens"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-key-fill"></i> Personal Access Tokens
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-person"></i> Profile Information
+            </h5>
+          </div>
+          <div class="card-body">
+            <dl class="row">
+              <dt class="col-sm-3">Full Name</dt>
+              <dd class="col-sm-9">
+                <%= if Authify.Accounts.User.full_name(@user) do %>
+                  {Authify.Accounts.User.full_name(@user)}
+                <% else %>
+                  <span class="text-muted">Not provided</span>
+                <% end %>
+              </dd>
+
+              <dt class="col-sm-3">First Name</dt>
+              <dd class="col-sm-9">
+                <%= if @user.first_name do %>
+                  {@user.first_name}
+                <% else %>
+                  <span class="text-muted">Not provided</span>
+                <% end %>
+              </dd>
+
+              <dt class="col-sm-3">Last Name</dt>
+              <dd class="col-sm-9">
+                <%= if @user.last_name do %>
+                  {@user.last_name}
+                <% else %>
+                  <span class="text-muted">Not provided</span>
+                <% end %>
+              </dd>
+
+              <dt class="col-sm-3">Username</dt>
+              <dd class="col-sm-9">
+                <%= if @user.username do %>
+                  <code>{@user.username}</code>
+                <% else %>
+                  <span class="text-muted">Not set</span>
+                <% end %>
+              </dd>
+
+              <dt class="col-sm-3">Email</dt>
+              <dd class="col-sm-9">
+                <code>{@user.email}</code>
+                <%= if @user.email_confirmed_at do %>
+                  <span class="badge bg-success ms-2">Verified</span>
+                <% else %>
+                  <span class="badge bg-warning ms-2">Unverified</span>
+                  <form
+                    action={~p"/#{@current_organization.slug}/profile/resend-verification"}
+                    method="post"
+                    class="d-inline ms-2"
+                  >
+                    <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                      <i class="bi bi-envelope"></i> Resend Verification Email
+                    </button>
+                  </form>
+                <% end %>
+              </dd>
+
+              <dt class="col-sm-3">Account Status</dt>
+              <dd class="col-sm-9">
+                <span class={["badge", if(@user.active, do: "bg-success", else: "bg-danger")]}>
+                  {if @user.active, do: "Active", else: "Disabled"}
+                </span>
+              </dd>
+
+              <dt class="col-sm-3">Member Since</dt>
+              <dd class="col-sm-9">
+                {Calendar.strftime(@user.inserted_at, "%B %d, %Y")}
+              </dd>
+
+              <%= if @user.email_confirmed_at do %>
+                <dt class="col-sm-3">Email Verified</dt>
+                <dd class="col-sm-9">
+                  {Calendar.strftime(@user.email_confirmed_at, "%B %d, %Y at %I:%M %p")}
+                </dd>
+              <% end %>
+            </dl>
+          </div>
+        </div>
+
+        <div class="card mt-4">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-building"></i> Organization Information
+            </h6>
+          </div>
+          <div class="card-body">
+            <%= if @user.organization do %>
+              <dl class="row">
+                <dt class="col-sm-4">Organization</dt>
+                <dd class="col-sm-8">
+                  <strong>{@user.organization.name}</strong>
+                  <br />
+                  <small class="text-muted">{@user.organization.slug}</small>
+                </dd>
+
+                <dt class="col-sm-4">Role</dt>
+                <dd class="col-sm-8">
+                  <span class={[
+                    "badge",
+                    if(@user.role == "admin", do: "bg-primary", else: "bg-secondary")
+                  ]}>
+                    {String.capitalize(@user.role)}
+                  </span>
+                </dd>
+
+                <dt class="col-sm-4">Status</dt>
+                <dd class="col-sm-8">
+                  <span class={[
+                    "badge",
+                    if(@user.active, do: "bg-success", else: "bg-secondary")
+                  ]}>
+                    {if @user.active, do: "Active", else: "Inactive"}
+                  </span>
+                </dd>
+              </dl>
+            <% else %>
+              <p class="text-muted mb-0">No organization assigned.</p>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-shield-check"></i> Account Security
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="d-grid gap-2">
+              <a
+                href={~p"/#{@current_organization.slug}/profile/password"}
+                class="btn btn-outline-primary"
+              >
+                <i class="bi bi-key"></i> Change Password
+              </a>
+            </div>
+            <hr />
+            <small class="text-muted">
+              <i class="bi bi-info-circle"></i>
+              Keep your account secure by using a strong password and updating it regularly.
+            </small>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-question-circle"></i> Need Help?
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-2">Common profile tasks:</p>
+            <ul class="small mb-0">
+              <li>Update your name and contact information</li>
+              <li>Change your password regularly</li>
+              <li>Verify your email address</li>
+              <li>Review your organization memberships</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

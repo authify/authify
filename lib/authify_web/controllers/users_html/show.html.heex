@@ -1,0 +1,332 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar user={@user} organization={@organization} current_page="users" />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">User Details</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@current_organization.slug}/users"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left"></i> Back to Users
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <!-- User Information -->
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">User Information</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <h6 class="text-muted">Full Name</h6>
+                <p>{Authify.Accounts.User.full_name(@target_user)}</p>
+              </div>
+              <div class="col-md-6">
+                <h6 class="text-muted">Email</h6>
+                <p>
+                  {@target_user.email}
+                  <%= if @target_user.email_confirmed_at do %>
+                    <span class="badge bg-success ms-2" title="Email verified">
+                      <i class="bi bi-check-circle"></i> Verified
+                    </span>
+                  <% else %>
+                    <span class="badge bg-warning ms-2" title="Email not verified">
+                      <i class="bi bi-exclamation-circle"></i> Unverified
+                    </span>
+                  <% end %>
+                </p>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6">
+                <h6 class="text-muted">Status</h6>
+                <p>
+                  <%= if @target_user.active do %>
+                    <span class="badge bg-success">
+                      <i class="bi bi-person-check"></i> Active
+                    </span>
+                  <% else %>
+                    <span class="badge bg-danger">
+                      <i class="bi bi-person-slash"></i> Disabled
+                    </span>
+                  <% end %>
+                </p>
+              </div>
+              <div class="col-md-6">
+                <h6 class="text-muted">Organization</h6>
+                <p>
+                  <%= if @target_user.organization do %>
+                    <%= if @is_global_view do %>
+                      <a
+                        href={
+                          ~p"/#{@current_organization.slug}/organizations/#{@target_user.organization.id}"
+                        }
+                        class="text-decoration-none"
+                      >
+                        {@target_user.organization.name}
+                      </a>
+                    <% else %>
+                      {@target_user.organization.name}
+                    <% end %>
+                  <% else %>
+                    <span class="text-muted">No organization</span>
+                  <% end %>
+                </p>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6">
+                <h6 class="text-muted">Role</h6>
+                <p>
+                  <span class={"badge #{if @target_user.role == "admin", do: "bg-primary", else: "bg-secondary"}"}>
+                    {String.capitalize(@target_user.role)}
+                  </span>
+                  <%= if @is_global_view and @target_user.organization && @target_user.organization.slug == "authify-global" do %>
+                    <span class="badge bg-warning ms-1">Global Admin</span>
+                  <% end %>
+                </p>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6">
+                <h6 class="text-muted">Joined</h6>
+                <p>{Calendar.strftime(@target_user.inserted_at, "%B %d, %Y at %I:%M %p")}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+<!-- Actions -->
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">Actions</h5>
+          </div>
+          <div class="card-body">
+            <%= if @is_global_view do %>
+              <!-- Global Admin Actions -->
+              <h6 class="text-muted">Global Administration</h6>
+              <div class="btn-group d-grid gap-2 mb-3">
+                <% # Check if user is in global organization
+                is_global_admin =
+                  @target_user.organization && @target_user.organization.slug == "authify-global" %>
+                <%= if is_global_admin && @target_user.id != @user.id do %>
+                  <.form
+                    for={%{}}
+                    action={
+                      ~p"/#{@current_organization.slug}/users/#{@target_user.id}/demote_global"
+                    }
+                    method="patch"
+                  >
+                    <button
+                      type="submit"
+                      class="btn btn-outline-warning btn-sm"
+                      onclick="return confirm('Are you sure you want to remove global admin privileges?')"
+                    >
+                      Remove Global Admin
+                    </button>
+                  </.form>
+                <% else %>
+                  <%= if !is_global_admin do %>
+                    <.form
+                      for={%{}}
+                      action={
+                        ~p"/#{@current_organization.slug}/users/#{@target_user.id}/promote_global"
+                      }
+                      method="patch"
+                    >
+                      <button
+                        type="submit"
+                        class="btn btn-outline-warning btn-sm"
+                        onclick="return confirm('Are you sure you want to promote this user to global admin?')"
+                      >
+                        Promote to Global Admin
+                      </button>
+                    </.form>
+                  <% end %>
+                <% end %>
+              </div>
+            <% end %>
+            
+<!-- Role Management -->
+            <h6 class="text-muted">Role Management</h6>
+            <div class="btn-group gap-2 mb-3">
+              <%= if @target_user.organization_id == @organization.id do %>
+                <%= if @target_user.role == "user" do %>
+                  <.form
+                    for={%{}}
+                    action={
+                      ~p"/#{@current_organization.slug}/users/#{@target_user.id}/role/admin"
+                    }
+                    method="patch"
+                  >
+                    <button type="submit" class="btn btn-outline-primary btn-sm">
+                      Promote to Admin
+                    </button>
+                  </.form>
+                <% else %>
+                  <%= if @target_user.id != @user.id do %>
+                    <.form
+                      for={%{}}
+                      action={
+                        ~p"/#{@current_organization.slug}/users/#{@target_user.id}/role/user"
+                      }
+                      method="patch"
+                    >
+                      <button
+                        type="submit"
+                        class="btn btn-outline-secondary btn-sm"
+                        onclick="return confirm('Are you sure you want to demote this admin to user?')"
+                      >
+                        Demote to User
+                      </button>
+                    </.form>
+                  <% else %>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary btn-sm"
+                      disabled
+                      title="You cannot demote yourself"
+                    >
+                      Demote to User
+                    </button>
+                  <% end %>
+                <% end %>
+              <% end %>
+            </div>
+            
+<!-- Security Actions -->
+            <h6 class="text-muted">Security</h6>
+            <div class="btn-group d-grid gap-2">
+              <%= if @target_user.id != @user.id do %>
+                <%= if @target_user.active do %>
+                  <.form
+                    for={%{}}
+                    action={~p"/#{@current_organization.slug}/users/#{@target_user.id}/disable"}
+                    method="patch"
+                  >
+                    <button
+                      type="submit"
+                      class="btn btn-outline-warning btn-sm"
+                      onclick="return confirm('Are you sure you want to disable this user? They will not be able to log in.')"
+                    >
+                      <i class="bi bi-person-slash"></i> Disable User
+                    </button>
+                  </.form>
+                <% else %>
+                  <.form
+                    for={%{}}
+                    action={~p"/#{@current_organization.slug}/users/#{@target_user.id}/enable"}
+                    method="patch"
+                  >
+                    <button type="submit" class="btn btn-outline-success btn-sm">
+                      <i class="bi bi-person-check"></i> Enable User
+                    </button>
+                  </.form>
+                <% end %>
+              <% else %>
+                <button
+                  type="button"
+                  class="btn btn-outline-warning btn-sm"
+                  disabled
+                  title="You cannot disable your own account"
+                >
+                  <i class="bi bi-person-slash"></i> Disable User
+                </button>
+              <% end %>
+
+              <.form
+                for={%{}}
+                action={
+                  ~p"/#{@current_organization.slug}/users/#{@target_user.id}/reset_password"
+                }
+                method="post"
+              >
+                <button
+                  type="submit"
+                  class="btn btn-outline-danger btn-sm"
+                  onclick="return confirm('Are you sure you want to force a password reset for this user?')"
+                >
+                  <i class="bi bi-key"></i> Force Password Reset
+                </button>
+              </.form>
+            </div>
+          </div>
+        </div>
+
+        <%= if @is_global_view && @target_user.organization && @target_user.organization.slug != "authify-global" do %>
+          <!-- Organization Information for Global View -->
+          <div class="card mt-3">
+            <div class="card-header">
+              <h5 class="card-title mb-0">Organization Details</h5>
+            </div>
+            <div class="card-body">
+              <h6 class="text-muted">Name</h6>
+              <p>{@target_user.organization.name}</p>
+
+              <h6 class="text-muted">Slug</h6>
+              <p><code>{@target_user.organization.slug}</code></p>
+
+              <h6 class="text-muted">Status</h6>
+              <p>
+                <%= if @target_user.organization.active do %>
+                  <span class="badge bg-success">Active</span>
+                <% else %>
+                  <span class="badge bg-danger">Inactive</span>
+                <% end %>
+              </p>
+
+              <div class="mt-3">
+                <a
+                  href={
+                    ~p"/#{@current_organization.slug}/organizations/#{@target_user.organization.id}"
+                  }
+                  class="btn btn-outline-primary btn-sm"
+                >
+                  View Organization
+                </a>
+              </div>
+            </div>
+          </div>
+        <% end %>
+        
+<!-- Recent Invitations sent by this user -->
+        <%= if not @is_global_view or @target_user.organization_id == @organization.id do %>
+          <%= if length(@invitations) > 0 do %>
+            <div class="card mt-3">
+              <div class="card-header">
+                <h5 class="card-title mb-0">Invitations Sent by This User</h5>
+              </div>
+              <div class="card-body">
+                <%= for invitation <- Enum.take(@invitations, 3) do %>
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                      <small class="text-muted">{invitation.email}</small>
+                      <br />
+                      <span class="badge bg-secondary">{invitation.role}</span>
+                    </div>
+                    <small class="text-muted">
+                      {Calendar.strftime(invitation.inserted_at, "%b %d")}
+                    </small>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>
+
+<.logout_modal />

@@ -1,0 +1,94 @@
+{
+  "version": "2.0.0",
+  "options": {
+    "env": {
+      "EXAMPLE_ENV_VAR": "test"
+    }
+  },
+  "tasks": [
+    {
+      "label": "Phoenix Server",
+      "type": "shell",
+      "command": "mix",
+      "args": ["phx.server"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^(.*):(\\d+):\\s+(warning|error):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "severity": 3,
+          "message": 4
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*Compiling.*",
+          "endsPattern": "^.*Running.*on.*"
+        }
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      }
+    },
+    {
+      "label": "Mix Test",
+      "type": "shell",
+      "command": "mix",
+      "args": ["test"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": true
+      }
+    },
+    {
+      "label": "Mix Format",
+      "type": "shell",
+      "command": "mix",
+      "args": ["format"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": false,
+        "clear": false
+      }
+    },
+    {
+      "label": "Mix Compile",
+      "type": "shell",
+      "command": "mix",
+      "args": ["compile"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": false
+      }
+    }
+  ]
+}

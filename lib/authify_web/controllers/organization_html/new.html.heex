@@ -1,0 +1,192 @@
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <div class="card shadow">
+        <div class="card-body p-5">
+          <div class="text-center mb-4">
+            <img
+              src="/images/logo-no-text.svg"
+              alt="Authify"
+              width="64"
+              height="64"
+              class="mb-3"
+            />
+            <h1 class="h3 mb-3 fw-normal">Create Your Organization</h1>
+            <p class="text-muted">
+              Get started with Authify by setting up your organization and admin account.
+            </p>
+          </div>
+
+          <.form
+            for={%{}}
+            as={:signup}
+            action={~p"/signup"}
+            method="post"
+            class="needs-validation"
+            novalidate
+          >
+            <div class="mb-4">
+              <h5 class="mb-3">Organization Details</h5>
+
+              <div class="mb-3">
+                <label for="signup_organization_name" class="form-label">Organization Name</label>
+                <input
+                  type="text"
+                  name="signup[organization][name]"
+                  id="signup_organization_name"
+                  class="form-control"
+                  placeholder="Acme Corp"
+                  value={
+                    Map.get(@organization_changeset.changes, :name) ||
+                      Map.get(@organization_changeset.data, :name)
+                  }
+                  required
+                />
+                <%= for {msg, _} <- (Keyword.get_values(@organization_changeset.errors, :name) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="signup_organization_slug" class="form-label">Organization Slug</label>
+                <input
+                  type="text"
+                  name="signup[organization][slug]"
+                  id="signup_organization_slug"
+                  class="form-control"
+                  placeholder="acme-corp"
+                  value={
+                    Map.get(@organization_changeset.changes, :slug) ||
+                      Map.get(@organization_changeset.data, :slug)
+                  }
+                  required
+                />
+                <div class="form-text">
+                  This will be used in your organization's URL: https://authify.io/acme-corp
+                </div>
+                <%= for {msg, _} <- (Keyword.get_values(@organization_changeset.errors, :slug) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <h5 class="mb-3">Admin Account</h5>
+
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label for="signup_user_first_name" class="form-label">First Name</label>
+                  <input
+                    type="text"
+                    name="signup[user][first_name]"
+                    id="signup_user_first_name"
+                    class="form-control"
+                    placeholder="John"
+                    value={
+                      Map.get(@user_changeset.changes, :first_name) ||
+                        Map.get(@user_changeset.data, :first_name)
+                    }
+                  />
+                  <%= for {msg, _} <- (Keyword.get_values(@user_changeset.errors, :first_name) || []) do %>
+                    <div class="invalid-feedback d-block">{msg}</div>
+                  <% end %>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label for="signup_user_last_name" class="form-label">Last Name</label>
+                  <input
+                    type="text"
+                    name="signup[user][last_name]"
+                    id="signup_user_last_name"
+                    class="form-control"
+                    placeholder="Doe"
+                    value={
+                      Map.get(@user_changeset.changes, :last_name) ||
+                        Map.get(@user_changeset.data, :last_name)
+                    }
+                  />
+                  <%= for {msg, _} <- (Keyword.get_values(@user_changeset.errors, :last_name) || []) do %>
+                    <div class="invalid-feedback d-block">{msg}</div>
+                  <% end %>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="signup_user_email" class="form-label">Email Address</label>
+                <input
+                  type="email"
+                  name="signup[user][email]"
+                  id="signup_user_email"
+                  class="form-control"
+                  placeholder="john@acme.com"
+                  value={
+                    Map.get(@user_changeset.changes, :email) ||
+                      Map.get(@user_changeset.data, :email)
+                  }
+                  required
+                />
+                <%= for {msg, _} <- (Keyword.get_values(@user_changeset.errors, :email) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="signup_user_password" class="form-label">Password</label>
+                <input
+                  type="password"
+                  name="signup[user][password]"
+                  id="signup_user_password"
+                  class="form-control"
+                  required
+                />
+                <div class="form-text">
+                  <small>Password must contain:</small>
+                  <ul class="mb-0" style="font-size: 0.875em;">
+                    <li>At least 8 characters</li>
+                    <li>At least one uppercase letter (A-Z)</li>
+                    <li>At least one lowercase letter (a-z)</li>
+                    <li>At least one number (0-9)</li>
+                    <li>At least one special character (!@#$%^&amp;*()_+-=[]{}|;:,.&lt;&gt;?)</li>
+                  </ul>
+                </div>
+                <%= for {msg, _} <- (Keyword.get_values(@user_changeset.errors, :password) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="signup_user_password_confirmation" class="form-label">
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  name="signup[user][password_confirmation]"
+                  id="signup_user_password_confirmation"
+                  class="form-control"
+                  required
+                />
+                <div class="form-text">
+                  <small>Please re-enter your password to confirm it matches.</small>
+                </div>
+                <%= for {msg, _} <- (Keyword.get_values(@user_changeset.errors, :password_confirmation) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+            </div>
+
+            <div class="d-grid gap-2 mt-4">
+              <button type="submit" class="btn btn-primary btn-lg">
+                Create Organization
+              </button>
+            </div>
+          </.form>
+
+          <div class="text-center mt-4">
+            <p class="text-muted small">
+              Already have an organization? <a href="/login">Sign in here</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

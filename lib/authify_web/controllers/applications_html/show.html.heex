@@ -1,0 +1,272 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@current_user}
+      organization={@organization}
+      current_page="applications"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">{@application.name}</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@current_organization.slug}/applications/#{@application}/edit"}
+            class="btn btn-primary btn-sm"
+          >
+            <i class="bi bi-pencil"></i> Edit Application
+          </a>
+          <a
+            href={~p"/#{@current_organization.slug}/applications"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left"></i> Back to Applications
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mt-4">
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">Application Information</h5>
+          </div>
+          <div class="card-body">
+            <table class="table table-borderless">
+              <tr>
+                <th style="width: 200px;">Name:</th>
+                <td>{@application.name}</td>
+              </tr>
+              <tr>
+                <th>Description:</th>
+                <td>{@application.description || "No description provided"}</td>
+              </tr>
+              <tr>
+                <th>Status:</th>
+                <td>
+                  <span class={"badge #{if @application.is_active, do: "bg-success", else: "bg-secondary"}"}>
+                    {if @application.is_active, do: "Active", else: "Inactive"}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <th>Created:</th>
+                <td>{Calendar.strftime(@application.inserted_at, "%B %d, %Y at %I:%M %p")}</td>
+              </tr>
+              <tr>
+                <th>Last Updated:</th>
+                <td>{Calendar.strftime(@application.updated_at, "%B %d, %Y at %I:%M %p")}</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="card mt-4">
+          <div class="card-header">
+            <h5 class="mb-0">OAuth Configuration</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label fw-bold">Redirect URIs</label>
+              <div class="bg-body-secondary p-3 rounded">
+                <%= for uri <- Authify.OAuth.Application.redirect_uris_list(@application) do %>
+                  <div class="mb-1"><code>{uri}</code></div>
+                <% end %>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">Scopes</label>
+              <div class="bg-body-secondary p-3 rounded">
+                <%= for scope <- Authify.OAuth.Application.scopes_list(@application) do %>
+                  <span class="badge bg-primary me-1">{scope}</span>
+                <% end %>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">Client Type</label>
+              <div class="bg-body-secondary p-3 rounded">
+                <%= case @application.client_type do %>
+                  <% "confidential" -> %>
+                    <span class="badge bg-success">
+                      <i class="bi bi-shield-lock"></i> Confidential
+                    </span>
+                    <div class="small text-muted mt-1">Web Application</div>
+                  <% "public" -> %>
+                    <span class="badge bg-info">
+                      <i class="bi bi-phone"></i> Public
+                    </span>
+                    <div class="small text-muted mt-1">SPA / Mobile App</div>
+                  <% _ -> %>
+                    <span class="text-muted">Not set</span>
+                <% end %>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">PKCE Required</label>
+              <div class="bg-body-secondary p-3 rounded">
+                <%= if Authify.OAuth.Application.requires_pkce?(@application) do %>
+                  <span class="badge bg-success">
+                    <i class="bi bi-check-circle"></i> Yes
+                  </span>
+                  <%= if @application.client_type == "public" do %>
+                    <div class="small text-muted mt-1">Enforced for public clients</div>
+                  <% end %>
+                <% else %>
+                  <span class="badge bg-secondary">
+                    <i class="bi bi-dash-circle"></i> No
+                  </span>
+                <% end %>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">Grant Types</label>
+              <div class="bg-body-secondary p-3 rounded">
+                <%= for grant_type <- Authify.OAuth.Application.grant_types_list(@application) do %>
+                  <%= case grant_type do %>
+                    <% "authorization_code" -> %>
+                      <span class="badge bg-primary me-1">
+                        <i class="bi bi-key"></i> Authorization Code
+                      </span>
+                    <% "refresh_token" -> %>
+                      <span class="badge bg-success me-1">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh Token
+                      </span>
+                    <% "client_credentials" -> %>
+                      <span class="badge bg-info me-1">
+                        <i class="bi bi-gear"></i> Client Credentials
+                      </span>
+                    <% other -> %>
+                      <span class="badge bg-secondary me-1">{other}</span>
+                  <% end %>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">Credentials</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label fw-bold">Client ID</label>
+              <div class="input-group">
+                <input
+                  type="text"
+                  class="form-control font-monospace"
+                  value={@application.client_id}
+                  readonly
+                />
+                <button
+                  class="btn btn-outline-secondary"
+                  type="button"
+                  onclick="copyToClipboard(this.previousElementSibling.value)"
+                >
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+            </div>
+
+            <%= if @application.client_type == "confidential" do %>
+              <div class="mb-3">
+                <label class="form-label fw-bold">Client Secret</label>
+                <div class="input-group">
+                  <input
+                    type="password"
+                    class="form-control font-monospace"
+                    value={@application.client_secret}
+                    readonly
+                    id="client-secret"
+                  />
+                  <button
+                    class="btn btn-outline-secondary"
+                    type="button"
+                    onclick="togglePasswordVisibility('client-secret')"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </button>
+                  <button
+                    class="btn btn-outline-secondary"
+                    type="button"
+                    onclick="copyToClipboard(document.getElementById('client-secret').value)"
+                  >
+                    <i class="bi bi-clipboard"></i>
+                  </button>
+                </div>
+                <small class="text-muted">
+                  Keep this secret secure. Do not share it publicly.
+                </small>
+              </div>
+            <% else %>
+              <div class="alert alert-info mb-0">
+                <i class="bi bi-info-circle"></i>
+                <strong>Public Client</strong>
+                <p class="mb-0 small">
+                  Public clients (SPAs, mobile apps) do not use client secrets. They must use PKCE for security.
+                </p>
+              </div>
+            <% end %>
+          </div>
+        </div>
+
+        <div class="card mt-4">
+          <div class="card-header">
+            <h5 class="mb-0">OIDC Endpoints</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-2">
+              <small class="text-muted">Authorization URL:</small>
+              <div class="font-monospace small">/{@organization.slug}/oauth/authorize</div>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted">Token URL:</small>
+              <div class="font-monospace small">/{@organization.slug}/oauth/token</div>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted">Userinfo URL:</small>
+              <div class="font-monospace small">/{@organization.slug}/oauth/userinfo</div>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted">Discovery URL:</small>
+              <div class="font-monospace small">
+                /{@organization.slug}/.well-known/openid_configuration
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>
+
+<script>
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+      // You could add a toast notification here
+    });
+  }
+
+  function togglePasswordVisibility(inputId) {
+    const input = document.getElementById(inputId);
+    const icon = event.target.querySelector('i') || event.target;
+
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.classList.remove('bi-eye');
+      icon.classList.add('bi-eye-slash');
+    } else {
+      input.type = 'password';
+      icon.classList.remove('bi-eye-slash');
+      icon.classList.add('bi-eye');
+    }
+  }
+</script>

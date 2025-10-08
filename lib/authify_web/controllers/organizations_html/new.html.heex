@@ -1,0 +1,128 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar user={@user} organization={@organization} current_page="organizations" />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Create New Organization</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@current_organization.slug}/organizations"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left"></i> Back to Organizations
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">Organization Details</h5>
+          </div>
+          <div class="card-body">
+            <.form
+              :let={f}
+              for={@changeset}
+              action={~p"/#{@current_organization.slug}/organizations"}
+              method="post"
+            >
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <.input field={f[:name]} type="text" label="Organization Name" required />
+                  <small class="form-text text-muted">
+                    The display name for this organization (e.g., "Acme Corporation")
+                  </small>
+                </div>
+                <div class="col-md-6">
+                  <.input field={f[:slug]} type="text" label="Organization Slug" required />
+                  <small class="form-text text-muted">
+                    URL-friendly identifier (e.g., "acme-corp"). Must be unique.
+                  </small>
+                </div>
+              </div>
+
+              <div class="row mb-3">
+                <div class="col-12">
+                  <div class="form-check form-switch">
+                    <.input
+                      field={f[:active]}
+                      type="checkbox"
+                      label="Active"
+                      class="form-check-input"
+                    />
+                    <small class="form-text text-muted">
+                      Inactive organizations cannot be accessed by their users.
+                    </small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-12">
+                  <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                      <i class="bi bi-plus-circle"></i> Create Organization
+                    </button>
+                    <a
+                      href={~p"/#{@current_organization.slug}/organizations"}
+                      class="btn btn-outline-secondary"
+                    >
+                      Cancel
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </.form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-header bg-info">
+            <h5 class="card-title mb-0 text-white">
+              <i class="bi bi-info-circle"></i> Organization Creation
+            </h5>
+          </div>
+          <div class="card-body">
+            <p class="mb-2">When creating a new organization:</p>
+            <ul class="mb-3">
+              <li><strong>Name</strong> - The display name shown to users</li>
+              <li><strong>Slug</strong> - Used in URLs and must be unique</li>
+              <li><strong>Active</strong> - Controls access to the organization</li>
+            </ul>
+
+            <div class="alert alert-warning" role="alert">
+              <small>
+                <strong>Note:</strong>
+                You'll need to create an admin user for this organization separately after creation.
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h5 class="card-title mb-0">Slug Guidelines</h5>
+          </div>
+          <div class="card-body">
+            <p class="mb-2 small">Organization slugs should:</p>
+            <ul class="small mb-0">
+              <li>Be lowercase</li>
+              <li>Use hyphens instead of spaces</li>
+              <li>Contain only letters, numbers, and hyphens</li>
+              <li>Start and end with a letter or number</li>
+              <li>Be memorable and descriptive</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>
+
+<.logout_modal />

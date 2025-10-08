@@ -1,0 +1,28 @@
+# ServiceMonitor for Prometheus Operator
+# This tells Prometheus to scrape metrics from each individual pod
+# instead of going through a Service (which would load-balance and miss data)
+#
+# Only apply this if you're using Prometheus Operator:
+# https://github.com/prometheus-operator/prometheus-operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: authify
+  namespace: authify
+  labels:
+    app: authify
+    # This label may need to match your Prometheus instance's serviceMonitorSelector
+    # Check your Prometheus CR for the correct label
+    release: prometheus  # Common label for Helm-installed Prometheus
+spec:
+  selector:
+    matchLabels:
+      app: authify
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+      scheme: http
+  namespaceSelector:
+    matchNames:
+      - authify

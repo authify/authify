@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme={get_theme(@conn)}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <meta name="user-theme-preference" content={get_user_theme_preference(@conn)} />
+    <.live_title default="Authify" suffix=" · Identity Management">
+      {assigns[:page_title]}
+    </.live_title>
+    <link rel="icon" type="image/svg+xml" href={~p"/favicon.svg"} />
+    <link rel="alternate icon" href={~p"/favicon.ico"} />
+    <link phx-track-static rel="stylesheet" href={~p"/assets/app.css"} />
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/app.js"}>
+    </script>
+    <script>
+      // Bootstrap 5.3 dark mode handler - runs before page render
+      (function() {
+        const userPreference = document.querySelector('meta[name="user-theme-preference"]')?.content || 'auto';
+        const htmlElement = document.documentElement;
+
+        function getPreferredTheme() {
+          if (userPreference === 'auto') {
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          return userPreference;
+        }
+
+        htmlElement.setAttribute('data-bs-theme', getPreferredTheme());
+
+        // Listen for system theme changes when in auto mode
+        if (userPreference === 'auto') {
+          window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+            htmlElement.setAttribute('data-bs-theme', e.matches ? 'dark' : 'light');
+          });
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    {@inner_content}
+    <.logout_modal />
+  </body>
+</html>

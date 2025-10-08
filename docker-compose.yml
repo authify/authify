@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: authify_dev_password
+      MYSQL_DATABASE: authify_prod
+      MYSQL_USER: authify
+      MYSQL_PASSWORD: authify_dev_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pauthify_dev_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  authify:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+      - "9568:9568"  # Metrics endpoint
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Database
+      DATABASE_URL: "ecto://authify:authify_dev_password@db/authify_prod"
+
+      # Application
+      SECRET_KEY_BASE: "CHANGE_ME_IN_PRODUCTION_use_mix_phx_gen_secret_to_generate_a_secure_key"
+      PHX_HOST: "localhost"
+      PORT: "4000"
+
+      # Pool size for database connections
+      POOL_SIZE: "10"
+
+      # Release configuration
+      RELEASE_COOKIE: "CHANGE_ME_IN_PRODUCTION_use_mix_release_init_to_generate"
+
+      # Metrics (optional)
+      ENABLE_METRICS: "true"
+
+    volumes:
+      # Optional: Mount config for runtime configuration
+      - ./config/runtime.exs:/app/config/runtime.exs:ro
+    command: >
+      sh -c "
+        /app/bin/authify eval 'Authify.Release.migrate' &&
+        /app/bin/server
+      "
+
+  # Optional: Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    profiles:
+      - monitoring
+
+  # Optional: Grafana for metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    profiles:
+      - monitoring
+
+volumes:
+  mysql_data:
+  prometheus_data:
+  grafana_data:

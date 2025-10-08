@@ -1,0 +1,133 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@current_user}
+      organization={@current_organization}
+      current_page="certificates"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Edit Certificate</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <a
+          href={~p"/#{@current_organization.slug}/certificates/#{@certificate.id}"}
+          class="btn btn-outline-secondary btn-sm"
+        >
+          <i class="bi bi-arrow-left"></i> Back to Certificate
+        </a>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <.form
+          :let={f}
+          for={@changeset}
+          action={~p"/#{@current_organization.slug}/certificates/#{@certificate.id}"}
+          method="patch"
+        >
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">
+                <i class="bi bi-pencil"></i> Certificate Details
+              </h5>
+            </div>
+            <div class="card-body">
+              <%= if @changeset.action do %>
+                <div class="alert alert-danger">
+                  <h6>Oops, something went wrong! Please check the errors below.</h6>
+                </div>
+              <% end %>
+
+              <div class="mb-3">
+                <.input field={f[:name]} type="text" label="Certificate Name" required />
+                <div class="form-text">A descriptive name for this certificate</div>
+              </div>
+
+              <.bootstrap_select
+                field={f[:usage]}
+                label="Usage"
+                options={usage_options()}
+                help_text="What this certificate will be used for"
+                required
+              />
+
+              <div class="mb-3">
+                <.input field={f[:is_active]} type="checkbox" label="Active" />
+                <div class="form-text">Whether this certificate is active for use</div>
+              </div>
+            </div>
+            <div class="card-footer">
+              <.button type="submit" class="btn btn-primary">
+                <i class="bi bi-check"></i> Update Certificate
+              </.button>
+              <a
+                href={~p"/#{@current_organization.slug}/certificates/#{@certificate.id}"}
+                class="btn btn-outline-secondary ms-2"
+              >
+                Cancel
+              </a>
+            </div>
+          </div>
+        </.form>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> Editing Notes
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-3">
+              <strong>Name:</strong> You can update the certificate name for better organization.
+            </p>
+            <p class="small mb-3">
+              <strong>Usage:</strong>
+              Change the usage type if the certificate's purpose has changed.
+            </p>
+            <p class="small mb-3">
+              <strong>Active Status:</strong>
+              Only one certificate per usage type can be active at a time.
+              Activating this certificate will deactivate others of the same usage type.
+            </p>
+            <p class="small mb-0">
+              <strong>Certificate/Key:</strong>
+              The actual certificate and private key cannot be edited.
+              Generate a new certificate if you need different cryptographic material.
+            </p>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-shield-check"></i> Current Certificate
+            </h6>
+          </div>
+          <div class="card-body">
+            <dl class="mb-0">
+              <dt>Created</dt>
+              <dd class="small text-muted">
+                {Calendar.strftime(@certificate.inserted_at, "%B %d, %Y")}
+              </dd>
+
+              <dt>Expires</dt>
+              <dd class="small text-muted">
+                {Calendar.strftime(@certificate.expires_at, "%B %d, %Y")}
+              </dd>
+
+              <dt>Current Status</dt>
+              <dd>
+                <% {status_text, badge_class} = certificate_status_badge(@certificate) %>
+                <span class={["badge", badge_class]}>{status_text}</span>
+              </dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

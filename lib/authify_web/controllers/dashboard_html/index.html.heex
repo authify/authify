@@ -1,0 +1,387 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar user={@user} organization={@organization} current_page="dashboard" />
+  </:sidebar>
+
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">
+        <%= if @organization.slug == "authify-global" do %>
+          Global Administration Dashboard
+        <% else %>
+          Dashboard
+        <% end %>
+      </h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <%= if @organization.slug == "authify-global" do %>
+            <button type="button" class="btn btn-sm btn-outline-secondary">
+              Export System Report
+            </button>
+          <% else %>
+            <button type="button" class="btn btn-sm btn-outline-secondary">Export</button>
+          <% end %>
+        </div>
+      </div>
+    </div>
+    
+<!-- Stats Cards -->
+    <%= if @organization.slug == "authify-global" do %>
+      <!-- Global Admin Stats -->
+      <div class="row mb-4">
+        <div class="col-md-6 col-lg-3">
+          <div class="card border-primary">
+            <div class="card-body">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <h6 class="card-title text-muted">Total Organizations</h6>
+                  <h3 class="card-text text-primary">{@system_stats.organization_count}</h3>
+                  <small class="text-muted">
+                    {@system_stats.active_organization_count} active
+                  </small>
+                </div>
+                <div class="align-self-center">
+                  <i class="bi bi-building text-primary" style="font-size: 2rem;"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3">
+          <div class="card border-success">
+            <div class="card-body">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <h6 class="card-title text-muted">Total Users</h6>
+                  <h3 class="card-text text-success">{@system_stats.total_users}</h3>
+                  <small class="text-muted">across all organizations</small>
+                </div>
+                <div class="align-self-center">
+                  <i class="bi bi-people text-success" style="font-size: 2rem;"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3">
+          <div class="card border-warning">
+            <div class="card-body">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <h6 class="card-title text-muted">Global Admins</h6>
+                  <h3 class="card-text text-warning">{@system_stats.super_admin_count}</h3>
+                  <small class="text-muted">system wide</small>
+                </div>
+                <div class="align-self-center">
+                  <i class="bi bi-shield-check text-warning" style="font-size: 2rem;"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3">
+          <div class="card border-info">
+            <div class="card-body">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <h6 class="card-title text-muted">System Status</h6>
+                  <h3 class="card-text text-info">Active</h3>
+                  <small class="text-muted">operational</small>
+                </div>
+                <div class="align-self-center">
+                  <i class="bi bi-check-circle text-info" style="font-size: 2rem;"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% else %>
+      <!-- Regular Organization Stats -->
+      <div class="row mb-4">
+        <div class="col-md-6 col-lg-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <h6 class="card-title text-muted">Total Users</h6>
+                  <h3 class="card-text">{@user_count}</h3>
+                </div>
+                <div class="align-self-center">
+                  <i class="bi bi-people text-primary" style="font-size: 2rem;"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <h6 class="card-title text-muted">Applications</h6>
+                  <h3 class="card-text">0</h3>
+                </div>
+                <div class="align-self-center">
+                  <i class="bi bi-app-indicator text-success" style="font-size: 2rem;"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <h6 class="card-title text-muted">Active Sessions</h6>
+                  <h3 class="card-text">1</h3>
+                </div>
+                <div class="align-self-center">
+                  <i class="bi bi-activity text-warning" style="font-size: 2rem;"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <h6 class="card-title text-muted">API Calls</h6>
+                  <h3 class="card-text">0</h3>
+                </div>
+                <div class="align-self-center">
+                  <i class="bi bi-graph-up text-info" style="font-size: 2rem;"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <%= if @organization.slug == "authify-global" do %>
+      <!-- Global Admin Management Sections -->
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">
+                <i class="bi bi-building"></i> Organization Management
+              </h5>
+            </div>
+            <div class="card-body">
+              <p class="card-text">Manage all organizations in the system.</p>
+              <div class="d-grid gap-2 d-md-flex">
+                <a
+                  href={~p"/#{@organization.slug}/organizations/new"}
+                  class="btn btn-primary btn-sm"
+                >
+                  <i class="bi bi-plus-circle"></i> Create Organization
+                </a>
+                <a
+                  href={~p"/#{@organization.slug}/organizations"}
+                  class="btn btn-outline-primary btn-sm"
+                >
+                  <i class="bi bi-list"></i> View All
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">
+                <i class="bi bi-people"></i> User Management
+              </h5>
+            </div>
+            <div class="card-body">
+              <p class="card-text">Search and manage users across all organizations.</p>
+              <div class="d-grid gap-2 d-md-flex">
+                <a href={~p"/#{@organization.slug}/users"} class="btn btn-primary btn-sm">
+                  <i class="bi bi-search"></i> Search Users
+                </a>
+                <a href={~p"/#{@organization.slug}/users"} class="btn btn-outline-warning btn-sm">
+                  <i class="bi bi-shield-check"></i> Global Admins
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">
+                <i class="bi bi-graph-up"></i> Analytics
+              </h5>
+            </div>
+            <div class="card-body">
+              <p class="card-text">View system-wide analytics and reports.</p>
+              <a href={~p"/#{@organization.slug}/analytics"} class="btn btn-info btn-sm">
+                <i class="bi bi-bar-chart"></i> View Analytics
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">
+                <i class="bi bi-tools"></i> System Maintenance
+              </h5>
+            </div>
+            <div class="card-body">
+              <p class="card-text">Perform system maintenance and cleanup tasks.</p>
+              <a href={~p"/#{@organization.slug}/maintenance"} class="btn btn-warning btn-sm">
+                <i class="bi bi-wrench"></i> Maintenance
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+<!-- Invitation Statistics for Global Admin -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">System Invitation Statistics</h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-3">
+                  <div class="card bg-body-secondary">
+                    <div class="card-body text-center">
+                      <h5 class="text-primary">{@invitation_stats.total}</h5>
+                      <small class="text-muted">Total Invitations</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card bg-body-secondary">
+                    <div class="card-body text-center">
+                      <h5 class="text-success">{@invitation_stats.accepted}</h5>
+                      <small class="text-muted">Accepted</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card bg-body-secondary">
+                    <div class="card-body text-center">
+                      <h5 class="text-warning">{@invitation_stats.pending}</h5>
+                      <small class="text-muted">Pending</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card bg-body-secondary">
+                    <div class="card-body text-center">
+                      <h5 class="text-success">
+                        {Float.round(@invitation_stats.acceptance_rate, 1)}%
+                      </h5>
+                      <small class="text-muted">Acceptance Rate</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+    
+<!-- Recent Activity -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <%= if @organization.slug == "authify-global" do %>
+                Recent Users (System-wide)
+              <% else %>
+                Recent Users
+              <% end %>
+            </h5>
+          </div>
+          <div class="card-body">
+            <%= if @user_count > 0 do %>
+              <div class="table-responsive">
+                <table class="table table-striped">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <%= if @organization.slug == "authify-global" do %>
+                        <th>Organization</th>
+                      <% end %>
+                      <th>Role</th>
+                      <th>Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <%= for user <- Enum.take(@users, 10) do %>
+                      <tr>
+                        <td>{Authify.Accounts.User.full_name(user)}</td>
+                        <td>{user.email}</td>
+                        <%= if @organization.slug == "authify-global" do %>
+                          <td>
+                            {if user.organization do
+                              user.organization.name
+                            else
+                              "No Organization"
+                            end}
+                          </td>
+                        <% end %>
+                        <td>
+                          <% # Determine badge style based on role and activity status
+                          {role, badge_class} =
+                            cond do
+                              # Inactive users get muted styling regardless of role
+                              not user.active ->
+                                {user.role, "bg-secondary text-muted"}
+
+                              # Active admin users get primary styling
+                              user.role == "admin" ->
+                                {user.role, "bg-primary"}
+
+                              # Active regular users get secondary styling
+                              true ->
+                                {user.role, "bg-secondary"}
+                            end %>
+                          <span class={"badge #{badge_class}"}>
+                            {String.capitalize(role)}{if not user.active, do: " (Inactive)"}
+                          </span>
+                        </td>
+                        <td>{Calendar.strftime(user.inserted_at, "%b %d, %Y")}</td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+            <% else %>
+              <p class="text-muted">
+                No users found. <a href={~p"/#{@organization.slug}/invitations/new"}>Invite your first user</a>.
+              </p>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>
+
+<.logout_modal />

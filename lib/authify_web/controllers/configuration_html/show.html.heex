@@ -1,0 +1,727 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@user}
+      organization={@organization}
+      current_page="organization_settings"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <div>
+        <h1 class="h2">Configuration</h1>
+        <p class="text-muted mb-0">
+          <%= if @schema_name == "global" do %>
+            System-wide settings for this Authify instance
+          <% else %>
+            Organization-specific feature settings
+          <% end %>
+        </p>
+      </div>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a href={~p"/#{@organization.slug}/settings"} class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Settings
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-sliders"></i>
+              <%= if @schema_name == "global" do %>
+                Global Settings
+              <% else %>
+                Organization Settings
+              <% end %>
+            </h5>
+          </div>
+          <div class="card-body">
+            <.form
+              for={%{}}
+              as={:settings}
+              action={~p"/#{@organization.slug}/settings/configuration"}
+              method="patch"
+            >
+              <%= if @schema_name == "global" do %>
+                <!-- Global Settings -->
+                <h6 class="border-bottom pb-2 mb-3">System Configuration</h6>
+
+                <div class="mb-4">
+                  <label for="tenant_base_domain" class="form-label">
+                    <strong>Tenant Base Domain</strong>
+                    <span class="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="tenant_base_domain"
+                    name="settings[tenant_base_domain]"
+                    value={@settings[:tenant_base_domain]}
+                    placeholder="authify.example.com"
+                    required
+                  />
+                  <small class="text-muted">
+                    Base domain for organization subdomains. Organizations are accessible at &lbrace;org-slug&rbrace;.&lbrace;tenant-base-domain&rbrace;. This setting is required and cannot be removed.
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <label for="authify_domain" class="form-label">
+                    <strong>Authify Domain</strong>
+                    <span class="text-muted">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="authify_domain"
+                    name="authify_domain"
+                    value={@authify_domain}
+                    placeholder="admin.example.com"
+                  />
+                  <small class="text-muted">
+                    Custom domain for Authify's global admin area. Leave empty to use authify-global.&lbrace;tenant-base-domain&rbrace;
+                  </small>
+                </div>
+
+                <h6 class="border-bottom pb-2 mb-3 mt-4">Application Settings</h6>
+
+                <div class="mb-4">
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      id="allow_organization_registration"
+                      name="settings[allow_organization_registration]"
+                      value="true"
+                      checked={@settings[:allow_organization_registration]}
+                    />
+                    <label class="form-check-label" for="allow_organization_registration">
+                      <strong>Allow Organization Registration</strong>
+                    </label>
+                  </div>
+                  <small class="text-muted ms-4">
+                    When enabled, new organizations can self-register. When disabled, only super admins can create organizations.
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <label for="site_name" class="form-label">
+                    <strong>Site Name</strong>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="site_name"
+                    name="settings[site_name]"
+                    value={@settings[:site_name]}
+                    placeholder="Authify"
+                  />
+                  <small class="text-muted">
+                    The name of this Authify instance displayed in the UI.
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <label for="support_email" class="form-label">
+                    <strong>Support Email</strong>
+                  </label>
+                  <input
+                    type="email"
+                    class="form-control"
+                    id="support_email"
+                    name="settings[support_email]"
+                    value={@settings[:support_email]}
+                    placeholder="support@example.com"
+                  />
+                  <small class="text-muted">
+                    Support email address shown to users.
+                  </small>
+                </div>
+              <% else %>
+                <!-- Organization Settings -->
+                <h6 class="border-bottom pb-2 mb-3">Feature Toggles</h6>
+
+                <div class="mb-4">
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      id="allow_invitations"
+                      name="settings[allow_invitations]"
+                      value="true"
+                      checked={@settings[:allow_invitations] != false}
+                    />
+                    <label class="form-check-label" for="allow_invitations">
+                      <strong>Allow Invitations</strong>
+                    </label>
+                  </div>
+                  <small class="text-muted ms-4">
+                    Allow organization admins to invite new users.
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      id="allow_saml"
+                      name="settings[allow_saml]"
+                      value="true"
+                      checked={@settings[:allow_saml] != false}
+                    />
+                    <label class="form-check-label" for="allow_saml">
+                      <strong>Enable SAML</strong>
+                    </label>
+                  </div>
+                  <small class="text-muted ms-4">
+                    Enable SAML 2.0 identity provider functionality for this organization.
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      id="allow_oauth"
+                      name="settings[allow_oauth]"
+                      value="true"
+                      checked={@settings[:allow_oauth] != false}
+                    />
+                    <label class="form-check-label" for="allow_oauth">
+                      <strong>Enable OAuth2/OIDC</strong>
+                    </label>
+                  </div>
+                  <small class="text-muted ms-4">
+                    Enable OAuth2/OIDC identity provider functionality for this organization.
+                  </small>
+                </div>
+
+                <%= if @is_super_admin and Map.has_key?(@settings, :quota_auth_rate_limit) do %>
+                  <h6 class="border-bottom pb-2 mb-3 mt-4">
+                    Rate Limit Quotas <span class="badge bg-danger ms-2">Super Admin Only</span>
+                  </h6>
+                  <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-shield-exclamation"></i>
+                    <strong>Notice:</strong>
+                    These quota settings define the maximum rate limits for this organization. They can only be modified by super administrators to prevent noisy neighbor problems in multi-tenant deployments.
+                  </div>
+
+                  <div class="row">
+                    <div class="col-md-6 mb-4">
+                      <label for="quota_auth_rate_limit" class="form-label">
+                        <strong>Authentication Quota</strong>
+                        <span class="text-danger">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        id="quota_auth_rate_limit"
+                        name="settings[quota_auth_rate_limit]"
+                        value={@settings[:quota_auth_rate_limit]}
+                        placeholder="10"
+                        min="1"
+                        required
+                      />
+                      <small class="text-muted">
+                        Maximum authentication requests per minute per IP.
+                      </small>
+                    </div>
+
+                    <div class="col-md-6 mb-4">
+                      <label for="quota_oauth_rate_limit" class="form-label">
+                        <strong>OAuth/OIDC Quota</strong>
+                        <span class="text-danger">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        id="quota_oauth_rate_limit"
+                        name="settings[quota_oauth_rate_limit]"
+                        value={@settings[:quota_oauth_rate_limit]}
+                        placeholder="60"
+                        min="1"
+                        required
+                      />
+                      <small class="text-muted">
+                        Maximum OAuth/OIDC requests per minute per IP.
+                      </small>
+                    </div>
+                  </div>
+
+                  <div class="row">
+                    <div class="col-md-6 mb-4">
+                      <label for="quota_saml_rate_limit" class="form-label">
+                        <strong>SAML Quota</strong>
+                        <span class="text-danger">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        id="quota_saml_rate_limit"
+                        name="settings[quota_saml_rate_limit]"
+                        value={@settings[:quota_saml_rate_limit]}
+                        placeholder="30"
+                        min="1"
+                        required
+                      />
+                      <small class="text-muted">
+                        Maximum SAML requests per minute per IP.
+                      </small>
+                    </div>
+
+                    <div class="col-md-6 mb-4">
+                      <label for="quota_api_rate_limit" class="form-label">
+                        <strong>API Quota</strong>
+                        <span class="text-danger">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        id="quota_api_rate_limit"
+                        name="settings[quota_api_rate_limit]"
+                        value={@settings[:quota_api_rate_limit]}
+                        placeholder="100"
+                        min="1"
+                        required
+                      />
+                      <small class="text-muted">
+                        Maximum Management API requests per minute per user/IP.
+                      </small>
+                    </div>
+                  </div>
+                <% end %>
+
+                <h6 class="border-bottom pb-2 mb-3 mt-4">Rate Limits</h6>
+                <p class="text-muted small">
+                  Configure rate limits for this organization. Leave empty to use the quota values
+                  <%= if @is_super_admin do %>
+                    (shown above)
+                  <% else %>
+                    (set by super admins)
+                  <% end %>.
+                  Values cannot exceed the quota limits.
+                </p>
+
+                <div class="row">
+                  <div class="col-md-6 mb-4">
+                    <label for="auth_rate_limit" class="form-label">
+                      <strong>Authentication Rate Limit</strong>
+                    </label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="auth_rate_limit"
+                      name="settings[auth_rate_limit]"
+                      value={@settings[:auth_rate_limit]}
+                      placeholder={
+                        if @is_super_admin,
+                          do: "#{@settings[:quota_auth_rate_limit]} (quota)",
+                          else: "Use quota"
+                      }
+                      min="1"
+                      max={if @is_super_admin, do: @settings[:quota_auth_rate_limit], else: nil}
+                    />
+                    <small class="text-muted">
+                      Auth requests per minute per IP.
+                      <%= if @is_super_admin do %>
+                        Max: {@settings[:quota_auth_rate_limit]}
+                      <% end %>
+                    </small>
+                  </div>
+
+                  <div class="col-md-6 mb-4">
+                    <label for="oauth_rate_limit" class="form-label">
+                      <strong>OAuth/OIDC Rate Limit</strong>
+                    </label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="oauth_rate_limit"
+                      name="settings[oauth_rate_limit]"
+                      value={@settings[:oauth_rate_limit]}
+                      placeholder={
+                        if @is_super_admin,
+                          do: "#{@settings[:quota_oauth_rate_limit]} (quota)",
+                          else: "Use quota"
+                      }
+                      min="1"
+                      max={if @is_super_admin, do: @settings[:quota_oauth_rate_limit], else: nil}
+                    />
+                    <small class="text-muted">
+                      OAuth/OIDC requests per minute per IP.
+                      <%= if @is_super_admin do %>
+                        Max: {@settings[:quota_oauth_rate_limit]}
+                      <% end %>
+                    </small>
+                  </div>
+                </div>
+
+                <div class="row">
+                  <div class="col-md-6 mb-4">
+                    <label for="saml_rate_limit" class="form-label">
+                      <strong>SAML Rate Limit</strong>
+                    </label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="saml_rate_limit"
+                      name="settings[saml_rate_limit]"
+                      value={@settings[:saml_rate_limit]}
+                      placeholder={
+                        if @is_super_admin,
+                          do: "#{@settings[:quota_saml_rate_limit]} (quota)",
+                          else: "Use quota"
+                      }
+                      min="1"
+                      max={if @is_super_admin, do: @settings[:quota_saml_rate_limit], else: nil}
+                    />
+                    <small class="text-muted">
+                      SAML requests per minute per IP.
+                      <%= if @is_super_admin do %>
+                        Max: {@settings[:quota_saml_rate_limit]}
+                      <% end %>
+                    </small>
+                  </div>
+
+                  <div class="col-md-6 mb-4">
+                    <label for="api_rate_limit" class="form-label">
+                      <strong>API Rate Limit</strong>
+                    </label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="api_rate_limit"
+                      name="settings[api_rate_limit]"
+                      value={@settings[:api_rate_limit]}
+                      placeholder={
+                        if @is_super_admin,
+                          do: "#{@settings[:quota_api_rate_limit]} (quota)",
+                          else: "Use quota"
+                      }
+                      min="1"
+                      max={if @is_super_admin, do: @settings[:quota_api_rate_limit], else: nil}
+                    />
+                    <small class="text-muted">
+                      Management API requests per minute per user/IP.
+                      <%= if @is_super_admin do %>
+                        Max: {@settings[:quota_api_rate_limit]}
+                      <% end %>
+                    </small>
+                  </div>
+                </div>
+
+                <h6 class="border-bottom pb-2 mb-3 mt-4">Domain Configuration</h6>
+
+                <div class="mb-4">
+                  <label for="custom_domains" class="form-label">
+                    <strong>Custom Domains (CNAMEs)</strong>
+                  </label>
+                  <textarea
+                    class="form-control font-monospace"
+                    id="custom_domains"
+                    name="custom_domains"
+                    rows="4"
+                    placeholder="auth.example.com&#10;login.example.org"
+                  ><%= @custom_domains %></textarea>
+                  <small class="text-muted">
+                    Enter one domain per line. These are custom domains that can be used to access your organization. You must configure DNS CNAME records pointing to `{@organization.slug}.{@settings[
+                      :tenant_base_domain
+                    ]}`.
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <label for="email_link_domain" class="form-label">
+                    <strong>Email Link Domain</strong>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="email_link_domain"
+                    name="settings[email_link_domain]"
+                    value={@settings[:email_link_domain]}
+                    placeholder={@organization.slug <> "." <> (@settings[:tenant_base_domain] || "example.com")}
+                  />
+                  <small class="text-muted">
+                    Domain used in email links (invitations, password reset, etc.). Must be either empty or one of the custom domains listed above. Leave empty to use the default.
+                  </small>
+                </div>
+
+                <h6 class="border-bottom pb-2 mb-3 mt-4">Email Configuration (SMTP)</h6>
+
+                <div class="mb-4">
+                  <label for="smtp_server" class="form-label">
+                    <strong>SMTP Server</strong>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="smtp_server"
+                    name="settings[smtp_server]"
+                    value={@settings[:smtp_server]}
+                    placeholder="smtp.gmail.com"
+                  />
+                  <small class="text-muted">
+                    SMTP server hostname for sending emails.
+                  </small>
+                </div>
+
+                <div class="row">
+                  <div class="col-md-6 mb-4">
+                    <label for="smtp_port" class="form-label">
+                      <strong>SMTP Port</strong>
+                    </label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="smtp_port"
+                      name="settings[smtp_port]"
+                      value={@settings[:smtp_port] || 587}
+                      placeholder="587"
+                      min="1"
+                      max="65535"
+                    />
+                    <small class="text-muted">
+                      Typically 587 (TLS), 465 (SSL), or 25 (unencrypted).
+                    </small>
+                  </div>
+
+                  <div class="col-md-6 mb-4">
+                    <div class="form-check form-switch mt-4">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        id="smtp_use_ssl"
+                        name="settings[smtp_use_ssl]"
+                        value="true"
+                        checked={@settings[:smtp_use_ssl] != false}
+                      />
+                      <label class="form-check-label" for="smtp_use_ssl">
+                        <strong>Use SSL/TLS</strong>
+                      </label>
+                    </div>
+                    <small class="text-muted ms-4 d-block">
+                      Enable SSL/TLS encryption for SMTP connection.
+                    </small>
+                  </div>
+                </div>
+
+                <div class="mb-4">
+                  <label for="smtp_username" class="form-label">
+                    <strong>SMTP Username</strong>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="smtp_username"
+                    name="settings[smtp_username]"
+                    value={@settings[:smtp_username]}
+                    placeholder="user@example.com"
+                    autocomplete="off"
+                  />
+                  <small class="text-muted">
+                    Username for SMTP authentication.
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <label for="smtp_password" class="form-label">
+                    <strong>SMTP Password</strong>
+                  </label>
+                  <input
+                    type="password"
+                    class="form-control"
+                    id="smtp_password"
+                    name="settings[smtp_password]"
+                    value={@settings[:smtp_password]}
+                    placeholder="••••••••"
+                    autocomplete="new-password"
+                  />
+                  <small class="text-muted">
+                    Password for SMTP authentication. Leave blank to keep existing password.
+                  </small>
+                </div>
+
+                <div class="row">
+                  <div class="col-md-6 mb-4">
+                    <label for="smtp_from_email" class="form-label">
+                      <strong>From Email Address</strong>
+                    </label>
+                    <input
+                      type="email"
+                      class="form-control"
+                      id="smtp_from_email"
+                      name="settings[smtp_from_email]"
+                      value={@settings[:smtp_from_email]}
+                      placeholder="noreply@example.com"
+                    />
+                    <small class="text-muted">
+                      Email address shown in the 'From' field.
+                    </small>
+                  </div>
+
+                  <div class="col-md-6 mb-4">
+                    <label for="smtp_from_name" class="form-label">
+                      <strong>From Name</strong>
+                    </label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="smtp_from_name"
+                      name="settings[smtp_from_name]"
+                      value={@settings[:smtp_from_name]}
+                      placeholder="Acme Corp"
+                    />
+                    <small class="text-muted">
+                      Name shown in the 'From' field.
+                    </small>
+                  </div>
+                </div>
+
+                <h6 class="border-bottom pb-2 mb-3 mt-4">Organization Profile</h6>
+
+                <div class="mb-4">
+                  <label for="description" class="form-label">
+                    <strong>Description</strong>
+                  </label>
+                  <textarea
+                    class="form-control"
+                    id="description"
+                    name="settings[description]"
+                    rows="3"
+                    placeholder="Brief description of your organization..."
+                  ><%= @settings[:description] %></textarea>
+                  <small class="text-muted">
+                    Optional description visible to users (max 1000 characters).
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <label for="website_url" class="form-label">
+                    <strong>Website URL</strong>
+                  </label>
+                  <input
+                    type="url"
+                    class="form-control"
+                    id="website_url"
+                    name="settings[website_url]"
+                    value={@settings[:website_url]}
+                    placeholder="https://example.com"
+                  />
+                  <small class="text-muted">
+                    Your organization's website URL.
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <label for="contact_email" class="form-label">
+                    <strong>Contact Email</strong>
+                  </label>
+                  <input
+                    type="email"
+                    class="form-control"
+                    id="contact_email"
+                    name="settings[contact_email]"
+                    value={@settings[:contact_email]}
+                    placeholder="contact@example.com"
+                  />
+                  <small class="text-muted">
+                    Public contact email for your organization.
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <label for="logo_url" class="form-label">
+                    <strong>Logo URL</strong>
+                  </label>
+                  <input
+                    type="url"
+                    class="form-control"
+                    id="logo_url"
+                    name="settings[logo_url]"
+                    value={@settings[:logo_url]}
+                    placeholder="https://example.com/logo.png"
+                  />
+                  <small class="text-muted">
+                    URL to your organization's logo image.
+                  </small>
+                </div>
+              <% end %>
+
+              <div class="d-grid">
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-check-circle"></i> Update Configuration
+                </button>
+              </div>
+            </.form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> About Configuration
+            </h6>
+          </div>
+          <div class="card-body">
+            <%= if @schema_name == "global" do %>
+              <p class="small mb-2">Global settings control system-wide behavior:</p>
+              <ul class="small mb-0">
+                <li>
+                  <strong>Tenant Base Domain</strong>
+                  - Required domain for organization subdomains
+                </li>
+                <li>
+                  <strong>Organization Registration</strong>
+                  - Controls who can create new organizations
+                </li>
+                <li><strong>Site Name</strong> - Customizes the application branding</li>
+                <li><strong>Support Email</strong> - Contact email shown to users</li>
+              </ul>
+            <% else %>
+              <p class="small mb-2">Organization configuration controls features and branding:</p>
+              <ul class="small mb-0">
+                <li>
+                  <strong>Feature Toggles</strong> - Enable/disable invitations, SAML, OAuth
+                </li>
+                <%= if @is_super_admin do %>
+                  <li>
+                    <strong>Rate Limit Quotas</strong>
+                    - Set maximum rate limits (super admin only)
+                  </li>
+                <% end %>
+                <li>
+                  <strong>Rate Limits</strong> - Configure request rate limits per endpoint type
+                </li>
+                <li>
+                  <strong>Domain Configuration</strong> - Set custom domains and email link domain
+                </li>
+                <li>
+                  <strong>Email Configuration</strong> - SMTP settings for sending emails
+                </li>
+                <li><strong>Profile</strong> - Description, website, contact info, logo</li>
+                <li>
+                  <strong>Branding</strong> - Customize your organization's public appearance
+                </li>
+              </ul>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

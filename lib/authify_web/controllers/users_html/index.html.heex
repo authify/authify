@@ -1,0 +1,255 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar user={@user} organization={@organization} current_page="users" />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">
+        <%= if @is_global_view do %>
+          Global Administrators
+        <% else %>
+          Users
+        <% end %>
+      </h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <%= unless @is_global_view do %>
+            <a
+              href={~p"/#{@current_organization.slug}/invitations/new"}
+              class="btn btn-outline-primary btn-sm"
+            >
+              <i class="bi bi-plus-circle"></i> Invite User
+            </a>
+          <% end %>
+          <%= if Authify.Accounts.User.admin?(@user, @organization.id) || Authify.Accounts.User.super_admin?(@user) do %>
+            <a href={~p"/#{@current_organization.slug}/users/new"} class="btn btn-primary btn-sm">
+              <i class="bi bi-person-plus"></i> Create User
+            </a>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <%= if @is_global_view do %>
+      <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+          <h5 class="card-title mb-0 text-dark">
+            <i class="bi bi-info-circle"></i> About Global Administrators
+          </h5>
+        </div>
+        <div class="card-body">
+          <p class="mb-2">Global administrators have system-wide access and can:</p>
+          <ul class="mb-0">
+            <li>Manage all organizations</li>
+            <li>View and manage users across organizations</li>
+            <li>Access system analytics and maintenance tools</li>
+            <li>Promote or demote other global administrators</li>
+            <li>Force password resets for any user</li>
+          </ul>
+        </div>
+      </div>
+    <% else %>
+      <p class="text-muted mb-4">
+        Manage users in your organization. Users can be invited via email or created directly.
+      </p>
+      
+<!-- Filter Toolbar -->
+      <.filter_sort_toolbar
+        base_path={~p"/#{@organization.slug}/users"}
+        current_sort={@sort}
+        current_order={@order}
+        current_search={@search}
+        sort_options={[]}
+      >
+        <:filter label="Role">
+          <select name="role" class="form-select form-select-sm">
+            <option value="" selected={@role_filter == nil || @role_filter == ""}>
+              All Roles
+            </option>
+            <option value="admin" selected={@role_filter == "admin"}>Admin</option>
+            <option value="user" selected={@role_filter == "user"}>User</option>
+          </select>
+        </:filter>
+        <:filter label="Status">
+          <select name="status" class="form-select form-select-sm">
+            <option value="" selected={@status_filter == nil || @status_filter == ""}>
+              Active Only
+            </option>
+            <option value="all" selected={@status_filter == "all"}>All Users</option>
+            <option value="false" selected={@status_filter == "false"}>Inactive Only</option>
+          </select>
+        </:filter>
+      </.filter_sort_toolbar>
+    <% end %>
+
+    <%= if @user_count == 0 do %>
+      <div class="card">
+        <div class="card-body text-center py-5">
+          <i class="bi bi-people display-4 text-muted"></i>
+          <h5 class="mt-3 text-muted">No users found</h5>
+          <p class="text-muted">
+            <%= if @is_global_view do %>
+              No global administrators found.
+            <% else %>
+              Invite your first user to get started.
+            <% end %>
+          </p>
+          <%= unless @is_global_view do %>
+            <a href={~p"/#{@current_organization.slug}/invitations/new"} class="btn btn-primary">
+              <i class="bi bi-plus-circle"></i> Invite User
+            </a>
+          <% end %>
+        </div>
+      </div>
+    <% else %>
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-list"></i>
+            <%= if @is_global_view do %>
+              Global Administrators
+            <% else %>
+              Organization Users
+            <% end %>
+          </h5>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <%= if @is_global_view do %>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Original Organization</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Joined</th>
+                  <th class="text-end">Actions</th>
+                <% else %>
+                  <.sortable_header
+                    field="first_name"
+                    label="Name"
+                    current_sort={@sort}
+                    current_order={@order}
+                    base_path={~p"/#{@organization.slug}/users"}
+                    params={
+                      %{
+                        "search" => @search,
+                        "role" => @role_filter,
+                        "status" => @status_filter
+                      }
+                    }
+                  />
+                  <.sortable_header
+                    field="email"
+                    label="Email"
+                    current_sort={@sort}
+                    current_order={@order}
+                    base_path={~p"/#{@organization.slug}/users"}
+                    params={
+                      %{
+                        "search" => @search,
+                        "role" => @role_filter,
+                        "status" => @status_filter
+                      }
+                    }
+                  />
+                  <.sortable_header
+                    field="role"
+                    label="Role"
+                    current_sort={@sort}
+                    current_order={@order}
+                    base_path={~p"/#{@organization.slug}/users"}
+                    params={
+                      %{
+                        "search" => @search,
+                        "role" => @role_filter,
+                        "status" => @status_filter
+                      }
+                    }
+                  />
+                  <th>Status</th>
+                  <.sortable_header
+                    field="inserted_at"
+                    label="Joined"
+                    current_sort={@sort}
+                    current_order={@order}
+                    base_path={~p"/#{@organization.slug}/users"}
+                    params={
+                      %{
+                        "search" => @search,
+                        "role" => @role_filter,
+                        "status" => @status_filter
+                      }
+                    }
+                  />
+                  <th class="text-end">Actions</th>
+                <% end %>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :for={user_item <- @users}>
+                <td>
+                  <div class="d-flex align-items-center">
+                    <i class="bi bi-person me-2 text-primary"></i>
+                    <div class="fw-medium">{Authify.Accounts.User.full_name(user_item)}</div>
+                  </div>
+                </td>
+                <td class="text-muted">
+                  {user_item.email}
+                  <%= if user_item.email_confirmed_at do %>
+                    <span class="badge bg-success ms-1" title="Email verified">
+                      <i class="bi bi-check-circle"></i>
+                    </span>
+                  <% else %>
+                    <span class="badge bg-warning ms-1" title="Email not verified">
+                      <i class="bi bi-exclamation-circle"></i>
+                    </span>
+                  <% end %>
+                </td>
+                <%= if @is_global_view do %>
+                  <td class="text-muted">
+                    <%= if user_item.organization do %>
+                      {user_item.organization.name}
+                    <% else %>
+                      <span class="text-muted fst-italic">No Organization</span>
+                    <% end %>
+                  </td>
+                <% end %>
+                <td>
+                  <span class={[
+                    "badge",
+                    if(user_item.role == "admin", do: "bg-primary", else: "bg-secondary")
+                  ]}>
+                    {String.capitalize(user_item.role)}
+                  </span>
+                </td>
+                <td>
+                  <%= if user_item.active do %>
+                    <span class="badge bg-success">Active</span>
+                  <% else %>
+                    <span class="badge bg-danger">Disabled</span>
+                  <% end %>
+                </td>
+                <td class="text-muted">
+                  {Calendar.strftime(user_item.inserted_at, "%b %d, %Y")}
+                </td>
+                <td class="text-end">
+                  <a
+                    href={~p"/#{@current_organization.slug}/users/#{user_item.id}"}
+                    class="btn btn-outline-primary btn-sm"
+                    title="View Details"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% end %>
+  </:main>
+</.two_column_layout>
+
+<.logout_modal />

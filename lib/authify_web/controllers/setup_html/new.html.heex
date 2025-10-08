@@ -1,0 +1,135 @@
+<.auth_layout>
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+      <div class="card shadow">
+        <div class="card-body p-5">
+          <div class="text-center mb-4">
+            <img
+              src="/images/logo-no-text.svg"
+              alt="Authify"
+              width="64"
+              height="64"
+              class="mb-3"
+            />
+            <h1 class="h3 mb-3 fw-normal">Initial System Setup</h1>
+            <p class="text-muted">
+              Welcome! No users exist in the system yet. <br />
+              Create your global administrator account to get started.
+            </p>
+          </div>
+
+          <.form for={@form} action={~p"/setup"} method="post" class="needs-validation" novalidate>
+            <div class="mb-4">
+              <h5 class="mb-3">System Configuration</h5>
+              <div class="mb-3">
+                <label for="tenant_base_domain" class="form-label">
+                  Tenant Base Domain <span class="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="tenant_base_domain"
+                  name="tenant_base_domain"
+                  value={@tenant_base_domain}
+                  placeholder="authify.example.com"
+                  required
+                />
+                <div class="form-text">
+                  Base domain for organization subdomains. Organizations will be accessible at &lbrace;org-slug&rbrace;.&lbrace;domain&rbrace;
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="authify_domain" class="form-label">
+                  Authify Domain <span class="text-muted">(Optional)</span>
+                </label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="authify_domain"
+                  name="authify_domain"
+                  value={@authify_domain}
+                  placeholder="admin.example.com"
+                />
+                <div class="form-text">
+                  Custom domain for Authify's global admin area. If not provided, Authify will be accessible at authify-global.&lbrace;tenant-base-domain&rbrace;
+                </div>
+              </div>
+            </div>
+
+            <h5 class="mb-3">Administrator Account</h5>
+            <div class="mb-3">
+              <.input
+                field={@form[:first_name]}
+                type="text"
+                label="First Name"
+                class="form-control"
+                placeholder="Enter your first name"
+                required
+              />
+            </div>
+
+            <div class="mb-3">
+              <.input
+                field={@form[:last_name]}
+                type="text"
+                label="Last Name"
+                class="form-control"
+                placeholder="Enter your last name"
+                required
+              />
+            </div>
+
+            <div class="mb-3">
+              <.input
+                field={@form[:email]}
+                type="email"
+                label="Email Address"
+                class="form-control"
+                placeholder="admin@yourcompany.com"
+                required
+              />
+              <div class="form-text">
+                This will be your login email address
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <.input
+                field={@form[:password]}
+                type="password"
+                label="Password"
+                class="form-control"
+                placeholder="Create a secure password"
+                required
+              />
+            </div>
+
+            <div class="mb-3">
+              <.input
+                field={@form[:password_confirmation]}
+                type="password"
+                label="Confirm Password"
+                class="form-control"
+                placeholder="Confirm your password"
+                required
+              />
+            </div>
+
+            <div class="d-grid">
+              <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-shield-lock me-2"></i> Create Global Admin Account
+              </button>
+            </div>
+          </.form>
+
+          <div class="text-center mt-4">
+            <p class="text-muted small">
+              This account will have full system access and can manage all organizations.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</.auth_layout>

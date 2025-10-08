@@ -1,0 +1,233 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@current_user}
+      organization={@organization}
+      current_page="application_groups"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Manage Members: {@application_group.name}</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <a
+          href={~p"/#{@current_organization.slug}/application_groups/#{@application_group}"}
+          class="btn btn-outline-secondary btn-sm"
+        >
+          <i class="bi bi-arrow-left"></i> Back to Group
+        </a>
+      </div>
+    </div>
+
+    <div class="row mt-4">
+      <!-- Users Section -->
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-people"></i> Group Users
+            </h5>
+          </div>
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              Users in this group can access all applications assigned to the group.
+            </p>
+            
+<!-- Add User Form -->
+            <form
+              method="post"
+              action={
+                ~p"/#{@organization.slug}/application_groups/#{@application_group.id}/users"
+              }
+              class="mb-4"
+            >
+              <input
+                type="hidden"
+                name="_csrf_token"
+                value={Plug.CSRFProtection.get_csrf_token()}
+              />
+              <div class="input-group">
+                <select name="user_id" class="form-select" required>
+                  <option value="">Select a user to add...</option>
+                  <%= for user <- @users do %>
+                    <option value={user.id}>
+                      {user.email} - {user.first_name} {user.last_name}
+                    </option>
+                  <% end %>
+                </select>
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-plus-circle"></i> Add
+                </button>
+              </div>
+            </form>
+            
+<!-- Current Users List -->
+            <%= if Enum.empty?(@application_group.user_application_groups) do %>
+              <div class="text-center py-4">
+                <i class="bi bi-person-x display-6 text-muted"></i>
+                <p class="text-muted mt-2">No users in this group yet</p>
+              </div>
+            <% else %>
+              <div class="list-group">
+                <%= for user_group <- @application_group.user_application_groups do %>
+                  <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                      <i class="bi bi-person-circle me-2 text-primary"></i>
+                      <span class="fw-medium">{user_group.user.email}</span>
+                      <%= if user_group.user.first_name || user_group.user.last_name do %>
+                        <br />
+                        <small class="text-muted ms-4">
+                          {user_group.user.first_name} {user_group.user.last_name}
+                        </small>
+                      <% end %>
+                    </div>
+                    <form
+                      method="post"
+                      action={
+                        ~p"/#{@organization.slug}/application_groups/#{@application_group.id}/users/#{user_group.user.id}"
+                      }
+                    >
+                      <input
+                        type="hidden"
+                        name="_csrf_token"
+                        value={Plug.CSRFProtection.get_csrf_token()}
+                      />
+                      <input type="hidden" name="_method" value="delete" />
+                      <button
+                        type="submit"
+                        class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('Remove this user from the group?')"
+                      >
+                        <i class="bi bi-x-circle"></i>
+                      </button>
+                    </form>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+      
+<!-- Applications Section -->
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-app"></i> Group Applications
+            </h5>
+          </div>
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              Applications in this group are accessible to all group members.
+            </p>
+            
+<!-- Add Application Form -->
+            <form
+              method="post"
+              action={
+                ~p"/#{@organization.slug}/application_groups/#{@application_group.id}/applications"
+              }
+              class="mb-4"
+            >
+              <input
+                type="hidden"
+                name="_csrf_token"
+                value={Plug.CSRFProtection.get_csrf_token()}
+              />
+              <div class="mb-2">
+                <label class="form-label small fw-bold">OAuth Applications</label>
+                <div class="input-group mb-2">
+                  <select name="application_id" class="form-select">
+                    <option value="">Select OAuth app...</option>
+                    <%= for app <- @oauth_apps do %>
+                      <option value={app.id}>{app.name}</option>
+                    <% end %>
+                  </select>
+                  <input type="hidden" name="application_type" value="oauth2" />
+                  <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i>
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            <form
+              method="post"
+              action={
+                ~p"/#{@organization.slug}/application_groups/#{@application_group.id}/applications"
+              }
+              class="mb-4"
+            >
+              <input
+                type="hidden"
+                name="_csrf_token"
+                value={Plug.CSRFProtection.get_csrf_token()}
+              />
+              <div class="mb-2">
+                <label class="form-label small fw-bold">SAML Service Providers</label>
+                <div class="input-group">
+                  <select name="application_id" class="form-select">
+                    <option value="">Select SAML provider...</option>
+                    <%= for sp <- @saml_providers do %>
+                      <option value={sp.id}>{sp.entity_id}</option>
+                    <% end %>
+                  </select>
+                  <input type="hidden" name="application_type" value="saml" />
+                  <button type="submit" class="btn btn-success">
+                    <i class="bi bi-plus-circle"></i>
+                  </button>
+                </div>
+              </div>
+            </form>
+            
+<!-- Current Applications List -->
+            <%= if Enum.empty?(@application_group.application_group_members) do %>
+              <div class="text-center py-4">
+                <i class="bi bi-app-indicator display-6 text-muted"></i>
+                <p class="text-muted mt-2">No applications in this group yet</p>
+              </div>
+            <% else %>
+              <div class="list-group">
+                <%= for member <- @application_group.application_group_members do %>
+                  <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                      <%= if member.application_type == "oauth2" do %>
+                        <i class="bi bi-shield-lock me-2 text-primary"></i>
+                        <span class="badge bg-primary me-2">OAuth2</span>
+                      <% else %>
+                        <i class="bi bi-diagram-3 me-2 text-success"></i>
+                        <span class="badge bg-success me-2">SAML</span>
+                      <% end %>
+                      <span class="small">ID: {member.application_id}</span>
+                    </div>
+                    <form
+                      method="post"
+                      action={
+                        ~p"/#{@organization.slug}/application_groups/#{@application_group.id}/applications/#{member.id}"
+                      }
+                    >
+                      <input
+                        type="hidden"
+                        name="_csrf_token"
+                        value={Plug.CSRFProtection.get_csrf_token()}
+                      />
+                      <input type="hidden" name="_method" value="delete" />
+                      <button
+                        type="submit"
+                        class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('Remove this application from the group?')"
+                      >
+                        <i class="bi bi-x-circle"></i>
+                      </button>
+                    </form>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

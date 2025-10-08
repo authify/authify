@@ -1,0 +1,408 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar user={@user} organization={@organization} current_page="maintenance" />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">System Maintenance</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <button type="button" class="btn btn-outline-success btn-sm" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+          </button>
+        </div>
+      </div>
+    </div>
+    
+<!-- System Health Overview -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-heart-pulse"></i> System Health
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-3">
+                <div class="card bg-info text-white">
+                  <div class="card-body">
+                    <div class="d-flex align-items-center">
+                      <div class="flex-shrink-0">
+                        <i class="bi bi-clock fs-1"></i>
+                      </div>
+                      <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold fs-5">
+                          {format_uptime(@maintenance.system_health.uptime_seconds)}
+                        </div>
+                        <div class="small">System Uptime</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                  <div class="card-body">
+                    <div class="d-flex align-items-center">
+                      <div class="flex-shrink-0">
+                        <i class="bi bi-memory fs-1"></i>
+                      </div>
+                      <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold fs-5">
+                          {@maintenance.system_health.memory_usage.used_mb} MB
+                        </div>
+                        <div class="small">Memory Used</div>
+                        <div class="small">
+                          ({format_memory_percentage(
+                            @maintenance.system_health.memory_usage.used_mb,
+                            @maintenance.system_health.memory_usage.total_mb
+                          )})
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card bg-success text-white">
+                  <div class="card-body">
+                    <div class="d-flex align-items-center">
+                      <div class="flex-shrink-0">
+                        <i class="bi bi-diagram-3 fs-1"></i>
+                      </div>
+                      <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold fs-5">
+                          {@maintenance.system_health.active_connections}
+                        </div>
+                        <div class="small">Active Connections</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card bg-warning text-dark">
+                  <div class="card-body">
+                    <div class="d-flex align-items-center">
+                      <div class="flex-shrink-0">
+                        <i class="bi bi-list-task fs-1"></i>
+                      </div>
+                      <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold fs-5">{@maintenance.system_health.pending_jobs}</div>
+                        <div class="small">Pending Jobs</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+<!-- Database Statistics -->
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-database"></i> Database Statistics
+            </h5>
+          </div>
+          <div class="card-body">
+            <h6 class="text-muted mb-3">Record Counts</h6>
+            <div class="row g-2 mb-3">
+              <div class="col-4">
+                <div class="text-center">
+                  <div class="h4 text-primary">
+                    {@maintenance.database_stats.total_records.organizations}
+                  </div>
+                  <div class="small text-muted">Organizations</div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="text-center">
+                  <div class="h4 text-info">
+                    {@maintenance.database_stats.total_records.users}
+                  </div>
+                  <div class="small text-muted">Users</div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="text-center">
+                  <div class="h4 text-success">
+                    {@maintenance.database_stats.total_records.invitations}
+                  </div>
+                  <div class="small text-muted">Invitations</div>
+                </div>
+              </div>
+            </div>
+            <hr />
+            <h6 class="text-muted mb-2">Storage Usage</h6>
+            <div class="mb-2">
+              <div class="d-flex justify-content-between">
+                <span>Total Database Size</span>
+                <span class="fw-bold">
+                  {@maintenance.database_stats.storage_usage.database_size_mb} MB
+                </span>
+              </div>
+            </div>
+            <div class="small">
+              <%= for {table, size} <- @maintenance.database_stats.storage_usage.table_sizes do %>
+                <div class="d-flex justify-content-between">
+                  <span class="text-capitalize">{table}</span>
+                  <span>{size} MB</span>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-tools"></i> Cleanup Statistics
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row g-3 mb-3">
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h4 text-warning">
+                    {@maintenance.cleanup_stats.expired_invitations}
+                  </div>
+                  <div class="small text-muted">Expired Invitations</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h4 text-danger">
+                    {@maintenance.cleanup_stats.inactive_organizations_90d}
+                  </div>
+                  <div class="small text-muted">Inactive Orgs (90d)</div>
+                </div>
+              </div>
+            </div>
+            <div class="row g-3">
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h5 text-secondary">
+                    {@maintenance.cleanup_stats.orphaned_sessions}
+                  </div>
+                  <div class="small text-muted">Orphaned Sessions</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h5 text-info">{@maintenance.cleanup_stats.temp_files}</div>
+                  <div class="small text-muted">Temp Files</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+<!-- Maintenance Actions -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-wrench"></i> Maintenance Actions
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <div class="card border-warning">
+                  <div class="card-body text-center">
+                    <i class="bi bi-envelope-x text-warning fs-1 mb-2"></i>
+                    <h6 class="card-title">Clean Expired Invitations</h6>
+                    <p class="card-text small text-muted">
+                      Remove invitations that have expired and cannot be accepted.
+                    </p>
+                    <.form
+                      for={%{}}
+                      action={~p"/#{@current_organization.slug}/maintenance/cleanup_invitations"}
+                      method="post"
+                    >
+                      <button
+                        type="submit"
+                        class="btn btn-outline-warning btn-sm w-100"
+                        onclick="return confirm('This will permanently delete all expired invitations. Continue?')"
+                      >
+                        <i class="bi bi-trash"></i> Clean Up
+                      </button>
+                    </.form>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="card border-danger">
+                  <div class="card-body text-center">
+                    <i class="bi bi-building-x text-danger fs-1 mb-2"></i>
+                    <h6 class="card-title">Clean Inactive Organizations</h6>
+                    <p class="card-text small text-muted">
+                      Remove organizations inactive for more than 90 days.
+                    </p>
+                    <.form
+                      for={%{}}
+                      action={
+                        ~p"/#{@current_organization.slug}/maintenance/cleanup_organizations"
+                      }
+                      method="post"
+                    >
+                      <button
+                        type="submit"
+                        class="btn btn-outline-danger btn-sm w-100"
+                        onclick="return confirm('This will mark old inactive organizations for cleanup. This action cannot be undone. Continue?')"
+                      >
+                        <i class="bi bi-trash"></i> Clean Up
+                      </button>
+                    </.form>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="card border-info">
+                  <div class="card-body text-center">
+                    <i class="bi bi-arrow-clockwise text-info fs-1 mb-2"></i>
+                    <h6 class="card-title">Recalculate Statistics</h6>
+                    <p class="card-text small text-muted">
+                      Refresh cached analytics and system statistics.
+                    </p>
+                    <.form
+                      for={%{}}
+                      action={~p"/#{@current_organization.slug}/maintenance/recalculate_stats"}
+                      method="post"
+                    >
+                      <button type="submit" class="btn btn-outline-info btn-sm w-100">
+                        <i class="bi bi-calculator"></i> Recalculate
+                      </button>
+                    </.form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+<!-- Recent Maintenance Logs -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-journal-text"></i> Recent Maintenance Activity
+            </h5>
+          </div>
+          <div class="card-body">
+            <%= if length(@maintenance.maintenance_logs) > 0 do %>
+              <div class="table-responsive">
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>Status</th>
+                      <th>Details</th>
+                      <th>Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <%= for log <- @maintenance.maintenance_logs do %>
+                      <tr>
+                        <td>{log.action}</td>
+                        <td>
+                          <span class={"badge #{status_badge_class(log.status)}"}>
+                            {String.capitalize(log.status)}
+                          </span>
+                        </td>
+                        <td class="text-muted small">{log.details}</td>
+                        <td class="text-muted small">
+                          {Calendar.strftime(log.timestamp, "%B %d, %Y at %I:%M %p")}
+                        </td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+            <% else %>
+              <div class="text-center text-muted py-4">
+                <i class="bi bi-journal fs-1 mb-2"></i>
+                <p>No recent maintenance activity</p>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+<!-- System Information -->
+    <div class="row mt-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> System Information
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <h6 class="text-muted">Backup Status</h6>
+                <p class="mb-3">
+                  Last backup: {Calendar.strftime(
+                    @maintenance.system_health.last_backup,
+                    "%B %d, %Y at %I:%M %p"
+                  )}
+                  <span class="badge bg-success ms-2">Up to date</span>
+                </p>
+
+                <h6 class="text-muted">Memory Details</h6>
+                <div class="progress mb-2" style="height: 20px;">
+                  <div
+                    class="progress-bar"
+                    role="progressbar"
+                    style={"width: #{format_memory_percentage(@maintenance.system_health.memory_usage.used_mb, @maintenance.system_health.memory_usage.total_mb)}"}
+                    aria-valuenow={@maintenance.system_health.memory_usage.used_mb}
+                    aria-valuemin="0"
+                    aria-valuemax={@maintenance.system_health.memory_usage.total_mb}
+                  >
+                    {format_memory_percentage(
+                      @maintenance.system_health.memory_usage.used_mb,
+                      @maintenance.system_health.memory_usage.total_mb
+                    )}
+                  </div>
+                </div>
+                <div class="small text-muted">
+                  {@maintenance.system_health.memory_usage.used_mb} MB used of {@maintenance.system_health.memory_usage.total_mb} MB total
+                  ({@maintenance.system_health.memory_usage.available_mb} MB available)
+                </div>
+              </div>
+              <div class="col-md-6">
+                <h6 class="text-muted">Maintenance Guidelines</h6>
+                <ul class="small mb-0">
+                  <li>Run expired invitation cleanup weekly</li>
+                  <li>Monitor inactive organizations monthly</li>
+                  <li>Recalculate statistics after major data changes</li>
+                  <li>Keep system memory usage below 80%</li>
+                  <li>Ensure database backups are running daily</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>
+
+<.logout_modal />

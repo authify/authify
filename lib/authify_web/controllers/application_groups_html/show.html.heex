@@ -1,0 +1,227 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@current_user}
+      organization={@organization}
+      current_page="application_groups"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">{@application_group.name}</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={
+              ~p"/#{@current_organization.slug}/application_groups/#{@application_group}/edit"
+            }
+            class="btn btn-primary btn-sm"
+          >
+            <i class="bi bi-pencil"></i> Edit Group
+          </a>
+          <a
+            href={
+              ~p"/#{@current_organization.slug}/application_groups/#{@application_group.id}/members"
+            }
+            class="btn btn-outline-primary btn-sm"
+          >
+            <i class="bi bi-people"></i> Manage Members
+          </a>
+          <a
+            href={~p"/#{@current_organization.slug}/application_groups"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left"></i> Back to Groups
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mt-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="bi bi-info-circle"></i> Group Information
+            </h5>
+          </div>
+          <div class="card-body">
+            <table class="table table-borderless mb-0">
+              <tr>
+                <th style="width: 150px;">Name:</th>
+                <td>{@application_group.name}</td>
+              </tr>
+              <tr>
+                <th>Description:</th>
+                <td>{@application_group.description || "No description provided"}</td>
+              </tr>
+              <tr>
+                <th>Status:</th>
+                <td>
+                  <span class={[
+                    "badge",
+                    if(@application_group.is_active, do: "bg-success", else: "bg-secondary")
+                  ]}>
+                    {if @application_group.is_active, do: "Active", else: "Inactive"}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <th>Created:</th>
+                <td>
+                  {Calendar.strftime(@application_group.inserted_at, "%B %d, %Y at %I:%M %p")}
+                </td>
+              </tr>
+              <tr>
+                <th>Last Updated:</th>
+                <td>
+                  {Calendar.strftime(@application_group.updated_at, "%B %d, %Y at %I:%M %p")}
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="bi bi-graph-up"></i> Statistics
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row text-center">
+              <div class="col-6">
+                <div class="p-3">
+                  <h3 class="mb-1 text-primary">
+                    {length(@application_group.user_application_groups)}
+                  </h3>
+                  <p class="text-muted mb-0 small">Users</p>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="p-3">
+                  <h3 class="mb-1 text-success">
+                    {length(@application_group.application_group_members)}
+                  </h3>
+                  <p class="text-muted mb-0 small">Applications</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mt-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+              <i class="bi bi-people"></i> Members
+            </h5>
+            <span class="badge bg-primary">
+              {length(@application_group.user_application_groups)}
+            </span>
+          </div>
+          <%= if Enum.empty?(@application_group.user_application_groups) do %>
+            <div class="card-body text-center py-4">
+              <i class="bi bi-person-x display-6 text-muted"></i>
+              <p class="text-muted mt-2 mb-0">No users assigned to this group</p>
+              <a
+                href={
+                  ~p"/#{@current_organization.slug}/application_groups/#{@application_group.id}/members"
+                }
+                class="btn btn-sm btn-primary mt-2"
+              >
+                <i class="bi bi-plus-circle"></i> Add Users
+              </a>
+            </div>
+          <% else %>
+            <div class="list-group list-group-flush">
+              <%= for user_group <- @application_group.user_application_groups do %>
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                  <div>
+                    <i class="bi bi-person-circle me-2 text-primary"></i>
+                    <span class="fw-medium">{user_group.user.email}</span>
+                    <%= if user_group.user.first_name || user_group.user.last_name do %>
+                      <br />
+                      <small class="text-muted ms-4">
+                        {user_group.user.first_name} {user_group.user.last_name}
+                      </small>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+            <div class="card-footer">
+              <a
+                href={
+                  ~p"/#{@current_organization.slug}/application_groups/#{@application_group.id}/members"
+                }
+                class="btn btn-sm btn-outline-primary"
+              >
+                <i class="bi bi-pencil"></i> Manage Members
+              </a>
+            </div>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+              <i class="bi bi-app"></i> Applications
+            </h5>
+            <span class="badge bg-success">
+              {length(@application_group.application_group_members)}
+            </span>
+          </div>
+          <%= if Enum.empty?(@application_group.application_group_members) do %>
+            <div class="card-body text-center py-4">
+              <i class="bi bi-app-indicator display-6 text-muted"></i>
+              <p class="text-muted mt-2 mb-0">No applications in this group</p>
+              <a
+                href={
+                  ~p"/#{@current_organization.slug}/application_groups/#{@application_group.id}/members"
+                }
+                class="btn btn-sm btn-success mt-2"
+              >
+                <i class="bi bi-plus-circle"></i> Add Applications
+              </a>
+            </div>
+          <% else %>
+            <div class="list-group list-group-flush">
+              <%= for member <- @application_group.application_group_members do %>
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                  <div>
+                    <%= if member.application_type == "oauth2" do %>
+                      <i class="bi bi-shield-lock me-2 text-primary"></i>
+                      <span class="badge bg-primary me-2">OAuth2</span>
+                    <% else %>
+                      <i class="bi bi-diagram-3 me-2 text-success"></i>
+                      <span class="badge bg-success me-2">SAML</span>
+                    <% end %>
+                    <span class="small text-muted">ID: {member.application_id}</span>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+            <div class="card-footer">
+              <a
+                href={
+                  ~p"/#{@current_organization.slug}/application_groups/#{@application_group.id}/members"
+                }
+                class="btn btn-sm btn-outline-success"
+              >
+                <i class="bi bi-pencil"></i> Manage Applications
+              </a>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

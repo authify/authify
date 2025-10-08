@@ -1,0 +1,652 @@
+<.form for={@changeset} action={@action} id="application-form">
+  <%= if @changeset.action do %>
+    <div class="alert alert-danger">
+      <p>Oops, something went wrong! Please check the errors below.</p>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <label for="application_name" class="form-label">Application Name</label>
+    <input
+      type="text"
+      name="application[name]"
+      id="application_name"
+      class="form-control"
+      placeholder="My OAuth App"
+      value={
+        Map.get(@changeset.changes, :name) ||
+          Map.get(@changeset.data, :name) || ""
+      }
+      required
+    />
+    <div class="form-text">A friendly name for your application</div>
+    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :name) || []) do %>
+      <div class="invalid-feedback d-block">{msg}</div>
+    <% end %>
+  </div>
+
+  <div class="mb-3">
+    <label for="application_description" class="form-label">Description</label>
+    <textarea
+      name="application[description]"
+      id="application_description"
+      class="form-control"
+      rows="3"
+      placeholder="Describe what this application does..."
+    ><%= Map.get(@changeset.changes, :description) || Map.get(@changeset.data, :description) || "" %></textarea>
+    <div class="form-text">Optional description of what this application does</div>
+    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :description) || []) do %>
+      <div class="invalid-feedback d-block">{msg}</div>
+    <% end %>
+  </div>
+
+  <div class="mb-3">
+    <label for="application_redirect_uris" class="form-label">
+      Redirect URIs <span class="text-danger">*</span>
+    </label>
+    <textarea
+      name="application[redirect_uris]"
+      id="application_redirect_uris"
+      class="form-control"
+      rows="4"
+      placeholder="https://example.com/auth/callback
+https://app.example.com/oauth/callback"
+      required
+    ><%= Map.get(@changeset.changes, :redirect_uris) || Map.get(@changeset.data, :redirect_uris) || "" %></textarea>
+    <div class="form-text">
+      <strong>One URI per line.</strong>
+      These are the allowed callback URLs where users will be redirected after authentication.
+      For security, Authify will only redirect to URLs listed here.
+    </div>
+    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :redirect_uris) || []) do %>
+      <div class="invalid-feedback d-block">{msg}</div>
+    <% end %>
+  </div>
+
+  <div class="mb-3">
+    <label for="application_scopes" class="form-label">
+      OAuth2/OIDC Scopes
+      <button
+        type="button"
+        class="btn btn-link btn-sm p-0 ms-1"
+        data-bs-toggle="modal"
+        data-bs-target="#scopesHelpModal"
+      >
+        <i class="bi bi-question-circle"></i>
+      </button>
+    </label>
+    <input
+      type="text"
+      name="application[scopes]"
+      id="application_scopes"
+      class="form-control"
+      placeholder="openid profile email"
+      value={
+        cond do
+          # If scopes is in changes (from form submission), use it
+          Map.has_key?(@changeset.changes, :scopes) ->
+            case Map.get(@changeset.changes, :scopes) do
+              scopes when is_binary(scopes) ->
+                scopes
+
+              scopes when is_list(scopes) ->
+                Enum.map(scopes, fn
+                  %Ecto.Changeset{} = cs -> Ecto.Changeset.get_field(cs, :scope)
+                  %{scope: scope} -> scope
+                  scope when is_binary(scope) -> scope
+                end)
+                |> Enum.join(" ")
+
+              _ ->
+                "openid profile email"
+            end
+
+          # If data has scopes loaded, convert from association
+          true ->
+            case Map.get(@changeset.data, :scopes) do
+              scopes when is_list(scopes) ->
+                Enum.map(scopes, fn
+                  %{scope: scope} -> scope
+                  scope when is_binary(scope) -> scope
+                end)
+                |> Enum.join(" ")
+
+              %Ecto.Association.NotLoaded{} ->
+                "openid profile email"
+
+              _ ->
+                "openid profile email"
+            end
+        end
+      }
+    />
+    <div class="form-text">
+      Space-separated list of OAuth scopes that users can grant to this application.
+      <a href="#" data-bs-toggle="modal" data-bs-target="#scopesHelpModal">
+        View available scopes
+      </a>
+    </div>
+    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :scopes) || []) do %>
+      <div class="invalid-feedback d-block">{msg}</div>
+    <% end %>
+  </div>
+
+  <div class="mb-3">
+    <label for="application_client_type" class="form-label">
+      Client Type
+      <button
+        type="button"
+        class="btn btn-link btn-sm p-0 ms-1"
+        data-bs-toggle="modal"
+        data-bs-target="#clientTypeHelpModal"
+      >
+        <i class="bi bi-question-circle"></i>
+      </button>
+    </label>
+    <select name="application[client_type]" id="application_client_type" class="form-select">
+      <option
+        value="confidential"
+        selected={
+          Map.get(@changeset.changes, :client_type, Map.get(@changeset.data, :client_type)) ==
+            "confidential"
+        }
+      >
+        Confidential (Web Application)
+      </option>
+      <option
+        value="public"
+        selected={
+          Map.get(@changeset.changes, :client_type, Map.get(@changeset.data, :client_type)) ==
+            "public"
+        }
+      >
+        Public (SPA / Mobile App)
+      </option>
+    </select>
+    <div class="form-text">
+      Confidential clients can securely store secrets. Public clients (SPAs, mobile apps) cannot.
+      <a href="#" data-bs-toggle="modal" data-bs-target="#clientTypeHelpModal">Learn more</a>
+    </div>
+    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :client_type) || []) do %>
+      <div class="invalid-feedback d-block">{msg}</div>
+    <% end %>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">
+      Grant Types
+      <button
+        type="button"
+        class="btn btn-link btn-sm p-0 ms-1"
+        data-bs-toggle="modal"
+        data-bs-target="#grantTypesHelpModal"
+      >
+        <i class="bi bi-question-circle"></i>
+      </button>
+    </label>
+    <% grant_types_str =
+      Map.get(@changeset.changes, :grant_types, Map.get(@changeset.data, :grant_types)) ||
+        "authorization_code refresh_token"
+
+    grant_types = String.split(grant_types_str, " ") |> Enum.reject(&(&1 == "")) %>
+    <div class="form-check">
+      <input
+        class="form-check-input"
+        type="checkbox"
+        name="application[grant_types][]"
+        value="authorization_code"
+        id="grant_type_auth_code"
+        checked={"authorization_code" in grant_types}
+      />
+      <label class="form-check-label" for="grant_type_auth_code">
+        <strong>Authorization Code</strong> - Standard OAuth flow for web and mobile apps
+      </label>
+    </div>
+    <div class="form-check">
+      <input
+        class="form-check-input"
+        type="checkbox"
+        name="application[grant_types][]"
+        value="refresh_token"
+        id="grant_type_refresh"
+        checked={"refresh_token" in grant_types}
+      />
+      <label class="form-check-label" for="grant_type_refresh">
+        <strong>Refresh Token</strong> - Long-lived sessions without re-authentication
+      </label>
+    </div>
+    <div class="form-text mt-2">
+      Select the OAuth2 grant types this application can use.
+      <a href="#" data-bs-toggle="modal" data-bs-target="#grantTypesHelpModal">Learn more</a>
+    </div>
+    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :grant_types) || []) do %>
+      <div class="invalid-feedback d-block">{msg}</div>
+    <% end %>
+  </div>
+
+  <div class="mb-3">
+    <div class="form-check form-switch">
+      <input
+        type="checkbox"
+        name="application[require_pkce]"
+        id="application_require_pkce"
+        class="form-check-input"
+        value="true"
+        checked={
+          Map.get(@changeset.changes, :require_pkce) ||
+            Map.get(@changeset.data, :require_pkce) || false
+        }
+      />
+      <label class="form-check-label" for="application_require_pkce">
+        Require PKCE
+        <button
+          type="button"
+          class="btn btn-link btn-sm p-0 ms-1"
+          data-bs-toggle="modal"
+          data-bs-target="#pkceHelpModal"
+        >
+          <i class="bi bi-question-circle"></i>
+        </button>
+      </label>
+      <div class="form-text">
+        PKCE prevents authorization code interception attacks. Recommended for SPAs and mobile apps.
+        <em>Automatically enabled for public clients.</em>
+      </div>
+    </div>
+    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :require_pkce) || []) do %>
+      <div class="invalid-feedback d-block">{msg}</div>
+    <% end %>
+  </div>
+
+  <div class="mb-3">
+    <div class="form-check form-switch">
+      <input
+        type="checkbox"
+        name="application[is_active]"
+        id="application_is_active"
+        class="form-check-input"
+        value="true"
+        checked={
+          Map.get(@changeset.changes, :is_active) ||
+            Map.get(@changeset.data, :is_active) || true
+        }
+      />
+      <label class="form-check-label" for="application_is_active">
+        Active
+      </label>
+      <div class="form-text">Whether this application can be used for authentication</div>
+    </div>
+    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :is_active) || []) do %>
+      <div class="invalid-feedback d-block">{msg}</div>
+    <% end %>
+  </div>
+
+  <div class="d-grid gap-2 mt-4">
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> Save Application
+    </button>
+  </div>
+</.form>
+
+<!-- OAuth Scopes Help Modal -->
+<div
+  class="modal fade"
+  id="scopesHelpModal"
+  tabindex="-1"
+  aria-labelledby="scopesHelpModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="scopesHelpModalLabel">
+          <i class="bi bi-key"></i> OAuth2/OIDC Scopes Reference
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted mb-4">
+          Scopes define what information and permissions your application can request from users.
+          Enter scopes as a space-separated list (e.g., <code>openid profile email</code>).
+        </p>
+
+        <h6 class="mt-3">
+          <i class="bi bi-shield-check text-primary"></i> OpenID Connect Scopes
+        </h6>
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th style="width: 25%;">Scope</th>
+              <th>Description</th>
+              <th style="width: 30%;">Claims Included</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>openid</code></td>
+              <td>
+                <strong>Required for OIDC.</strong>
+                Enables authentication and returns an ID token.
+              </td>
+              <td><code>sub</code> (user ID)</td>
+            </tr>
+            <tr>
+              <td><code>profile</code></td>
+              <td>Access to user's basic profile information</td>
+              <td>
+                <code>name</code>, <code>preferred_username</code>
+              </td>
+            </tr>
+            <tr>
+              <td><code>email</code></td>
+              <td>Access to user's email address</td>
+              <td>
+                <code>email</code>, <code>email_verified</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="alert alert-info mt-3">
+          <i class="bi bi-info-circle"></i>
+          <strong>Common Use Cases:</strong>
+          <ul class="mb-0 mt-2">
+            <li>
+              <strong>Web Applications (SSO):</strong>
+              <code>openid profile email</code>
+            </li>
+            <li>
+              <strong>Mobile Apps:</strong>
+              <code>openid profile</code>
+            </li>
+            <li>
+              <strong>API Access Only:</strong>
+              <code>openid</code>
+            </li>
+          </ul>
+        </div>
+
+        <div class="alert alert-warning mt-3">
+          <i class="bi bi-exclamation-triangle"></i>
+          <strong>Important:</strong>
+          Only request the scopes your application actually needs. Users will see these permissions during the consent screen.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Client Type Help Modal -->
+<div
+  class="modal fade"
+  id="clientTypeHelpModal"
+  tabindex="-1"
+  aria-labelledby="clientTypeHelpModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="clientTypeHelpModalLabel">
+          <i class="bi bi-laptop"></i> OAuth2 Client Types
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+        </button>
+      </div>
+      <div class="modal-body">
+        <h6 class="mt-3">
+          <i class="bi bi-shield-lock text-success"></i> Confidential Clients
+        </h6>
+        <p>
+          Applications that can <strong>securely store client secrets</strong>
+          (e.g., server-side web applications with backend code).
+        </p>
+        <div class="card bg-body-secondary mb-3">
+          <div class="card-body">
+            <h6 class="card-title">Examples:</h6>
+            <ul class="mb-0">
+              <li>Traditional web applications (Rails, Django, Laravel, ASP.NET)</li>
+              <li>Server-side applications with secure backend storage</li>
+              <li>Applications running on servers you control</li>
+            </ul>
+          </div>
+        </div>
+
+        <h6 class="mt-4">
+          <i class="bi bi-phone text-primary"></i> Public Clients
+        </h6>
+        <p>
+          Applications that <strong>cannot securely store secrets</strong>
+          because the code runs in environments the developer doesn't control.
+        </p>
+        <div class="card bg-body-secondary mb-3">
+          <div class="card-body">
+            <h6 class="card-title">Examples:</h6>
+            <ul class="mb-0">
+              <li>Single-Page Applications (React, Vue, Angular)</li>
+              <li>Mobile apps (iOS, Android)</li>
+              <li>Desktop applications</li>
+              <li>Any client-side JavaScript application</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="alert alert-warning mt-3">
+          <i class="bi bi-exclamation-triangle"></i>
+          <strong>Security Note:</strong>
+          Public clients <strong>must use PKCE</strong>
+          (Proof Key for Code Exchange) to secure the OAuth flow, as they cannot use client secrets.
+        </div>
+
+        <h6 class="mt-3">Comparison Table</h6>
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Confidential</th>
+              <th>Public</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Client Secret</td>
+              <td><i class="bi bi-check-circle text-success"></i> Required</td>
+              <td><i class="bi bi-x-circle text-danger"></i> Not used</td>
+            </tr>
+            <tr>
+              <td>PKCE</td>
+              <td><i class="bi bi-dash-circle text-muted"></i> Optional</td>
+              <td><i class="bi bi-check-circle text-success"></i> Required</td>
+            </tr>
+            <tr>
+              <td>Code runs on</td>
+              <td>Server (trusted)</td>
+              <td>Client (untrusted)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Grant Types Help Modal -->
+<div
+  class="modal fade"
+  id="grantTypesHelpModal"
+  tabindex="-1"
+  aria-labelledby="grantTypesHelpModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="grantTypesHelpModalLabel">
+          <i class="bi bi-arrow-left-right"></i> OAuth2 Grant Types
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted">
+          Grant types define the different OAuth2 flows your application can use to obtain access tokens.
+        </p>
+
+        <h6 class="mt-3">
+          <i class="bi bi-key text-primary"></i> Authorization Code
+        </h6>
+        <p>
+          The standard OAuth2 flow for web and mobile applications. Users are redirected to Authify to authenticate,
+          then redirected back to your app with an authorization code that can be exchanged for tokens.
+        </p>
+        <div class="card bg-body-secondary mb-3">
+          <div class="card-body">
+            <strong>Use for:</strong> Web apps, mobile apps, SPAs (with PKCE)
+          </div>
+        </div>
+
+        <h6 class="mt-3">
+          <i class="bi bi-arrow-clockwise text-success"></i> Refresh Token
+        </h6>
+        <p>
+          Allows your application to obtain new access tokens without requiring the user to re-authenticate.
+          Refresh tokens are long-lived and can be used to maintain sessions.
+        </p>
+        <div class="card bg-body-secondary mb-3">
+          <div class="card-body">
+            <strong>Use for:</strong>
+            Applications that need persistent access without repeated logins
+          </div>
+        </div>
+
+        <div class="alert alert-info mt-3">
+          <i class="bi bi-info-circle"></i>
+          <strong>Recommended Settings:</strong>
+          <ul class="mb-0 mt-2">
+            <li>
+              <strong>Web Applications:</strong> Enable both Authorization Code and Refresh Token
+            </li>
+            <li>
+              <strong>Mobile Apps:</strong>
+              Enable both Authorization Code and Refresh Token (with PKCE)
+            </li>
+            <li>
+              <strong>SPAs:</strong>
+              Enable Authorization Code (with PKCE), optionally Refresh Token
+            </li>
+          </ul>
+        </div>
+
+        <h6 class="mt-3">Token Lifetime</h6>
+        <ul class="small">
+          <li>
+            <strong>Access Tokens:</strong> 1 hour (short-lived for security)
+          </li>
+          <li>
+            <strong>Refresh Tokens:</strong> 30 days (automatically rotated on use)
+          </li>
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PKCE Help Modal -->
+<div
+  class="modal fade"
+  id="pkceHelpModal"
+  tabindex="-1"
+  aria-labelledby="pkceHelpModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="pkceHelpModalLabel">
+          <i class="bi bi-shield-check"></i> PKCE (Proof Key for Code Exchange)
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted">
+          PKCE is a security extension to OAuth2 that prevents authorization code interception attacks.
+        </p>
+
+        <h6 class="mt-3">How PKCE Works</h6>
+        <ol>
+          <li>
+            Client generates a random <code>code_verifier</code>
+          </li>
+          <li>
+            Client creates a <code>code_challenge</code> from the verifier (using SHA-256)
+          </li>
+          <li>Client sends the challenge with the authorization request</li>
+          <li>Authify stores the challenge with the authorization code</li>
+          <li>
+            Client sends the <code>code_verifier</code> when exchanging the code for tokens
+          </li>
+          <li>Authify verifies the verifier matches the stored challenge</li>
+        </ol>
+
+        <div class="alert alert-success mt-3">
+          <i class="bi bi-check-circle"></i>
+          <strong>Security Benefits:</strong>
+          <ul class="mb-0 mt-2">
+            <li>Prevents authorization code interception on insecure networks</li>
+            <li>Eliminates need for client secrets in public clients</li>
+            <li>Protects against malicious apps intercepting deep links</li>
+          </ul>
+        </div>
+
+        <div class="alert alert-warning mt-3">
+          <i class="bi bi-exclamation-triangle"></i>
+          <strong>When to Require PKCE:</strong>
+          <ul class="mb-0 mt-2">
+            <li>
+              <strong>Always</strong> for public clients (SPAs, mobile apps)
+            </li>
+            <li>
+              <strong>Recommended</strong> for all OAuth2 flows (best practice)
+            </li>
+            <li>
+              <strong>Required</strong> by OAuth 2.1 specification draft
+            </li>
+          </ul>
+        </div>
+
+        <h6 class="mt-3">Client Implementation</h6>
+        <p class="small">Most modern OAuth2 libraries support PKCE automatically:</p>
+        <ul class="small">
+          <li>
+            <strong>JavaScript:</strong>
+            <code>@auth0/auth0-spa-js</code>, <code>oidc-client-ts</code>
+          </li>
+          <li>
+            <strong>iOS:</strong> AppAuth-iOS
+          </li>
+          <li>
+            <strong>Android:</strong> AppAuth-Android
+          </li>
+          <li>
+            <strong>React Native:</strong>
+            <code>react-native-app-auth</code>
+          </li>
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

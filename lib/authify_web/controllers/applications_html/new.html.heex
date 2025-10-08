@@ -1,0 +1,107 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@current_user}
+      organization={@organization}
+      current_page="applications"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Create OAuth Application</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@current_organization.slug}/applications"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left"></i> Back to Applications
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-plus-circle"></i> Application Information
+            </h5>
+          </div>
+          <div class="card-body">
+            <.application_form
+              changeset={@changeset}
+              action={~p"/#{@current_organization.slug}/applications"}
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> OAuth 2.0 / OIDC Setup Guide
+            </h6>
+          </div>
+          <div class="card-body">
+            <h6 class="small">What You'll Need</h6>
+            <ol class="small mb-3">
+              <li>
+                <strong>Application Name</strong> - A friendly identifier
+              </li>
+              <li>
+                <strong>Redirect URI(s)</strong> - Callback URL(s) from your app
+              </li>
+              <li>
+                <strong>Scopes</strong> - Permissions your app needs
+              </li>
+            </ol>
+
+            <h6 class="small">After Creation</h6>
+            <p class="small mb-2">You'll receive:</p>
+            <ul class="small mb-3">
+              <li>
+                <strong>Client ID</strong> - Public identifier
+              </li>
+              <li>
+                <strong>Client Secret</strong> - Keep this secure!
+              </li>
+            </ul>
+
+            <h6 class="small">Common Integrations</h6>
+            <ul class="small mb-0">
+              <li>Web applications (React, Vue, etc.)</li>
+              <li>Mobile apps (iOS, Android)</li>
+              <li>Backend services (API access)</li>
+              <li>SPA applications (JavaScript)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-lightbulb"></i> Quick Tips
+            </h6>
+          </div>
+          <div class="card-body">
+            <ul class="small mb-0">
+              <li class="mb-2">
+                <strong>Use HTTPS:</strong> Always use HTTPS for redirect URIs in production
+              </li>
+              <li class="mb-2">
+                <strong>Minimal Scopes:</strong> Only request scopes your app actually needs
+              </li>
+              <li>
+                <strong>Test First:</strong>
+                Test with <code>localhost</code>
+                URLs before deploying
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

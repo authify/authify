@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: authify-external
+  namespace: authify
+  annotations:
+    # NGINX ingress controller annotations
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+    # cert-manager annotations for automatic TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+    # Rate limiting (optional)
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - auth.example.com  # Change this to your domain
+      secretName: authify-tls
+  rules:
+    - host: auth.example.com  # Change this to your domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: authify-external
+                port:
+                  number: 80

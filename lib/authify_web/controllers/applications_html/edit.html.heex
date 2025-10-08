@@ -1,0 +1,60 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@current_user}
+      organization={@organization}
+      current_page="applications"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Edit {@application.name}</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@current_organization.slug}/applications/#{@application}"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left"></i> Back to Application
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-pencil"></i> Edit Application
+            </h5>
+          </div>
+          <div class="card-body">
+            <.application_form
+              changeset={@changeset}
+              action={~p"/#{@current_organization.slug}/applications/#{@application}"}
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-exclamation-triangle"></i> Important Notes
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-2">When editing:</p>
+            <ul class="small mb-0">
+              <li>Client ID and secret cannot be changed</li>
+              <li>Changing redirect URIs may break existing integrations</li>
+              <li>Removing scopes will revoke access for those permissions</li>
+              <li>Deactivating will prevent new authentications</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

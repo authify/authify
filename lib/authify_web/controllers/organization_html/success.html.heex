@@ -1,0 +1,55 @@
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <div class="card shadow">
+        <div class="card-body p-5 text-center">
+          <div class="mb-4">
+            <div class="display-1 text-success mb-3">✓</div>
+            <h1 class="h3 mb-3 fw-normal">Welcome to Authify!</h1>
+            <p class="lead">
+              Your organization "<strong><%= @organization.name %></strong>" has been created successfully.
+            </p>
+          </div>
+
+          <div class="mb-4">
+            <div class="row text-start">
+              <div class="col-12">
+                <h5>Next Steps:</h5>
+                <ul class="list-unstyled">
+                  <li class="mb-2">
+                    <i class="text-primary">1.</i> Set up your organization settings
+                  </li>
+                  <li class="mb-2">
+                    <i class="text-primary">2.</i> Invite team members to join
+                  </li>
+                  <li class="mb-2">
+                    <i class="text-primary">3.</i> Create your first OAuth application
+                  </li>
+                  <li class="mb-2">
+                    <i class="text-primary">4.</i> Configure your authentication flows
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-grid gap-2">
+            <a href="/login" class="btn btn-primary btn-lg">
+              Sign In to Your Account
+            </a>
+            <a href="/signup" class="btn btn-outline-secondary">
+              Create Another Organization
+            </a>
+          </div>
+
+          <div class="mt-4 p-3 bg-body-secondary rounded">
+            <small class="text-muted">
+              <strong>Your organization URL:</strong> <br />
+              <code>https://authify.io/{@organization.slug}</code>
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

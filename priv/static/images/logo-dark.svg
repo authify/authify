@@ -1,0 +1,27 @@
+<svg width="200" height="100" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cardGradientDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <filter id="shadowDark">
+      <feDropShadow dx="2" dy="2" stdDeviation="4" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  
+  <!-- ID Card -->
+  <g filter="url(#shadowDark)">
+    <rect x="4" y="4" width="64" height="84" rx="6" fill="url(#cardGradientDark)" stroke="#475569" stroke-width="1.5" />
+    <circle cx="36" cy="12" r="3" fill="#334155" stroke="#64748b" stroke-width="1" />
+    <rect x="16" y="22" width="40" height="28" rx="3" fill="#1e3a5f" />
+    <circle cx="36" cy="32" r="6" fill="#60a5fa" opacity="0.5" />
+    <path d="M28 42 Q32 38 36 38 Q40 38 44 42 L44 50 L28 50 Z" fill="#60a5fa" opacity="0.5" />
+    <rect x="16" y="56" width="40" height="3" rx="1.5" fill="#60a5fa" opacity="0.7" />
+    <rect x="16" y="62" width="28" height="2.5" rx="1.25" fill="#cbd5e1" opacity="0.4" />
+    <rect x="16" y="68" width="32" height="2.5" rx="1.25" fill="#cbd5e1" opacity="0.4" />
+    <rect x="16" y="78" width="12" height="6" rx="1" fill="#60a5fa" opacity="0.4" />
+  </g>
+  
+  <!-- Text -->
+  <text x="80" y="55" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#f8fafc">Authify</text>
+</svg>

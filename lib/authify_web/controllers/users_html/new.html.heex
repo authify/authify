@@ -1,0 +1,219 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar user={@current_user} organization={@organization} current_page="users" />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Create User</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@current_organization.slug}/users"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left"></i> Back to Users
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-person-plus"></i> User Information
+            </h5>
+          </div>
+          <div class="card-body">
+            <.form
+              for={@changeset}
+              action={~p"/#{@current_organization.slug}/users"}
+              id="user-form"
+            >
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="user_first_name" class="form-label">First Name</label>
+                    <input
+                      type="text"
+                      name="user[first_name]"
+                      id="user_first_name"
+                      class="form-control"
+                      placeholder="John"
+                      value={
+                        Map.get(@changeset.changes, :first_name) ||
+                          Map.get(@changeset.data, :first_name) || ""
+                      }
+                      required
+                    />
+                    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :first_name) || []) do %>
+                      <div class="invalid-feedback d-block">{msg}</div>
+                    <% end %>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="user_last_name" class="form-label">Last Name</label>
+                    <input
+                      type="text"
+                      name="user[last_name]"
+                      id="user_last_name"
+                      class="form-control"
+                      placeholder="Doe"
+                      value={
+                        Map.get(@changeset.changes, :last_name) ||
+                          Map.get(@changeset.data, :last_name) || ""
+                      }
+                      required
+                    />
+                    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :last_name) || []) do %>
+                      <div class="invalid-feedback d-block">{msg}</div>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_email" class="form-label">Email Address</label>
+                <input
+                  type="email"
+                  name="user[email]"
+                  id="user_email"
+                  class="form-control"
+                  placeholder="john@example.com"
+                  value={
+                    Map.get(@changeset.changes, :email) || Map.get(@changeset.data, :email) || ""
+                  }
+                  required
+                />
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :email) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="user_password" class="form-label">Password</label>
+                    <input
+                      type="password"
+                      name="user[password]"
+                      id="user_password"
+                      class="form-control"
+                      required
+                    />
+                    <div class="form-text">
+                      <small>Password must contain:</small>
+                      <ul class="mb-0" style="font-size: 0.875em;">
+                        <li>At least 8 characters</li>
+                        <li>At least one uppercase letter (A-Z)</li>
+                        <li>At least one lowercase letter (a-z)</li>
+                        <li>At least one number (0-9)</li>
+                        <li>
+                          At least one special character (!@#$%^&amp;*()_+-=[]{}|;:,.&lt;&gt;?)
+                        </li>
+                      </ul>
+                    </div>
+                    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :password) || []) do %>
+                      <div class="invalid-feedback d-block">{msg}</div>
+                    <% end %>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="user_password_confirmation" class="form-label">
+                      Confirm Password
+                    </label>
+                    <input
+                      type="password"
+                      name="user[password_confirmation]"
+                      id="user_password_confirmation"
+                      class="form-control"
+                      required
+                    />
+                    <div class="form-text">
+                      <small>Please re-enter your password to confirm it matches.</small>
+                    </div>
+                    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :password_confirmation) || []) do %>
+                      <div class="invalid-feedback d-block">{msg}</div>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_role" class="form-label">Role</label>
+                <select name="user[role]" id="user_role" class="form-select">
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <div class="form-text">
+                  <small>
+                    <strong>User:</strong>
+                    Standard access to organization features<br />
+                    <strong>Admin:</strong>
+                    Can manage organization settings and invite/manage users
+                  </small>
+                </div>
+              </div>
+
+              <div class="d-grid gap-2 mt-4">
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-person-plus"></i> Create User
+                </button>
+              </div>
+            </.form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> About Direct User Creation
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-2">Creating a user directly:</p>
+            <ul class="small mb-0">
+              <li>Bypasses the invitation process</li>
+              <li>User is immediately active</li>
+              <li>User can log in right away</li>
+              <li>You set their initial password</li>
+              <li>User can change password after login</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-shield-check"></i> Role Permissions
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <strong class="text-primary">User Role</strong>
+              <ul class="small mb-0 mt-1">
+                <li>Access organization dashboard</li>
+                <li>View organization information</li>
+                <li>Update own profile</li>
+              </ul>
+            </div>
+            <div>
+              <strong class="text-warning">Admin Role</strong>
+              <ul class="small mb-0 mt-1">
+                <li>All user permissions</li>
+                <li>Invite and manage users</li>
+                <li>Update organization settings</li>
+                <li>Create users directly</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

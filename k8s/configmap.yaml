@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authify-config
+  namespace: authify
+data:
+  PHX_HOST: "auth.example.com"  # Change this to your domain
+  PORT: "4000"
+  POOL_SIZE: "10"
+  ENABLE_METRICS: "true"
+
+  # Clustering configuration for libcluster
+  RELEASE_NAME: "authify"
+  RELEASE_NAMESPACE: "authify"
+  RELEASE_NODE: "authify"

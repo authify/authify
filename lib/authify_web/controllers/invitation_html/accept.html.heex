@@ -1,0 +1,124 @@
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-header text-center">
+          <h4 class="mb-0">Accept Invitation</h4>
+        </div>
+        <div class="card-body">
+          <div class="text-center mb-4">
+            <i class="bi bi-envelope-check text-primary" style="font-size: 3rem;"></i>
+            <h5 class="mt-3">You've been invited to join</h5>
+            <h6 class="text-muted">{@invitation.organization.name}</h6>
+            <p class="text-muted">
+              You'll be joining as a <strong>{String.capitalize(@invitation.role)}</strong>
+            </p>
+          </div>
+
+          <.form
+            :let={f}
+            for={@changeset}
+            action={~p"/invite/#{@invitation.token}/accept"}
+            method="post"
+          >
+            <div class="mb-3">
+              <label for="user_first_name" class="form-label">First Name</label>
+              <.input
+                field={f[:first_name]}
+                type="text"
+                class="form-control"
+                placeholder="John"
+                required
+              />
+            </div>
+
+            <div class="mb-3">
+              <label for="user_last_name" class="form-label">Last Name</label>
+              <.input
+                field={f[:last_name]}
+                type="text"
+                class="form-control"
+                placeholder="Doe"
+                required
+              />
+            </div>
+
+            <div class="mb-3">
+              <label for="user_username" class="form-label">Preferred Username</label>
+              <.input
+                field={f[:username]}
+                type="text"
+                class="form-control"
+                placeholder="johndoe"
+                required
+              />
+              <div class="form-text">
+                Choose a username that will be unique within the organization. If it's already taken, we'll suggest an alternative.
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="user_email" class="form-label">Email Address</label>
+              <input
+                type="email"
+                class="form-control"
+                value={@invitation.email}
+                disabled
+              />
+              <div class="form-text">
+                This email cannot be changed as it's tied to your invitation.
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="user_password" class="form-label">Password</label>
+              <.input
+                field={f[:password]}
+                type="password"
+                class="form-control"
+                placeholder="Choose a secure password"
+                required
+              />
+              <div class="form-text">
+                <small>Password must contain:</small>
+                <ul class="mb-0" style="font-size: 0.875em;">
+                  <li>At least 8 characters</li>
+                  <li>At least one uppercase letter (A-Z)</li>
+                  <li>At least one lowercase letter (a-z)</li>
+                  <li>At least one number (0-9)</li>
+                  <li>At least one special character (!@#$%^&amp;*()_+-=[]{}|;:,.&lt;&gt;?)</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="user_password_confirmation" class="form-label">Confirm Password</label>
+              <.input
+                field={f[:password_confirmation]}
+                type="password"
+                class="form-control"
+                placeholder="Confirm your password"
+                required
+              />
+            </div>
+
+            <div class="d-grid gap-2 mt-4">
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-circle"></i> Accept Invitation & Create Account
+              </button>
+              <a href="/" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+          </.form>
+        </div>
+        <div class="card-footer text-center text-muted">
+          <small>
+            Invited by {Authify.Accounts.User.full_name(@invitation.invited_by)} on {Calendar.strftime(
+              @invitation.inserted_at,
+              "%b %d, %Y"
+            )}
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,209 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@current_user}
+      organization={@organization}
+      current_page="saml_providers"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">{@service_provider.name}</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@current_organization.slug}/saml_providers"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left"></i> Back to SAML Providers
+          </a>
+          <a
+            href={~p"/#{@current_organization.slug}/saml_providers/#{@service_provider.id}/edit"}
+            class="btn btn-primary btn-sm"
+          >
+            <i class="bi bi-pencil"></i> Edit
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-shield-check"></i> Service Provider Details
+            </h5>
+          </div>
+          <div class="card-body">
+            <dl class="row">
+              <dt class="col-sm-3">Name</dt>
+              <dd class="col-sm-9">{@service_provider.name}</dd>
+
+              <dt class="col-sm-3">Entity ID</dt>
+              <dd class="col-sm-9">
+                <code>{@service_provider.entity_id}</code>
+              </dd>
+
+              <dt class="col-sm-3">ACS URL</dt>
+              <dd class="col-sm-9">
+                <code>{@service_provider.acs_url}</code>
+              </dd>
+
+              <%= if @service_provider.sls_url do %>
+                <dt class="col-sm-3">SLS URL</dt>
+                <dd class="col-sm-9">
+                  <code>{@service_provider.sls_url}</code>
+                </dd>
+              <% end %>
+
+              <dt class="col-sm-3">Status</dt>
+              <dd class="col-sm-9">
+                <span class={[
+                  "badge",
+                  if(@service_provider.is_active, do: "bg-success", else: "bg-secondary")
+                ]}>
+                  {if @service_provider.is_active, do: "Active", else: "Inactive"}
+                </span>
+              </dd>
+
+              <dt class="col-sm-3">Sign Assertions</dt>
+              <dd class="col-sm-9">
+                <span class={[
+                  "badge",
+                  if(@service_provider.sign_assertions, do: "bg-success", else: "bg-secondary")
+                ]}>
+                  {if @service_provider.sign_assertions, do: "Yes", else: "No"}
+                </span>
+              </dd>
+
+              <dt class="col-sm-3">Require Signed Requests</dt>
+              <dd class="col-sm-9">
+                <span class={[
+                  "badge",
+                  if(@service_provider.sign_requests, do: "bg-success", else: "bg-secondary")
+                ]}>
+                  {if @service_provider.sign_requests, do: "Yes", else: "No"}
+                </span>
+              </dd>
+
+              <dt class="col-sm-3">Created</dt>
+              <dd class="col-sm-9">
+                {Calendar.strftime(@service_provider.inserted_at, "%B %d, %Y at %I:%M %p")}
+              </dd>
+            </dl>
+          </div>
+        </div>
+
+        <%= if @service_provider.certificate do %>
+          <div class="card mt-4">
+            <div class="card-header">
+              <h6 class="card-title mb-0">
+                <i class="bi bi-file-earmark-lock"></i> SP Certificate
+              </h6>
+            </div>
+            <div class="card-body">
+              <pre class="bg-body-secondary p-3 small"><%= @service_provider.certificate %></pre>
+            </div>
+          </div>
+        <% end %>
+
+        <div class="card mt-4">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-gear"></i> Attribute Mapping
+            </h6>
+          </div>
+          <div class="card-body">
+            <pre class="bg-body-secondary p-3 small"><%= @service_provider.attribute_mapping %></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-link-45deg"></i> Integration URLs
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label small fw-bold">SAML Metadata URL</label>
+              <div class="input-group input-group-sm">
+                <input
+                  type="text"
+                  class="form-control font-monospace small"
+                  value={url(~p"/#{@current_organization.slug}/saml/metadata")}
+                  readonly
+                />
+                <button
+                  class="btn btn-outline-secondary"
+                  type="button"
+                  onclick="navigator.clipboard.writeText(this.previousElementSibling.value)"
+                >
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small fw-bold">SSO URL</label>
+              <div class="input-group input-group-sm">
+                <input
+                  type="text"
+                  class="form-control font-monospace small"
+                  value={url(~p"/#{@current_organization.slug}/saml/sso")}
+                  readonly
+                />
+                <button
+                  class="btn btn-outline-secondary"
+                  type="button"
+                  onclick="navigator.clipboard.writeText(this.previousElementSibling.value)"
+                >
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="mb-0">
+              <label class="form-label small fw-bold">SLO URL</label>
+              <div class="input-group input-group-sm">
+                <input
+                  type="text"
+                  class="form-control font-monospace small"
+                  value={url(~p"/#{@current_organization.slug}/saml/slo")}
+                  readonly
+                />
+                <button
+                  class="btn btn-outline-secondary"
+                  type="button"
+                  onclick="navigator.clipboard.writeText(this.previousElementSibling.value)"
+                >
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> About SAML SSO
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-2">To configure this service provider:</p>
+            <ol class="small mb-0">
+              <li>Copy the metadata URL above</li>
+              <li>Configure your application to use this IdP</li>
+              <li>Test SSO authentication</li>
+              <li>Activate the service provider</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

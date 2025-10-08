@@ -1,0 +1,383 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar user={@user} organization={@organization} current_page="analytics" />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">System Analytics</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-download"></i> Export Report
+          </button>
+        </div>
+      </div>
+    </div>
+    
+<!-- System Overview -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-graph-up"></i> System Overview
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                  <div class="card-body">
+                    <div class="d-flex align-items-center">
+                      <div class="flex-shrink-0">
+                        <i class="bi bi-building fs-1"></i>
+                      </div>
+                      <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold fs-4">
+                          {@analytics.system_overview.total_organizations}
+                        </div>
+                        <div class="small">Total Organizations</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card bg-success text-white">
+                  <div class="card-body">
+                    <div class="d-flex align-items-center">
+                      <div class="flex-shrink-0">
+                        <i class="bi bi-check-circle fs-1"></i>
+                      </div>
+                      <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold fs-4">
+                          {@analytics.system_overview.active_organizations}
+                        </div>
+                        <div class="small">Active Organizations</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card bg-info text-white">
+                  <div class="card-body">
+                    <div class="d-flex align-items-center">
+                      <div class="flex-shrink-0">
+                        <i class="bi bi-people fs-1"></i>
+                      </div>
+                      <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold fs-4">{@analytics.system_overview.total_users}</div>
+                        <div class="small">Total Users</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card bg-warning text-dark">
+                  <div class="card-body">
+                    <div class="d-flex align-items-center">
+                      <div class="flex-shrink-0">
+                        <i class="bi bi-person-badge fs-1"></i>
+                      </div>
+                      <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold fs-4">{@analytics.system_overview.global_admins}</div>
+                        <div class="small">Global Admins</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+<!-- Organization Analytics -->
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-bar-chart"></i> Organization Distribution
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h4 text-primary">
+                    {@analytics.organization_stats.largest_organization}
+                  </div>
+                  <div class="small text-muted">Largest Org</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h4 text-success">
+                    {Float.round(@analytics.organization_stats.average_users_per_org, 1)}
+                  </div>
+                  <div class="small text-muted">Avg Users/Org</div>
+                </div>
+              </div>
+            </div>
+            <hr />
+            <div class="row g-2">
+              <%= for {size, orgs} <- @analytics.organization_stats.organizations_by_size do %>
+                <div class="col-12">
+                  <div class="d-flex justify-content-between">
+                    <span class="text-capitalize">
+                      {size} ({if size == :empty do
+                        "0"
+                      else
+                        case size do
+                          :small -> "1-5"
+                          :medium -> "6-20"
+                          :large -> "21-100"
+                          :enterprise -> "100+"
+                        end
+                      end} users)
+                    </span>
+                    <span class="badge bg-secondary">{length(orgs)}</span>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-person-check"></i> User Analytics
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h4 text-info">{@analytics.user_stats.new_users_last_30_days}</div>
+                  <div class="small text-muted">New Users (30d)</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h4 text-success">
+                    {@analytics.user_stats.users_by_status.active}
+                  </div>
+                  <div class="small text-muted">Active Users</div>
+                </div>
+              </div>
+            </div>
+            <hr />
+            <h6 class="text-muted mb-2">By Role</h6>
+            <div class="row">
+              <div class="col-6">
+                <div class="d-flex justify-content-between">
+                  <span>Admins</span>
+                  <span class="badge bg-primary">
+                    {@analytics.user_stats.users_by_role.admin}
+                  </span>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="d-flex justify-content-between">
+                  <span>Users</span>
+                  <span class="badge bg-secondary">
+                    {@analytics.user_stats.users_by_role.user}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+<!-- Activity Metrics -->
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-activity"></i> Recent Activity
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h5 text-primary">
+                    {@analytics.activity_metrics.new_organizations_24h}
+                  </div>
+                  <div class="small text-muted">New Orgs (24h)</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h5 text-info">{@analytics.activity_metrics.new_users_24h}</div>
+                  <div class="small text-muted">New Users (24h)</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h5 text-success">
+                    {@analytics.activity_metrics.new_organizations_7d}
+                  </div>
+                  <div class="small text-muted">New Orgs (7d)</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h5 text-warning">{@analytics.activity_metrics.new_users_7d}</div>
+                  <div class="small text-muted">New Users (7d)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-envelope"></i> Invitation Metrics
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h5 text-primary">
+                    {@analytics.invitation_stats.total_invitations}
+                  </div>
+                  <div class="small text-muted">Total Sent</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h5 text-success">
+                    {@analytics.invitation_stats.accepted_invitations}
+                  </div>
+                  <div class="small text-muted">Accepted</div>
+                </div>
+              </div>
+            </div>
+            <hr />
+            <div class="row">
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h6 text-warning">
+                    {@analytics.invitation_stats.pending_invitations}
+                  </div>
+                  <div class="small text-muted">Pending</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="text-center">
+                  <div class="h6 text-danger">
+                    {@analytics.invitation_stats.expired_invitations}
+                  </div>
+                  <div class="small text-muted">Expired</div>
+                </div>
+              </div>
+            </div>
+            <hr />
+            <div class="row">
+              <div class="col-12">
+                <div class="small text-muted mb-1">Recent Activity (7d)</div>
+                <div class="d-flex justify-content-between">
+                  <span>
+                    Sent:
+                    <span class="badge bg-info">
+                      {@analytics.activity_metrics.invitations_sent_7d}
+                    </span>
+                  </span>
+                  <span>
+                    Accepted:
+                    <span class="badge bg-success">
+                      {@analytics.activity_metrics.invitations_accepted_7d}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+<!-- Growth Metrics -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-graph-up-arrow"></i> Growth Trends (6 Months)
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-md-4">
+                <div class="text-center">
+                  <div class="h4 text-primary">
+                    {@analytics.growth_metrics.organization_growth_rate}%
+                  </div>
+                  <div class="small text-muted">Organization Growth Rate</div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="text-center">
+                  <div class="h4 text-info">{@analytics.growth_metrics.user_growth_rate}%</div>
+                  <div class="small text-muted">User Growth Rate</div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="text-center">
+                  <%= if @analytics.invitation_stats.total_invitations > 0 do %>
+                    <div class="h4 text-success">
+                      {Float.round(
+                        @analytics.invitation_stats.accepted_invitations /
+                          @analytics.invitation_stats.total_invitations * 100,
+                        1
+                      )}%
+                    </div>
+                    <div class="small text-muted">Invitation Accept Rate</div>
+                  <% else %>
+                    <div class="h4 text-muted">N/A</div>
+                    <div class="small text-muted">Invitation Accept Rate</div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Month</th>
+                    <th>Organizations</th>
+                    <th>Users</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <%= for month_data <- @analytics.growth_metrics.monthly_growth do %>
+                    <tr>
+                      <td>{month_data.month}</td>
+                      <td>{month_data.organizations}</td>
+                      <td>{month_data.users}</td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>
+
+<.logout_modal />

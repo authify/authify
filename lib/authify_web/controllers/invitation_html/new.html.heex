@@ -1,0 +1,87 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar user={@user} organization={@organization} current_page="invitations" />
+  </:sidebar>
+
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Invite User</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@current_organization.slug}/invitations"}
+            class="btn btn-sm btn-outline-secondary"
+          >
+            <i class="bi bi-arrow-left"></i> Back to Invitations
+          </a>
+        </div>
+      </div>
+    </div>
+    
+<!-- Invitation Form -->
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-envelope-plus"></i> Send Invitation
+            </h5>
+          </div>
+          <div class="card-body">
+            <.form
+              :let={f}
+              for={@changeset}
+              action={~p"/#{@current_organization.slug}/invitations"}
+              method="post"
+            >
+              <div class="mb-3">
+                <label for="invitation_email" class="form-label">Email Address</label>
+                <.input
+                  field={f[:email]}
+                  type="email"
+                  class="form-control"
+                  placeholder="user@example.com"
+                  required
+                />
+                <div class="form-text">
+                  The user will receive an invitation email with instructions to create their account.
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="invitation_role" class="form-label">Role</label>
+                <.input
+                  field={f[:role]}
+                  type="select"
+                  options={[{"User", "user"}, {"Admin", "admin"}]}
+                  class="form-select"
+                  required
+                />
+                <div class="form-text">
+                  <strong>User:</strong>
+                  Can access their profile and organization features.<br />
+                  <strong>Admin:</strong>
+                  Can manage users, invitations, and organization settings.
+                </div>
+              </div>
+
+              <div class="d-grid gap-2 mt-4">
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-send"></i> Send Invitation
+                </button>
+                <a
+                  href={~p"/#{@current_organization.slug}/invitations"}
+                  class="btn btn-outline-secondary"
+                >
+                  Cancel
+                </a>
+              </div>
+            </.form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>
+
+<.logout_modal />
