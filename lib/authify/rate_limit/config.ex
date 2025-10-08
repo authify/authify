@@ -36,10 +36,23 @@ defmodule Authify.RateLimit.Config do
       iex> Config.get_limit(org, :oauth)
       {60, 60_000}
   """
-  def get_limit(org, scope) when scope in [:auth, :oauth, :saml, :api] do
-    setting_name = :"#{scope}_rate_limit"
-    quota_name = :"quota_#{scope}_rate_limit"
+  def get_limit(org, :auth) do
+    get_limit_for_scope(org, :auth_rate_limit, :quota_auth_rate_limit)
+  end
 
+  def get_limit(org, :oauth) do
+    get_limit_for_scope(org, :oauth_rate_limit, :quota_oauth_rate_limit)
+  end
+
+  def get_limit(org, :saml) do
+    get_limit_for_scope(org, :saml_rate_limit, :quota_saml_rate_limit)
+  end
+
+  def get_limit(org, :api) do
+    get_limit_for_scope(org, :api_rate_limit, :quota_api_rate_limit)
+  end
+
+  defp get_limit_for_scope(org, setting_name, quota_name) do
     # Try org-specific limit first
     limit = Configurations.get_organization_setting(org, setting_name)
 
@@ -72,9 +85,20 @@ defmodule Authify.RateLimit.Config do
       iex> Config.get_quota(org, :oauth)
       60
   """
-  def get_quota(org, scope) when scope in [:auth, :oauth, :saml, :api] do
-    quota_name = :"quota_#{scope}_rate_limit"
-    Configurations.get_organization_setting(org, quota_name)
+  def get_quota(org, :auth) do
+    Configurations.get_organization_setting(org, :quota_auth_rate_limit)
+  end
+
+  def get_quota(org, :oauth) do
+    Configurations.get_organization_setting(org, :quota_oauth_rate_limit)
+  end
+
+  def get_quota(org, :saml) do
+    Configurations.get_organization_setting(org, :quota_saml_rate_limit)
+  end
+
+  def get_quota(org, :api) do
+    Configurations.get_organization_setting(org, :quota_api_rate_limit)
   end
 
   @doc """
@@ -99,8 +123,19 @@ defmodule Authify.RateLimit.Config do
       iex> Config.get_configured_limit(org, :oauth)
       nil  # using quota default
   """
-  def get_configured_limit(org, scope) when scope in [:auth, :oauth, :saml, :api] do
-    setting_name = :"#{scope}_rate_limit"
-    Configurations.get_organization_setting(org, setting_name)
+  def get_configured_limit(org, :auth) do
+    Configurations.get_organization_setting(org, :auth_rate_limit)
+  end
+
+  def get_configured_limit(org, :oauth) do
+    Configurations.get_organization_setting(org, :oauth_rate_limit)
+  end
+
+  def get_configured_limit(org, :saml) do
+    Configurations.get_organization_setting(org, :saml_rate_limit)
+  end
+
+  def get_configured_limit(org, :api) do
+    Configurations.get_organization_setting(org, :api_rate_limit)
   end
 end

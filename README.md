@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="priv/static/images/logo-dark.svg" alt="Authify Logo" width="400">
+  <img src="priv/static/images/logo-readme.svg" alt="Authify Logo" width="400">
 </p>
-
-<h1 align="center">Authify</h1>
 
 <p align="center"><strong>Multi-tenant OpenID Connect & SAML Identity Provider</strong></p>
 
@@ -66,15 +64,85 @@ Authify is built as a **multi-tenant identity provider** that can serve multiple
 ├─────────────────────────────────────────────────────────────┤
 │                   Management API                            │
 │  ├─ Organization API     │  ├─ Authentication               │
-│  ├─ Users API            │  ├─ OpenAPI Docs                │
-│  └─ Applications API     │  └─ HATEOAS Navigation          │
+│  ├─ Users API            │  ├─ OpenAPI Docs                 │
+│  └─ Applications API     │  └─ HATEOAS Navigation           │
 ├─────────────────────────────────────────────────────────────┤
 │              Identity Protocol Endpoints                    │
-│  ├─ OIDC (/:org_slug/.well-known/openid_configuration)    │
-│  ├─ OAuth 2.0 (/:org_slug/oauth/authorize, /token)        │
-│  └─ SAML 2.0 (/:org_slug/saml/sso, /metadata)             │
+│  ├─ OIDC (/:org_slug/.well-known/openid_configuration)      │
+│  ├─ OAuth 2.0 (/:org_slug/oauth/authorize, /token)          │
+│  └─ SAML 2.0 (/:org_slug/saml/sso, /metadata)               │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+Authify is a **multi-tenant identity provider**. A single runtime instance securely serves many organizations with strict data and rate isolation. Below is a high‑level view of the layered system.
+
+<details>
+<summary><strong>Conceptual diagram</strong></summary>
+
+```
+Clients ──> [ Protocol Layer ] ──> [ Core Domain ] ──> [ Infrastructure ]
+Browsers      OIDC/OAuth            Orgs / Users         MySQL (state)
+Relying       SAML SSO/SLO          OAuth Apps           ETS (caches)
+Parties       Mgmt API (HATEOAS)    SAML Providers       PubSub (cluster)
+Automation    Auth Pipeline         Config Engine        Telemetry
+```
+
+</details>
+
+### Multi-Tenancy Model
+Each request is resolved to an organization via (priority order):
+1. Custom domain (CNAME → mapped org)
+2. Subdomain (`<org>.tenant-base-domain`)
+3. Path segment (`/:org_slug/...`) fallback
+
+Data isolation is enforced at the query layer; every domain aggregate includes an `organization_id` foreign key. Cross‑org access is prevented by scoping queries through context modules (e.g. `Organizations`, `OAuth`, `SAML`).
+
+### Configuration & Rate Limiting
+Organizations store dynamic feature flags and per‑scope rate limits. Super admin quotas act as hard ceilings; org overrides can only lower or equal them. In-memory ETS caches accelerate reads and are invalidated via PubSub broadcasts on change.
+
+### Core Entities (Selected)
+| Entity                      | Purpose                 | Notes                                                 |
+| --------------------------- | ----------------------- | ----------------------------------------------------- |
+| Organization                | Tenant boundary         | Holds feature flags & domain settings                 |
+| User                        | Auth principal          | Scoped to one organization; roles (admin/user)        |
+| OAuth Application           | OIDC/OAuth client       | Redirect URIs, grant types, scopes                    |
+| Authorization Code / Tokens | OAuth artifacts         | Short‑lived codes, access & refresh tokens            |
+| SAML Service Provider       | External SP config      | ACS/SLO URLs, attribute mapping, certificate usage    |
+| SAML Session                | Federated session state | Supports coordinated SLO across SPs                   |
+| Certificate                 | IdP signing (SAML/JWKS) | Active certificate used for signatures                |
+| Configuration               | Typed setting container | Schema‑driven, includes rate limits & feature toggles |
+| Invitation                  | Onboarding flow         | Email token, auto‑verify on acceptance                |
+| Personal Access Token       | User API auth           | Scope-constrained bearer alternative                  |
+
+### Request Flow (OIDC Authorization Code Example)
+1. Client hits `/:org/oauth/authorize` with client_id, redirect_uri, scopes
+2. Auth pipeline loads org, validates client, ensures scopes permitted
+3. User session established (login if needed) → consent screen (if required)
+4. Authorization code issued (org + client scoped)
+5. Client exchanges code at `/:org/oauth/token` → access & ID tokens (JWT) minted
+6. Management API or resource server consumes bearer token (scopes enforced)
+
+### SAML SSO / SLO Flow (Condensed)
+1. SP sends AuthnRequest → IdP validates SP & user session
+2. Assertion generated & signed (optionally -> future encryption)
+3. Browser posts to SP ACS
+4. Logout (SP‑initiated or IdP‑initiated) coordinates termination of all active SAML sessions for the user; responses signed.
+
+### Extensibility Points
+- Add new configuration keys via configuration schema modules.
+- Additional auth factors (MFA) will hook into the existing session pipeline.
+- Future SCIM & Dynamic Client Registration will mount under dedicated API paths with version negotiation.
+
+### Operational Characteristics
+| Aspect              | Characteristic                                                               |
+| ------------------- | ---------------------------------------------------------------------------- |
+| Stateless Web Layer | Horizontal scaling; no sticky sessions required                              |
+| Token Storage       | DB for refresh / access (revocation / auditing); signed JWT for presentation |
+| Caching             | ETS + PubSub invalidation for configuration & rate limits                    |
+| Metrics             | Prometheus exporter (HTTP, DB, business metrics)                             |
+| Clustering          | Optional (Kubernetes DNS) for PubSub fanout & distribution                   |
+
+> See later sections for Deployment, Security Hardening, and Rate Limiting details.
 
 ## 🛠️ Installation & Setup
 
@@ -89,7 +157,7 @@ Authify is built as a **multi-tenant identity provider** that can serve multiple
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-org/authify.git
+   git clone https://github.com/authify/authify.git
    cd authify
    ```
 
@@ -650,7 +718,7 @@ openapi-generator generate -i authify-openapi.json -g go -o ./authify-go-client
 
 ### Reporting Security Issues
 
-Please report security vulnerabilities to [security@yourcompany.com](mailto:security@yourcompany.com). Do not create public GitHub issues for security vulnerabilities.
+Please report security vulnerabilities to [security@authify.pw](mailto:security@authify.pw). Do not create public GitHub issues for security vulnerabilities.
 
 ### Security Features
 

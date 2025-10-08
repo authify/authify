@@ -256,7 +256,7 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
 
       # Verify all CNAMEs were removed
       cnames = Authify.Organizations.list_organization_cnames(global_org)
-      assert length(cnames) == 0
+      assert Enum.empty?(cnames)
       # email_link_domain should be nil or empty when cleared
       assert Authify.Configurations.get_global_setting(:email_link_domain) in [nil, ""]
     end
@@ -401,7 +401,7 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
 
       # Verify all CNAMEs were removed
       cnames = Authify.Organizations.list_organization_cnames(organization)
-      assert length(cnames) == 0
+      assert Enum.empty?(cnames)
     end
 
     test "custom domains textarea handles whitespace and duplicates", %{conn: conn} do

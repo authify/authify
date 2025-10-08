@@ -9,7 +9,7 @@ on:
 env:
   MIX_ENV: test
   ELIXIR_VERSION: '1.18.4'
-  OTP_VERSION: '26.2.5'
+  OTP_VERSION: '27.3.4.2'
 
 jobs:
   test:
@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         elixir: ['1.18.4']
-        otp: ['26.2.5']
+        otp: ['27.3.4.2']
 
     services:
       mysql:
@@ -27,6 +27,8 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: authify_test
+          MYSQL_USER: authifytest
+          MYSQL_PASSWORD: authifytest
         ports:
           - 3306:3306
         options: >-
@@ -70,12 +72,16 @@ jobs:
 
       - name: Run tests
         env:
-          DATABASE_URL: ecto://root:root@localhost/authify_test
+          CI_MODE: "true"
         run: mix test
 
       - name: Run code quality checks
         run: mix credo --strict
         continue-on-error: true
+
+      - name: Run security scan (Sobelow)
+        run: mix sobelow --config
+        continue-on-error: false
 
   build-docker:
     name: Build Docker Image

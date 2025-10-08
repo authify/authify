@@ -11,7 +11,12 @@ defmodule Authify.MixProject do
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      preferred_cli_env: [
+        precommit: :test,
+        credo: :test,
+        sobelow: :test
+      ]
     ]
   end
 
@@ -65,7 +70,10 @@ defmodule Authify.MixProject do
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_metrics_prometheus, "~> 1.1"},
       {:telemetry_poller, "~> 1.0"},
-      {:x509, "~> 0.9"}
+      {:x509, "~> 0.9"},
+      # Static analysis & security (dev/test only)
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -87,7 +95,14 @@ defmodule Authify.MixProject do
         "esbuild authify --minify",
         "phx.digest"
       ],
-      precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: [
+        "compile --warning-as-errors",
+        "deps.unlock --unused",
+        "format",
+        "test",
+        "credo --strict",
+        "sobelow --config"
+      ]
     ]
   end
 end

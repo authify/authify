@@ -188,7 +188,7 @@ defmodule AuthifyWeb.SetupControllerTest do
       # Verify no CNAME was created
       global_org = Authify.Accounts.get_global_organization()
       cnames = Authify.Organizations.list_organization_cnames(global_org)
-      assert length(cnames) == 0
+      assert Enum.empty?(cnames)
 
       # email_link_domain should be default (not explicitly set, so nil)
       assert Authify.Configurations.get_global_setting(:email_link_domain) == nil

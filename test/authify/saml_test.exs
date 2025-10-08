@@ -209,7 +209,7 @@ defmodule Authify.SAMLTest do
 
       # Check sessions are now expired
       active_sessions = SAML.get_active_sessions_for_user(user)
-      assert length(active_sessions) == 0
+      assert Enum.empty?(active_sessions)
     end
   end
 

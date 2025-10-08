@@ -3,6 +3,15 @@ defmodule AuthifyWeb.OrganizationsController do
 
   alias Authify.Accounts
 
+  # Safely convert string to atom, only for known valid values
+  defp safe_to_atom(string)
+       when string in ~w(email first_name last_name role inserted_at updated_at name slug client_id entity_id acs_url description asc desc) do
+    String.to_existing_atom(string)
+  end
+
+  defp safe_to_atom(string) when is_binary(string), do: :inserted_at
+  defp safe_to_atom(value), do: value
+
   # All actions require being in the global organization
   def action(conn, _) do
     if conn.assigns.current_organization.slug != "authify-global" do
@@ -26,8 +35,8 @@ defmodule AuthifyWeb.OrganizationsController do
     status_filter = params["status"]
 
     filter_opts = [
-      sort: String.to_atom(sort),
-      order: String.to_atom(order),
+      sort: safe_to_atom(sort),
+      order: safe_to_atom(order),
       search: search,
       status: status_filter
     ]

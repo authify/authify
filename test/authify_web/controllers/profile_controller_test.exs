@@ -97,7 +97,7 @@ defmodule AuthifyWeb.ProfileControllerTest do
 
       # Verify token was deleted from database
       tokens = Accounts.list_personal_access_tokens(user)
-      assert length(tokens) == 0
+      assert Enum.empty?(tokens)
     end
 
     test "cannot delete another user's token", %{conn: conn, user: user} do
