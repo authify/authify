@@ -718,7 +718,12 @@ openapi-generator generate -i authify-openapi.json -g go -o ./authify-go-client
 
 ### Reporting Security Issues
 
-Please report security vulnerabilities to [security@authify.pw](mailto:security@authify.pw). Do not create public GitHub issues for security vulnerabilities.
+**IMPORTANT**: If you find a critical security vulnerability that could be actively exploited,
+please report it privately using GitHub's Security Advisories feature instead of creating a public issue:
+
+  1. Go to the Security tab
+  2. Click "Report a vulnerability"
+  3. Follow the private disclosure process
 
 ### Security Features
 

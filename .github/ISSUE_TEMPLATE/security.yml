@@ -1,0 +1,114 @@
+name: Security Vulnerability
+description: Report a security vulnerability (please use responsibly)
+title: "[SECURITY]: "
+labels: ["security", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ⚠️ Security Vulnerability Report
+
+        **IMPORTANT**: If this is a critical security vulnerability that could be actively exploited,
+        please report it privately using GitHub's Security Advisories feature instead of creating a public issue:
+
+        1. Go to the Security tab
+        2. Click "Report a vulnerability"
+        3. Follow the private disclosure process
+
+        Only use this public template for:
+        - Lower-severity security improvements
+        - Already-disclosed vulnerabilities
+        - Security hardening suggestions
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity Assessment
+      description: How severe is this vulnerability?
+      options:
+        - Critical (Remote code execution, authentication bypass)
+        - High (Privilege escalation, sensitive data exposure)
+        - Medium (Information disclosure, CSRF)
+        - Low (Security hardening, best practices)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Vulnerability Description
+      description: Describe the security issue (be careful not to provide exploit details if this is high severity)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which component is affected?
+      options:
+        - OAuth2/OIDC
+        - SAML SSO
+        - Authentication/Sessions
+        - Authorization/Permissions
+        - API Authentication
+        - Password Management
+        - Cryptography
+        - Input Validation
+        - Configuration
+        - Dependencies
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What is the potential impact of this vulnerability?
+      placeholder: |
+        An attacker could...
+        This could lead to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected-versions
+    attributes:
+      label: Affected Versions
+      description: Which versions are affected?
+      placeholder: "e.g., v1.0.0 - v1.2.3, or 'all versions'"
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce (if safe to share)
+      description: Only provide if this is low/medium severity
+      placeholder: |
+        1. Configure...
+        2. Send request to...
+        3. Observe...
+
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Suggested Mitigation
+      description: How could this be fixed?
+
+  - type: checkboxes
+    id: attestation
+    attributes:
+      label: Responsible Disclosure
+      options:
+        - label: I confirm this is not a critical vulnerability that should be reported privately
+          required: true
+        - label: I have not publicly disclosed this vulnerability elsewhere
+          required: false
+        - label: I am willing to work with the maintainers on a fix
+          required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other relevant information

@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Discussions & Questions
+    url: https://github.com/authify/authify/discussions
+    about: Ask questions, share ideas, and discuss Authify with the community
+  - name: 📚 Documentation
+    url: https://github.com/authify/authify/wiki
+    about: Read the documentation before reporting issues
+  - name: 🔒 Private Security Report
+    url: https://github.com/authify/authify/security/advisories/new
+    about: Report critical security vulnerabilities privately
