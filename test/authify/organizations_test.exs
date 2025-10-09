@@ -1,9 +1,9 @@
 defmodule Authify.OrganizationsTest do
   use Authify.DataCase, async: true
 
+  alias Authify.Configurations
   alias Authify.Organizations
   alias Authify.Organizations.OrganizationCname
-  alias Authify.Configurations
   import Authify.AccountsFixtures
 
   setup do

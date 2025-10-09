@@ -345,7 +345,7 @@ defmodule AuthifyWeb.SAMLController do
         <body>
           <h2>Single Logout in Progress</h2>
           <p>Logging you out from connected applications:</p>
-          #{Enum.map(sp_logout_info, fn info -> if info.success do
+          #{Enum.map_join(sp_logout_info, "", fn info -> if info.success do
             """
             <div class="logout-item success">
               <strong>#{info.name}</strong>:
@@ -358,7 +358,7 @@ defmodule AuthifyWeb.SAMLController do
               <strong>#{info.name}</strong>: Logout failed
             </div>
             """
-          end end) |> Enum.join("")}
+          end end)}
           <p><a href="/logout">Complete logout from Authify</a></p>
         </body>
         </html>

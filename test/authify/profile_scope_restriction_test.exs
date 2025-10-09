@@ -1,8 +1,8 @@
 defmodule Authify.ProfileScopeRestrictionTest do
   use Authify.DataCase
 
-  alias Authify.OAuth
   alias Authify.Accounts
+  alias Authify.OAuth
   import Authify.AccountsFixtures
 
   describe "profile scope restrictions" do

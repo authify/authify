@@ -135,57 +135,55 @@ defmodule AuthifyWeb.Auth.APIAuth do
   end
 
   defp authenticate_bearer_token(token) do
-    cond do
-      # Try Personal Access Token first (they have 'authify_pat_' prefix)
-      String.starts_with?(token, "authify_pat_") ->
-        case authenticate_personal_access_token(token) do
-          {:ok, pat} ->
-            {:ok, pat.user, pat.organization,
-             Authify.Accounts.PersonalAccessToken.scopes_list(pat)}
+    # Try Personal Access Token first (they have 'authify_pat_' prefix)
+    if String.starts_with?(token, "authify_pat_") do
+      case authenticate_personal_access_token(token) do
+        {:ok, pat} ->
+          {:ok, pat.user, pat.organization,
+           Authify.Accounts.PersonalAccessToken.scopes_list(pat)}
 
-          {:error, _reason} ->
-            {:error, "Invalid or expired personal access token"}
-        end
-
+        {:error, _reason} ->
+          {:error, "Invalid or expired personal access token"}
+      end
+    else
       # Try OAuth access token
-      true ->
-        case validate_oauth_access_token(token) do
-          {:ok, user, organization, scopes} ->
-            {:ok, user, organization, scopes}
+      case validate_oauth_access_token(token) do
+        {:ok, user, organization, scopes} ->
+          {:ok, user, organization, scopes}
 
-          {:error, _oauth_error} ->
-            # Fall back to Guardian JWT validation
-            case Guardian.decode_and_verify(token) do
-              {:ok, %{"sub" => user_id, "org" => org_id}} ->
-                user = Authify.Accounts.get_user!(user_id)
-                organization = Authify.Accounts.get_organization!(org_id)
+        {:error, _oauth_error} ->
+          # Fall back to Guardian JWT validation
+          case Guardian.decode_and_verify(token) do
+            {:ok, %{"sub" => user_id, "org" => org_id}} ->
+              user = Authify.Accounts.get_user!(user_id)
+              organization = Authify.Accounts.get_organization!(org_id)
 
-                # Guardian JWT gets all management API scopes
-                all_scopes = [
-                  "management_app:read",
-                  "management_app:write",
-                  "users:read",
-                  "users:write",
-                  "invitations:read",
-                  "invitations:write",
-                  "applications:read",
-                  "applications:write",
-                  "application_groups:read",
-                  "application_groups:write",
-                  "saml:read",
-                  "saml:write",
-                  "certificates:read",
-                  "certificates:write",
-                  "organizations:read",
-                  "organizations:write"
-                ]
+              # Guardian JWT gets all management API scopes
+              all_scopes = [
+                "management_app:read",
+                "management_app:write",
+                "users:read",
+                "users:write",
+                "invitations:read",
+                "invitations:write",
+                "applications:read",
+                "applications:write",
+                "application_groups:read",
+                "application_groups:write",
+                "saml:read",
+                "saml:write",
+                "certificates:read",
+                "certificates:write",
+                "organizations:read",
+                "organizations:write"
+              ]
 
-                {:ok, user, organization, all_scopes}
+              {:ok, user, organization, all_scopes}
 
-              {:error, _reason} ->
-                {:error, "Invalid or expired token"}
-            end
-        end
+            {:error, _reason} ->
+              {:error, "Invalid or expired token"}
+          end
+      end
     end
   rescue
     _ ->

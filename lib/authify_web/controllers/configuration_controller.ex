@@ -38,8 +38,7 @@ defmodule AuthifyWeb.ConfigurationController do
       if organization.slug != "authify-global" do
         organization
         |> Organizations.list_organization_cnames()
-        |> Enum.map(& &1.domain)
-        |> Enum.join("\n")
+        |> Enum.map_join("\n", & &1.domain)
       else
         # For global org, custom_domains is managed via authify_domain abstraction
         ""

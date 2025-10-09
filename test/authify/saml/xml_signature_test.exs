@@ -1,9 +1,9 @@
 defmodule Authify.SAML.XMLSignatureTest do
   use Authify.DataCase, async: true
 
-  alias Authify.SAML.XMLSignature
-  alias Authify.Accounts.Certificate
   alias Authify.Accounts
+  alias Authify.Accounts.Certificate
+  alias Authify.SAML.XMLSignature
 
   import Authify.AccountsFixtures
 

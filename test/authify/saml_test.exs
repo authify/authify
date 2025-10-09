@@ -2,7 +2,7 @@ defmodule Authify.SAMLTest do
   use Authify.DataCase
 
   alias Authify.SAML
-  alias Authify.SAML.{ServiceProvider, Session, Certificate}
+  alias Authify.SAML.{Certificate, ServiceProvider, Session}
 
   import Authify.AccountsFixtures
   import Authify.SAMLFixtures

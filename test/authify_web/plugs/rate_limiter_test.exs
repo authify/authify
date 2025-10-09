@@ -2,8 +2,8 @@ defmodule AuthifyWeb.Plugs.RateLimiterTest do
   use AuthifyWeb.ConnCase, async: false
   import Authify.RateLimitTestHelper
 
-  alias AuthifyWeb.Plugs.RateLimiter
   alias Authify.AccountsFixtures
+  alias AuthifyWeb.Plugs.RateLimiter
 
   describe "rate limiting (when enabled)" do
     setup do

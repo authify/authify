@@ -220,9 +220,8 @@ defmodule AuthifyWeb.ApplicationGroupsIntegrationTest do
       # Note: This test may need adjustment based on actual implementation
       _accessible = Authify.Accounts.get_user_accessible_applications(user_a, org)
 
-      # The current implementation doesn't filter by is_active, so this might still show apps
-      # This test documents the expected behavior vs actual behavior
-      # TODO: Update get_user_accessible_applications to filter by group.is_active
+      # Known limitation: get_user_accessible_applications doesn't filter by group.is_active
+      # See: https://github.com/authify/authify/issues/3
     end
   end
 

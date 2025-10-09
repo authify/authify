@@ -8,7 +8,7 @@ defmodule Authify.Accounts.User do
   import Ecto.Changeset
   import Ecto.Query
 
-  alias Authify.Accounts.{Organization, UserApplicationGroup, ApplicationGroup}
+  alias Authify.Accounts.{ApplicationGroup, Organization, UserApplicationGroup}
 
   @derive {Jason.Encoder,
            except: [

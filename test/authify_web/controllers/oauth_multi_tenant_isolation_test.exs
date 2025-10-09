@@ -503,7 +503,8 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
       org_a: org_a,
       org_b: org_b
     } do
-      # TODO: Implement organization-scoped JWKS endpoint
+      # Skipped: Organization-scoped JWKS endpoint not yet implemented.
+      # See: https://github.com/authify/authify/issues/1
       # Get JWKS for org A
       conn_a = get(conn, "/#{org_a.slug}/.well-known/jwks.json")
       jwks_a = json_response(conn_a, 200)

@@ -6,8 +6,8 @@ defmodule Authify.SAML do
   import Ecto.Query, warn: false
   alias Authify.Repo
 
-  alias Authify.SAML.{ServiceProvider, Session, Certificate}
-  alias Authify.Accounts.{User, Organization}
+  alias Authify.Accounts.{Organization, User}
+  alias Authify.SAML.{Certificate, ServiceProvider, Session}
 
   @doc """
   Returns the list of service providers for an organization.

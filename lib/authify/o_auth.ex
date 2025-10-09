@@ -6,8 +6,8 @@ defmodule Authify.OAuth do
   import Ecto.Query, warn: false
   alias Authify.Repo
 
-  alias Authify.OAuth.{Application, AuthorizationCode, AccessToken, RefreshToken}
-  alias Authify.Accounts.{User, Organization}
+  alias Authify.Accounts.{Organization, User}
+  alias Authify.OAuth.{AccessToken, Application, AuthorizationCode, RefreshToken}
 
   @doc """
   Returns the list of applications for an organization.

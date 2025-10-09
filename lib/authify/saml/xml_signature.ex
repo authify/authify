@@ -151,9 +151,7 @@ defmodule Authify.SAML.XMLSignature do
   end
 
   defp normalize_children(children) when is_list(children) do
-    children
-    |> Enum.map(&normalize_xml_element/1)
-    |> Enum.join("")
+    Enum.map_join(children, "", &normalize_xml_element/1)
   end
 
   defp format_attributes([]), do: ""
@@ -494,9 +492,10 @@ defmodule Authify.SAML.XMLSignature do
                 # Now verify the signature over the SignedInfo
                 case Base.decode64(signature_value) do
                   {:ok, signature_bytes} ->
-                    case :public_key.verify(signed_info, :sha256, signature_bytes, public_key) do
-                      true -> {:ok, true}
-                      false -> {:ok, false}
+                    if :public_key.verify(signed_info, :sha256, signature_bytes, public_key) do
+                      {:ok, true}
+                    else
+                      {:ok, false}
                     end
 
                   :error ->

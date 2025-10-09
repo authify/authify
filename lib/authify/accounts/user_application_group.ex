@@ -2,7 +2,7 @@ defmodule Authify.Accounts.UserApplicationGroup do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias Authify.Accounts.{User, ApplicationGroup}
+  alias Authify.Accounts.{ApplicationGroup, User}
 
   schema "user_application_groups" do
     belongs_to :user, User

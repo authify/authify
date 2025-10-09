@@ -826,15 +826,14 @@ defmodule AuthifyWeb.OAuthControllerTest do
     end
 
     @tag :skip
-    test "rate limiting would be applied in production", %{conn: conn, organization: organization} do
-      # TODO: Implement rate limiting middleware and enable this test
-      # This test should verify that too many requests are rejected with 429
+    test "rate limiting for OAuth token endpoint", %{conn: conn, organization: organization} do
+      # Skipped: OAuth token endpoint needs rate limiting configured.
+      # See: https://github.com/authify/authify/issues/2
       for _i <- 1..20 do
         post(conn, ~p"/#{organization.slug}/oauth/token", %{})
       end
 
       conn = post(conn, ~p"/#{organization.slug}/oauth/token", %{})
-      # Too Many Requests
       assert response(conn, 429)
     end
   end

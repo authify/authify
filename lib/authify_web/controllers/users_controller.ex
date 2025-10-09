@@ -179,14 +179,14 @@ defmodule AuthifyWeb.UsersController do
       else
         user = Accounts.get_user!(id)
         # Verify user belongs to current organization
-        unless Accounts.User.member_of?(user, organization.id) do
+        if Accounts.User.member_of?(user, organization.id) do
+          user
+        else
           conn
           |> put_status(:not_found)
           |> put_view(AuthifyWeb.ErrorHTML)
           |> render(:"404")
           |> halt()
-        else
-          user
         end
       end
 
@@ -226,14 +226,14 @@ defmodule AuthifyWeb.UsersController do
       else
         user = Accounts.get_user!(id)
         # Verify user belongs to current organization
-        unless Accounts.User.member_of?(user, organization.id) do
+        if Accounts.User.member_of?(user, organization.id) do
+          user
+        else
           conn
           |> put_status(:not_found)
           |> put_view(AuthifyWeb.ErrorHTML)
           |> render(:"404")
           |> halt()
-        else
-          user
         end
       end
 
@@ -343,13 +343,8 @@ defmodule AuthifyWeb.UsersController do
     current_user = conn.assigns.current_user
 
     # Check if user is admin
-    unless Accounts.User.admin?(current_user, organization.id) ||
-             Accounts.User.super_admin?(current_user) do
-      conn
-      |> put_flash(:error, "You must be an administrator to create users.")
-      |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users")
-      |> halt()
-    else
+    if Accounts.User.admin?(current_user, organization.id) ||
+         Accounts.User.super_admin?(current_user) do
       # Allow user creation in any organization, including global
       changeset = Accounts.change_user_form(%Accounts.User{})
 
@@ -357,6 +352,11 @@ defmodule AuthifyWeb.UsersController do
         changeset: changeset,
         organization: organization
       )
+    else
+      conn
+      |> put_flash(:error, "You must be an administrator to create users.")
+      |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users")
+      |> halt()
     end
   end
 
@@ -365,13 +365,8 @@ defmodule AuthifyWeb.UsersController do
     current_user = conn.assigns.current_user
 
     # Check if user is admin
-    unless Accounts.User.admin?(current_user, organization.id) ||
-             Accounts.User.super_admin?(current_user) do
-      conn
-      |> put_flash(:error, "You must be an administrator to create users.")
-      |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users")
-      |> halt()
-    else
+    if Accounts.User.admin?(current_user, organization.id) ||
+         Accounts.User.super_admin?(current_user) do
       # Allow user creation in any organization, including global
       # Extract role from params, default to "user"
       role = Map.get(user_params, "role", "user")
@@ -389,6 +384,11 @@ defmodule AuthifyWeb.UsersController do
             organization: organization
           )
       end
+    else
+      conn
+      |> put_flash(:error, "You must be an administrator to create users.")
+      |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users")
+      |> halt()
     end
   end
 end

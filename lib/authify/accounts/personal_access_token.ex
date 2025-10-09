@@ -2,7 +2,7 @@ defmodule Authify.Accounts.PersonalAccessToken do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias Authify.Accounts.{User, Organization, Scope}
+  alias Authify.Accounts.{Organization, Scope, User}
 
   schema "personal_access_tokens" do
     field :name, :string
@@ -54,9 +54,10 @@ defmodule Authify.Accounts.PersonalAccessToken do
   Returns the scopes as a list of strings.
   """
   def scopes_list(%__MODULE__{} = token) do
-    case Ecto.assoc_loaded?(token.scopes) do
-      true -> Enum.map(token.scopes, & &1.scope)
-      false -> []
+    if Ecto.assoc_loaded?(token.scopes) do
+      Enum.map(token.scopes, & &1.scope)
+    else
+      []
     end
   end
 

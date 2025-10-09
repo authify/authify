@@ -2,7 +2,7 @@ defmodule Authify.AccountsTest do
   use Authify.DataCase
 
   alias Authify.Accounts
-  alias Authify.Accounts.{Organization, User, Invitation}
+  alias Authify.Accounts.{Invitation, Organization, User}
 
   import Authify.AccountsFixtures
 

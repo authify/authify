@@ -66,9 +66,8 @@ defmodule Authify.Configurations.Schemas.Global do
 
     if setting do
       with {:ok, casted_value} <-
-             Authify.Configurations.Schema.cast_value(setting.value_type, value),
-           {:ok, validated_value} <- run_validation(setting, casted_value) do
-        {:ok, validated_value}
+             Authify.Configurations.Schema.cast_value(setting.value_type, value) do
+        run_validation(setting, casted_value)
       end
     else
       {:error, "unknown setting: #{setting_name}"}

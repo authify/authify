@@ -2,7 +2,7 @@ defmodule Authify.Accounts.ApplicationGroup do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias Authify.Accounts.{Organization, UserApplicationGroup, ApplicationGroupMember}
+  alias Authify.Accounts.{ApplicationGroupMember, Organization, UserApplicationGroup}
 
   @derive {Jason.Encoder,
            except: [

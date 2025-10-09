@@ -7,14 +7,7 @@ defmodule AuthifyWeb.OrganizationController do
 
   def new(conn, _params) do
     # Check if organization registration is allowed
-    unless Configurations.get_global_setting(:allow_organization_registration) do
-      conn
-      |> put_flash(
-        :error,
-        "Organization registration is currently disabled. Please contact an administrator."
-      )
-      |> redirect(to: ~p"/login")
-    else
+    if Configurations.get_global_setting(:allow_organization_registration) do
       # Create empty changesets without validation for initial form display
       organization_changeset = %Organization{} |> Ecto.Changeset.change()
       user_changeset = %User{} |> Ecto.Changeset.change()
@@ -24,20 +17,27 @@ defmodule AuthifyWeb.OrganizationController do
         user_changeset: user_changeset,
         page_title: "Create Organization"
       )
-    end
-  end
-
-  def create(conn, %{"signup" => signup_params}) do
-    # Check if organization registration is allowed
-    unless Configurations.get_global_setting(:allow_organization_registration) do
+    else
       conn
       |> put_flash(
         :error,
         "Organization registration is currently disabled. Please contact an administrator."
       )
       |> redirect(to: ~p"/login")
-    else
+    end
+  end
+
+  def create(conn, %{"signup" => signup_params}) do
+    # Check if organization registration is allowed
+    if Configurations.get_global_setting(:allow_organization_registration) do
       do_create(conn, signup_params)
+    else
+      conn
+      |> put_flash(
+        :error,
+        "Organization registration is currently disabled. Please contact an administrator."
+      )
+      |> redirect(to: ~p"/login")
     end
   end
 

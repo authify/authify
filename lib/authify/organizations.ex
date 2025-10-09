@@ -6,10 +6,10 @@ defmodule Authify.Organizations do
   """
 
   import Ecto.Query
-  alias Authify.Repo
   alias Authify.Accounts.Organization
-  alias Authify.Organizations.OrganizationCname
   alias Authify.Configurations
+  alias Authify.Organizations.OrganizationCname
+  alias Authify.Repo
 
   @doc """
   Gets the list of allowed domains for an organization.

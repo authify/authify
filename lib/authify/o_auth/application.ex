@@ -312,13 +312,11 @@ defmodule Authify.OAuth.Application do
   def redirect_uris_list(_), do: []
 
   def scopes_list(%__MODULE__{} = application) do
-    case Ecto.assoc_loaded?(application.scopes) do
-      true ->
-        Enum.map(application.scopes, & &1.scope)
-
-      false ->
-        # Default to OAuth scopes if not loaded
-        ["openid", "profile", "email"]
+    if Ecto.assoc_loaded?(application.scopes) do
+      Enum.map(application.scopes, & &1.scope)
+    else
+      # Default to OAuth scopes if not loaded
+      ["openid", "profile", "email"]
     end
   end
 

@@ -8,14 +8,14 @@ defmodule Authify.Accounts do
   alias Authify.Repo
 
   alias Authify.Accounts.{
-    Organization,
-    User,
-    Invitation,
-    PersonalAccessToken,
-    Certificate,
     ApplicationGroup,
-    UserApplicationGroup,
-    ApplicationGroupMember
+    ApplicationGroupMember,
+    Certificate,
+    Invitation,
+    Organization,
+    PersonalAccessToken,
+    User,
+    UserApplicationGroup
   }
 
   ## Organizations

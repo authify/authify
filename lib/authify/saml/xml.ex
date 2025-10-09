@@ -4,8 +4,8 @@ defmodule Authify.SAML.XML do
   """
 
   import SweetXml
-  alias Authify.SAML.{ServiceProvider, Session}
   alias Authify.Accounts.User
+  alias Authify.SAML.{ServiceProvider, Session}
 
   @doc """
   Parse a SAML AuthnRequest from XML or Base64-encoded XML.

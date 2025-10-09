@@ -1,8 +1,8 @@
 defmodule AuthifyWeb.OAuthController do
   use AuthifyWeb, :controller
 
-  alias Authify.OAuth
   alias Authify.Accounts
+  alias Authify.OAuth
 
   @doc """
   OAuth2 Authorization endpoint.

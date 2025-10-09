@@ -98,7 +98,6 @@ defmodule AuthifyWeb.CertificatesHTML do
     |> Base.encode16(case: :upper)
     |> String.graphemes()
     |> Enum.chunk_every(2)
-    |> Enum.map(&Enum.join/1)
-    |> Enum.join(":")
+    |> Enum.map_join(":", &Enum.join/1)
   end
 end

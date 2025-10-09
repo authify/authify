@@ -181,9 +181,7 @@ defmodule Authify.Email do
       |> Mailer.deliver()
     else
       # In production, require SMTP configuration
-      unless Mailer.smtp_configured?(organization) do
-        {:error, :smtp_not_configured}
-      else
+      if Mailer.smtp_configured?(organization) do
         # Get SMTP config and build mailer with org-specific settings
         smtp_config = Mailer.get_smtp_config(organization)
 
@@ -191,6 +189,8 @@ defmodule Authify.Email do
         |> invitation_email(accept_url)
         |> put_provider_option(:adapter_config, smtp_config)
         |> Mailer.deliver()
+      else
+        {:error, :smtp_not_configured}
       end
     end
   end
@@ -362,9 +362,7 @@ defmodule Authify.Email do
       |> Mailer.deliver()
     else
       # In production, require SMTP configuration
-      unless Mailer.smtp_configured?(organization) do
-        {:error, :smtp_not_configured}
-      else
+      if Mailer.smtp_configured?(organization) do
         # Get SMTP config and build mailer with org-specific settings
         smtp_config = Mailer.get_smtp_config(organization)
 
@@ -372,6 +370,8 @@ defmodule Authify.Email do
         |> password_reset_email(reset_url)
         |> put_provider_option(:adapter_config, smtp_config)
         |> Mailer.deliver()
+      else
+        {:error, :smtp_not_configured}
       end
     end
   end
@@ -541,9 +541,7 @@ defmodule Authify.Email do
       |> Mailer.deliver()
     else
       # In production, require SMTP configuration
-      unless Mailer.smtp_configured?(organization) do
-        {:error, :smtp_not_configured}
-      else
+      if Mailer.smtp_configured?(organization) do
         # Get SMTP config and build mailer with org-specific settings
         smtp_config = Mailer.get_smtp_config(organization)
 
@@ -551,6 +549,8 @@ defmodule Authify.Email do
         |> email_verification_email(verification_url)
         |> put_provider_option(:adapter_config, smtp_config)
         |> Mailer.deliver()
+      else
+        {:error, :smtp_not_configured}
       end
     end
   end

@@ -1,8 +1,8 @@
 defmodule AuthifyWeb.Auth.OrganizationContextTest do
   use AuthifyWeb.ConnCase
 
-  alias AuthifyWeb.Auth.OrganizationContext
   alias Authify.Accounts
+  alias AuthifyWeb.Auth.OrganizationContext
 
   describe "organization context middleware" do
     setup do
