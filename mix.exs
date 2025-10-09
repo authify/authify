@@ -102,6 +102,13 @@ defmodule Authify.MixProject do
         "test",
         "credo --strict",
         "sobelow --config"
+      ],
+      "precommit.fast": [
+        "compile --warning-as-errors",
+        "deps.unlock --unused",
+        "format --check-formatted",
+        "credo --strict",
+        "sobelow --config"
       ]
     ]
   end

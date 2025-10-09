@@ -23,11 +23,16 @@ Authify is a multi‑tenant identity provider offering OAuth2/OIDC and SAML 2.0 
    ```bash
    mix ecto.setup
    ```
-4. Run the server (optional while developing backend logic):
+4. **(Recommended)** Install git hooks for automatic pre-commit checks:
+   ```bash
+   ./.git-hooks/install.sh
+   ```
+   This will run fast quality checks (formatting, compilation, credo, sobelow) before each commit, catching issues early.
+5. Run the server (optional while developing backend logic):
    ```bash
    mix phx.server
    ```
-5. Run tests to ensure a clean baseline:
+6. Run tests to ensure a clean baseline:
    ```bash
    mix test
    ```
@@ -59,11 +64,31 @@ Authify is a multi‑tenant identity provider offering OAuth2/OIDC and SAML 2.0 
    ```bash
    mix sobelow --exit
    ```
-6. Use the precommit alias (runs formatting, tests, etc.):
+6. Before committing, run quality checks:
    ```bash
+   # Fast checks (no tests) - runs automatically if you installed git hooks
+   mix precommit.fast
+
+   # Full checks including tests (recommended before pushing)
    mix precommit
    ```
 7. Open a Pull Request with a clear description (see below).
+
+### Git Pre-commit Hooks
+If you ran `./.git-hooks/install.sh` during setup, the pre-commit hook will automatically run `mix precommit.fast` before each commit. This catches formatting, compilation, and code quality issues early without the time cost of running the full test suite.
+
+**What the hook checks:**
+- Code compilation with warnings as errors
+- Code formatting (`mix format`)
+- Credo static analysis
+- Sobelow security checks
+
+**To bypass the hook** (not recommended):
+```bash
+git commit --no-verify
+```
+
+**Note:** The hook runs fast checks only. Always run `mix precommit` (with tests) before pushing or opening a PR.
 
 ## Pull Request Guidelines
 A good PR includes:
