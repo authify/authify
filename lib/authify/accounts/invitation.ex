@@ -1,4 +1,9 @@
 defmodule Authify.Accounts.Invitation do
+  @moduledoc """
+  Schema for user invitations to organizations. Invitations are sent via email
+  with a secure token and expire after 7 days. Tracks invitation status and
+  supports role assignment (user or admin).
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

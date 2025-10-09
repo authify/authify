@@ -224,7 +224,7 @@ defmodule Authify.Configurations do
     schema_module = get_schema_module(config)
 
     # Check if setting is super_admin_only
-    if Schema.is_super_admin_setting?(schema_module, setting_name) do
+    if Schema.super_admin_setting?(schema_module, setting_name) do
       if user && user.global_admin do
         # Super admin can set quota settings
         do_set_organization_setting(config, schema_module, org, setting_name, value)

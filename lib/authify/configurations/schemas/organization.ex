@@ -362,7 +362,7 @@ defmodule Authify.Configurations.Schemas.Organization do
   defp validate_smtp_port(nil), do: {:ok, nil}
 
   defp validate_smtp_port(port) when is_integer(port) do
-    if port > 0 and port <= 65535 do
+    if port > 0 and port <= 65_535 do
       {:ok, port}
     else
       {:error, "Must be a valid port number (1-65535)"}

@@ -1,4 +1,8 @@
 defmodule Authify.Accounts.ApplicationGroupMember do
+  @moduledoc """
+  Join table schema for the many-to-many relationship between ApplicationGroups
+  and applications (OAuth2 or SAML). Allows applications to be members of groups.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

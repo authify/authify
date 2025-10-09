@@ -104,7 +104,7 @@ defmodule Authify.Configurations.Schema do
 
   Defaults to false if not explicitly set, meaning org admins can see and modify it.
   """
-  def is_super_admin_setting?(schema_module, setting_name) do
+  def super_admin_setting?(schema_module, setting_name) do
     case get_setting(schema_module, setting_name) do
       nil -> false
       setting -> Map.get(setting, :super_admin_only, false)

@@ -1,4 +1,8 @@
 defmodule Authify.OAuth.AccessToken do
+  @moduledoc """
+  Schema for OAuth2 access tokens. Tokens are generated securely and expire
+  after 1 hour by default. Supports scope-based authorization and revocation.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

@@ -1,4 +1,9 @@
 defmodule Authify.Accounts.PersonalAccessToken do
+  @moduledoc """
+  Schema for personal access tokens (PATs) that allow users to authenticate
+  API requests. Tokens are hashed using SHA-256 and support scopes, expiration,
+  and activity tracking. Default expiration is 1 year.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -163,11 +168,13 @@ defmodule Authify.Accounts.PersonalAccessToken do
 
   defp generate_token do
     # Generate a secure random token
-    :crypto.strong_rand_bytes(32)
-    |> Base.url_encode64(padding: false)
-    # Truncate to 40 characters
-    |> binary_part(0, 40)
-    |> (fn token -> "authify_pat_#{token}" end).()
+    token =
+      :crypto.strong_rand_bytes(32)
+      |> Base.url_encode64(padding: false)
+      # Truncate to 40 characters
+      |> binary_part(0, 40)
+
+    "authify_pat_#{token}"
   end
 
   @doc """

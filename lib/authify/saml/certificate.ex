@@ -1,4 +1,9 @@
 defmodule Authify.SAML.Certificate do
+  @moduledoc """
+  Schema for SAML IdP certificates used for signing and encryption.
+  Stores PEM-formatted certificates and private keys with expiration tracking.
+  Supports per-organization certificate management.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

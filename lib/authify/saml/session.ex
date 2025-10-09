@@ -1,4 +1,9 @@
 defmodule Authify.SAML.Session do
+  @moduledoc """
+  Schema for SAML SSO sessions. Tracks active SAML sessions for Single Logout
+  coordination. Sessions expire after 1 hour by default and include request/relay
+  state for SP-initiated flows.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

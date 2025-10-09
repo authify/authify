@@ -1,4 +1,9 @@
 defmodule Authify.OAuth.AuthorizationCode do
+  @moduledoc """
+  Schema for OAuth2 authorization codes used in the authorization code flow.
+  Codes expire after 10 minutes and can only be used once. Supports PKCE
+  with S256 and plain code challenge methods.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

@@ -113,7 +113,7 @@ defmodule AuthifyWeb.SessionController do
     user = Accounts.get_user_with_organizations!(user.id)
 
     # Check if user is an admin in this organization or global admin
-    if is_admin_user?(user, organization) do
+    if admin_user?(user, organization) do
       ~p"/#{organization.slug}/dashboard"
     else
       ~p"/#{organization.slug}/user/dashboard"
@@ -121,7 +121,7 @@ defmodule AuthifyWeb.SessionController do
   end
 
   # Helper to determine if user has admin privileges
-  defp is_admin_user?(user, organization) do
+  defp admin_user?(user, organization) do
     # Check if user is admin in current organization or global admin
     Authify.Accounts.User.admin?(user, organization.id) or
       Authify.Accounts.User.global_admin?(user)

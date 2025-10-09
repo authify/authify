@@ -139,8 +139,7 @@ defmodule AuthifyWeb.Auth.APIAuth do
     if String.starts_with?(token, "authify_pat_") do
       case authenticate_personal_access_token(token) do
         {:ok, pat} ->
-          {:ok, pat.user, pat.organization,
-           Authify.Accounts.PersonalAccessToken.scopes_list(pat)}
+          {:ok, pat.user, pat.organization, Authify.Accounts.PersonalAccessToken.scopes_list(pat)}
 
         {:error, _reason} ->
           {:error, "Invalid or expired personal access token"}

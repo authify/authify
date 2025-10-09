@@ -1,4 +1,9 @@
 defmodule Authify.Accounts.ApplicationGroup do
+  @moduledoc """
+  Schema for application groups, which allow organizing OAuth/SAML applications
+  for user access management. Users can be assigned to groups to gain access to
+  multiple applications at once.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

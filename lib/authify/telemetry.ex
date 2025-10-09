@@ -30,7 +30,7 @@ defmodule Authify.Telemetry do
 
   def metrics do
     # Define histogram buckets for latency metrics (in milliseconds)
-    buckets = [10, 50, 100, 250, 500, 1000, 2500, 5000, 10000]
+    buckets = [10, 50, 100, 250, 500, 1000, 2500, 5000, 10_000]
 
     [
       # Phoenix HTTP Metrics

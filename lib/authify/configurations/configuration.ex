@@ -1,4 +1,9 @@
 defmodule Authify.Configurations.Configuration do
+  @moduledoc """
+  Polymorphic schema for configuration records. Each configurable entity
+  (e.g., Organization) can have one configuration with multiple values.
+  Links to a schema definition for validation and defaults.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

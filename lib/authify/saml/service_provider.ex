@@ -1,4 +1,9 @@
 defmodule Authify.SAML.ServiceProvider do
+  @moduledoc """
+  Schema for SAML service provider configurations. Manages SP metadata including
+  entity ID, ACS URL, and SLS URL. Supports configurable attribute mapping and
+  signature/encryption settings.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

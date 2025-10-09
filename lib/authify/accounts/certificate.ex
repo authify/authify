@@ -1,4 +1,9 @@
 defmodule Authify.Accounts.Certificate do
+  @moduledoc """
+  Schema for X.509 certificates used by the identity provider for SAML and OAuth
+  signing and encryption. Supports RSA key pairs with automatic expiration date
+  extraction and key pair validation.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -399,7 +404,7 @@ defmodule Authify.Accounts.Certificate do
             end
 
           # Check if it's an encrypted key (base64 encoded, no PEM headers)
-          is_encrypted_private_key?(key) ->
+          encrypted_private_key?(key) ->
             # Encrypted keys are valid - skip PEM validation and key pair matching
             changeset
 
@@ -411,7 +416,7 @@ defmodule Authify.Accounts.Certificate do
   end
 
   # Check if a string looks like an encrypted private key (base64 encoded)
-  defp is_encrypted_private_key?(key) do
+  defp encrypted_private_key?(key) do
     # Encrypted keys are base64 strings without PEM headers
     # They should be valid base64 and have a reasonable length
     case Base.decode64(key) do

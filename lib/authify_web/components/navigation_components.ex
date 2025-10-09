@@ -18,7 +18,7 @@ defmodule AuthifyWeb.NavigationComponents do
 
   def organization_sidebar(assigns) do
     # Check if user is admin to determine navigation type
-    assigns = assign(assigns, :is_admin, is_admin_user?(assigns.user, assigns.organization))
+    assigns = assign(assigns, :is_admin, admin_user?(assigns.user, assigns.organization))
 
     ~H"""
     <nav class="col-md-3 col-lg-2 d-md-block bg-body-tertiary sidebar collapse">
@@ -266,7 +266,7 @@ defmodule AuthifyWeb.NavigationComponents do
   end
 
   # Helper to determine if user has admin privileges in the current organization
-  defp is_admin_user?(user, organization) do
+  defp admin_user?(user, organization) do
     Authify.Accounts.User.admin?(user, organization.id) or
       Authify.Accounts.User.global_admin?(user)
   end

@@ -122,7 +122,7 @@ defmodule Authify.SAMLFixtures do
   # Generate a real RSA certificate for testing
   defp generate_test_certificate do
     # Generate RSA key pair
-    private_key = :public_key.generate_key({:rsa, 2048, 65537})
+    private_key = :public_key.generate_key({:rsa, 2048, 65_537})
 
     # Create certificate using X509 library helpers
     subject =

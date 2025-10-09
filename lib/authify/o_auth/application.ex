@@ -1,4 +1,9 @@
 defmodule Authify.OAuth.Application do
+  @moduledoc """
+  Schema for OAuth2 and OIDC applications. Supports authorization code flow,
+  refresh tokens, and client credentials. Includes PKCE support for public
+  clients (SPAs and native apps) and configurable scopes.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 

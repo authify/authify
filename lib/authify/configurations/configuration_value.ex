@@ -1,4 +1,9 @@
 defmodule Authify.Configurations.ConfigurationValue do
+  @moduledoc """
+  Schema for individual configuration setting values. Each value belongs to a
+  Configuration and stores the setting name and value as strings. Values are
+  encrypted if marked as such in the schema definition.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 
