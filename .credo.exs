@@ -44,11 +44,14 @@
         {Credo.Check.Refactor.FunctionArity, [max_arity: 8]},
         {Credo.Check.Refactor.LongQuoteBlocks, []},
         {Credo.Check.Refactor.MatchInCondition, []},
-        {Credo.Check.Refactor.MapInto, []},
+        # Disabled - requires Elixir < 1.8.0, we're on 1.18.4
+        {Credo.Check.Refactor.MapInto, false},
         {Credo.Check.Refactor.NegatedConditionsInUnless, []},
         {Credo.Check.Refactor.NegatedConditionsWithElse, []},
         {Credo.Check.Refactor.Nesting, [max_nesting: 4]},
         {Credo.Check.Refactor.UnlessWithElse, []},
+        # Disable nested module alias suggestions - we prefer explicit fully-qualified names
+        {Credo.Check.Design.AliasUsage, false},
         {Credo.Check.Warning.ApplicationConfigInModuleAttribute, []},
         {Credo.Check.Warning.BoolOperationOnSameValues, []},
         {Credo.Check.Warning.ExpensiveEmptyEnumCheck, []},

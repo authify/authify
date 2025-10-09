@@ -29,7 +29,8 @@ defmodule AuthifyWeb.API.UsersController do
           }
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -60,7 +61,8 @@ defmodule AuthifyWeb.API.UsersController do
             )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -88,7 +90,8 @@ defmodule AuthifyWeb.API.UsersController do
             render_validation_errors(conn, changeset)
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -102,7 +105,8 @@ defmodule AuthifyWeb.API.UsersController do
           "Request must include user parameters"
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -139,7 +143,8 @@ defmodule AuthifyWeb.API.UsersController do
             end
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -153,7 +158,8 @@ defmodule AuthifyWeb.API.UsersController do
           "Request must include user parameters"
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -198,7 +204,8 @@ defmodule AuthifyWeb.API.UsersController do
             end
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -245,7 +252,8 @@ defmodule AuthifyWeb.API.UsersController do
             end
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -259,7 +267,8 @@ defmodule AuthifyWeb.API.UsersController do
           "Request must include role parameter"
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 end

@@ -4,6 +4,8 @@ defmodule AuthifyWeb.Auth.APIScopeTest do
   import Authify.AccountsFixtures
   import Authify.OAuthFixtures
 
+  alias AuthifyWeb.Auth.APIAuth
+
   describe "scope validation" do
     setup do
       organization = organization_fixture()
@@ -37,7 +39,7 @@ defmodule AuthifyWeb.Auth.APIScopeTest do
         conn
         |> assign(:current_organization, organization)
         |> put_req_header("authorization", "Bearer #{access_token.token}")
-        |> AuthifyWeb.Auth.APIAuth.call(require_scopes: ["management_app:read"])
+        |> APIAuth.call(require_scopes: ["management_app:read"])
 
       assert conn.assigns.current_scopes == ["management_app:read", "users:write"]
       refute conn.halted
@@ -57,7 +59,7 @@ defmodule AuthifyWeb.Auth.APIScopeTest do
         conn
         |> assign(:current_organization, organization)
         |> put_req_header("authorization", "Bearer #{access_token.token}")
-        |> AuthifyWeb.Auth.APIAuth.call(require_scopes: ["saml:read"])
+        |> APIAuth.call(require_scopes: ["saml:read"])
 
       assert conn.status == 403
       assert conn.halted
@@ -82,7 +84,7 @@ defmodule AuthifyWeb.Auth.APIScopeTest do
         conn
         |> assign(:current_organization, organization)
         |> put_req_header("authorization", "Bearer #{access_token.token}")
-        |> AuthifyWeb.Auth.APIAuth.call(require_scopes: ["users:read"])
+        |> APIAuth.call(require_scopes: ["users:read"])
 
       assert conn.assigns.current_scopes == ["users:write"]
       refute conn.halted
@@ -102,7 +104,7 @@ defmodule AuthifyWeb.Auth.APIScopeTest do
         conn
         |> assign(:current_organization, organization)
         |> put_req_header("authorization", "Bearer #{access_token.token}")
-        |> AuthifyWeb.Auth.APIAuth.call(require_scopes: ["users:write"])
+        |> APIAuth.call(require_scopes: ["users:write"])
 
       assert conn.status == 403
       assert conn.halted
@@ -122,7 +124,7 @@ defmodule AuthifyWeb.Auth.APIScopeTest do
         conn
         |> assign(:current_organization, organization)
         |> put_req_header("authorization", "Bearer #{access_token.token}")
-        |> AuthifyWeb.Auth.APIAuth.call(require_scopes: ["users:read"])
+        |> APIAuth.call(require_scopes: ["users:read"])
 
       assert conn.status == 403
       assert conn.halted
@@ -142,7 +144,7 @@ defmodule AuthifyWeb.Auth.APIScopeTest do
         conn
         |> assign(:current_organization, organization)
         |> put_req_header("authorization", "Bearer #{access_token.token}")
-        |> AuthifyWeb.Auth.APIAuth.call([])
+        |> APIAuth.call([])
 
       assert conn.assigns.current_scopes == ["users:read"]
       refute conn.halted

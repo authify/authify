@@ -38,7 +38,8 @@ defmodule AuthifyWeb.API.ApplicationGroupsController do
           }
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -77,7 +78,8 @@ defmodule AuthifyWeb.API.ApplicationGroupsController do
             )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -103,7 +105,8 @@ defmodule AuthifyWeb.API.ApplicationGroupsController do
             render_validation_errors(conn, changeset)
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -117,7 +120,8 @@ defmodule AuthifyWeb.API.ApplicationGroupsController do
           "Request must include application_group parameters"
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -162,7 +166,8 @@ defmodule AuthifyWeb.API.ApplicationGroupsController do
             )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -176,7 +181,8 @@ defmodule AuthifyWeb.API.ApplicationGroupsController do
           "Request must include application_group parameters"
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -221,7 +227,8 @@ defmodule AuthifyWeb.API.ApplicationGroupsController do
             )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 end

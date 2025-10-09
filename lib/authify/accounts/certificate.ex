@@ -93,24 +93,13 @@ defmodule Authify.Accounts.Certificate do
   Extracts the expiration date from an X.509 certificate in PEM format.
   """
   def extract_expiration_date(certificate_pem) when is_binary(certificate_pem) do
-    try do
-      case parse_certificate_pem(certificate_pem) do
-        {:ok, certificate} ->
-          case extract_validity_from_certificate(certificate) do
-            {:ok, {_not_before, not_after}} ->
-              {:ok, not_after}
-
-            {:error, reason} ->
-              {:error, reason}
-          end
-
-        {:error, reason} ->
-          {:error, reason}
-      end
-    rescue
-      error ->
-        {:error, "Failed to extract expiration date: #{inspect(error)}"}
+    with {:ok, certificate} <- parse_certificate_pem(certificate_pem),
+         {:ok, {_not_before, not_after}} <- extract_validity_from_certificate(certificate) do
+      {:ok, not_after}
     end
+  rescue
+    error ->
+      {:error, "Failed to extract expiration date: #{inspect(error)}"}
   end
 
   @doc """
@@ -118,169 +107,133 @@ defmodule Authify.Accounts.Certificate do
   """
   def validate_key_pair(private_key_pem, certificate_pem)
       when is_binary(private_key_pem) and is_binary(certificate_pem) do
-    try do
-      # Parse private key
-      case parse_private_key_pem(private_key_pem) do
-        {:ok, private_key} ->
-          # Parse certificate
-          case parse_certificate_pem(certificate_pem) do
-            {:ok, certificate} ->
-              # Extract public key from certificate
-              case extract_public_key_from_certificate(certificate) do
-                {:ok, cert_public_key} ->
-                  # Derive public key from private key
-                  case derive_public_key_from_private(private_key) do
-                    {:ok, derived_public_key} ->
-                      # Compare public keys
-                      if public_keys_match?(cert_public_key, derived_public_key) do
-                        {:ok, true}
-                      else
-                        {:error, "Private key does not match certificate"}
-                      end
-
-                    {:error, reason} ->
-                      {:error, "Failed to derive public key: #{reason}"}
-                  end
-
-                {:error, reason} ->
-                  {:error, "Failed to extract public key from certificate: #{reason}"}
-              end
-
-            {:error, reason} ->
-              {:error, "Failed to parse certificate: #{reason}"}
-          end
-
-        {:error, reason} ->
-          {:error, "Failed to parse private key: #{reason}"}
+    with {:ok, private_key} <- parse_private_key_pem(private_key_pem),
+         {:ok, certificate} <- parse_certificate_pem(certificate_pem),
+         {:ok, cert_public_key} <- extract_public_key_from_certificate(certificate),
+         {:ok, derived_public_key} <- derive_public_key_from_private(private_key) do
+      if public_keys_match?(cert_public_key, derived_public_key) do
+        {:ok, true}
+      else
+        {:error, "Private key does not match certificate"}
       end
-    rescue
-      error ->
-        {:error, "Key pair validation failed: #{inspect(error)}"}
     end
+  rescue
+    error ->
+      {:error, "Key pair validation failed: #{inspect(error)}"}
   end
 
   # Private helper functions for key management
 
   defp parse_private_key_pem(private_key_pem) do
-    try do
-      pem_entries = :public_key.pem_decode(private_key_pem)
+    pem_entries = :public_key.pem_decode(private_key_pem)
 
-      case pem_entries do
-        [pem_entry | _] ->
-          private_key = :public_key.pem_entry_decode(pem_entry)
-          {:ok, private_key}
+    case pem_entries do
+      [pem_entry | _] ->
+        private_key = :public_key.pem_entry_decode(pem_entry)
+        {:ok, private_key}
 
-        [] ->
-          {:error, "No PEM entries found"}
-      end
-    rescue
-      error ->
-        {:error, "PEM decode failed: #{inspect(error)}"}
+      [] ->
+        {:error, "No PEM entries found"}
     end
+  rescue
+    error ->
+      {:error, "PEM decode failed: #{inspect(error)}"}
   end
 
   defp parse_certificate_pem(certificate_pem) do
-    try do
-      pem_entries = :public_key.pem_decode(certificate_pem)
+    pem_entries = :public_key.pem_decode(certificate_pem)
 
-      case pem_entries do
-        [pem_entry | _] ->
-          certificate = :public_key.pem_entry_decode(pem_entry)
-          {:ok, certificate}
+    case pem_entries do
+      [pem_entry | _] ->
+        certificate = :public_key.pem_entry_decode(pem_entry)
+        {:ok, certificate}
 
-        [] ->
-          {:error, "No PEM entries found"}
-      end
-    rescue
-      error ->
-        {:error, "PEM decode failed: #{inspect(error)}"}
+      [] ->
+        {:error, "No PEM entries found"}
     end
+  rescue
+    error ->
+      {:error, "PEM decode failed: #{inspect(error)}"}
   end
 
   defp extract_public_key_from_certificate(certificate) do
-    try do
-      case certificate do
-        {:Certificate, tbs_certificate, _signature_algorithm, _signature_value} ->
-          {:TBSCertificate, _version, _serial, _signature, _issuer, _validity, _subject,
-           subject_public_key_info, _issuer_unique_id, _subject_unique_id,
-           _extensions} = tbs_certificate
+    case certificate do
+      {:Certificate, tbs_certificate, _signature_algorithm, _signature_value} ->
+        {:TBSCertificate, _version, _serial, _signature, _issuer, _validity, _subject,
+         subject_public_key_info, _issuer_unique_id, _subject_unique_id,
+         _extensions} = tbs_certificate
 
-          {:SubjectPublicKeyInfo, _algorithm, public_key_data} = subject_public_key_info
+        {:SubjectPublicKeyInfo, _algorithm, public_key_data} = subject_public_key_info
 
-          # Decode the DER-encoded public key data into an RSA public key
-          case :public_key.der_decode(:RSAPublicKey, public_key_data) do
-            {:RSAPublicKey, _modulus, _exponent} = public_key ->
-              {:ok, public_key}
+        # Decode the DER-encoded public key data into an RSA public key
+        case :public_key.der_decode(:RSAPublicKey, public_key_data) do
+          {:RSAPublicKey, _modulus, _exponent} = public_key ->
+            {:ok, public_key}
 
-            _ ->
-              {:error, "Unable to decode RSA public key from certificate"}
-          end
+          _ ->
+            {:error, "Unable to decode RSA public key from certificate"}
+        end
 
-        _ ->
-          {:error, "Unsupported certificate format"}
-      end
-    rescue
-      error ->
-        {:error, "Failed to extract public key: #{inspect(error)}"}
+      _ ->
+        {:error, "Unsupported certificate format"}
     end
+  rescue
+    error ->
+      {:error, "Failed to extract public key: #{inspect(error)}"}
   end
 
   defp extract_validity_from_certificate(certificate) do
-    try do
-      case certificate do
-        {:Certificate, tbs_certificate, _signature_algorithm, _signature_value} ->
-          {:TBSCertificate, _version, _serial, _signature, _issuer, validity, _subject,
-           _subject_public_key_info, _issuer_unique_id, _subject_unique_id,
-           _extensions} = tbs_certificate
+    case certificate do
+      {:Certificate, tbs_certificate, _signature_algorithm, _signature_value} ->
+        {:TBSCertificate, _version, _serial, _signature, _issuer, validity, _subject,
+         _subject_public_key_info, _issuer_unique_id, _subject_unique_id,
+         _extensions} = tbs_certificate
 
-          case validity do
-            {:Validity, not_before, not_after} ->
-              # Convert ASN.1 time to DateTime
-              case {convert_asn1_time_to_datetime(not_before),
-                    convert_asn1_time_to_datetime(not_after)} do
-                {{:ok, not_before_dt}, {:ok, not_after_dt}} ->
-                  {:ok, {not_before_dt, not_after_dt}}
+        case validity do
+          {:Validity, not_before, not_after} ->
+            # Convert ASN.1 time to DateTime
+            case {convert_asn1_time_to_datetime(not_before),
+                  convert_asn1_time_to_datetime(not_after)} do
+              {{:ok, not_before_dt}, {:ok, not_after_dt}} ->
+                {:ok, {not_before_dt, not_after_dt}}
 
-                {{:error, reason}, _} ->
-                  {:error, "Failed to parse not_before time: #{reason}"}
+              {{:error, reason}, _} ->
+                {:error, "Failed to parse not_before time: #{reason}"}
 
-                {_, {:error, reason}} ->
-                  {:error, "Failed to parse not_after time: #{reason}"}
-              end
+              {_, {:error, reason}} ->
+                {:error, "Failed to parse not_after time: #{reason}"}
+            end
 
-            _ ->
-              {:error, "Invalid validity format"}
-          end
+          _ ->
+            {:error, "Invalid validity format"}
+        end
 
-        _ ->
-          {:error, "Unsupported certificate format"}
-      end
-    rescue
-      error ->
-        {:error, "Failed to extract validity: #{inspect(error)}"}
+      _ ->
+        {:error, "Unsupported certificate format"}
     end
+  rescue
+    error ->
+      {:error, "Failed to extract validity: #{inspect(error)}"}
   end
 
   defp convert_asn1_time_to_datetime(asn1_time) do
-    try do
-      case asn1_time do
-        {:utcTime, time_string} when is_list(time_string) ->
-          # Convert charlist to string
-          time_str = to_string(time_string)
-          parse_utc_time(time_str)
+    case asn1_time do
+      {:utcTime, time_string} when is_list(time_string) ->
+        # Convert charlist to string
+        time_str = to_string(time_string)
+        parse_utc_time(time_str)
 
-        {:generalTime, time_string} when is_list(time_string) ->
-          # Convert charlist to string
-          time_str = to_string(time_string)
-          parse_general_time(time_str)
+      {:generalTime, time_string} when is_list(time_string) ->
+        # Convert charlist to string
+        time_str = to_string(time_string)
+        parse_general_time(time_str)
 
-        _ ->
-          {:error, "Unsupported time format: #{inspect(asn1_time)}"}
-      end
-    rescue
-      error ->
-        {:error, "Failed to convert ASN.1 time: #{inspect(error)}"}
+      _ ->
+        {:error, "Unsupported time format: #{inspect(asn1_time)}"}
     end
+  rescue
+    error ->
+      {:error, "Failed to convert ASN.1 time: #{inspect(error)}"}
   end
 
   defp parse_utc_time(time_str) do
@@ -333,20 +286,18 @@ defmodule Authify.Accounts.Certificate do
   end
 
   defp derive_public_key_from_private(private_key) do
-    try do
-      case private_key do
-        {:RSAPrivateKey, _version, modulus, public_exponent, _private_exponent, _p, _q,
-         _exponent1, _exponent2, _coefficient, _other_prime_infos} ->
-          public_key = {:RSAPublicKey, modulus, public_exponent}
-          {:ok, public_key}
+    case private_key do
+      {:RSAPrivateKey, _version, modulus, public_exponent, _private_exponent, _p, _q, _exponent1,
+       _exponent2, _coefficient, _other_prime_infos} ->
+        public_key = {:RSAPublicKey, modulus, public_exponent}
+        {:ok, public_key}
 
-        _ ->
-          {:error, "Unsupported private key format"}
-      end
-    rescue
-      error ->
-        {:error, "Failed to derive public key: #{inspect(error)}"}
+      _ ->
+        {:error, "Unsupported private key format"}
     end
+  rescue
+    error ->
+      {:error, "Failed to derive public key: #{inspect(error)}"}
   end
 
   defp public_keys_match?(key1, key2) do
@@ -430,37 +381,33 @@ defmodule Authify.Accounts.Certificate do
   end
 
   defp parse_and_validate_certificate(cert_pem) do
-    try do
-      case :public_key.pem_decode(cert_pem) do
-        [pem_entry | _] ->
-          # Try to decode the certificate to ensure it's valid
-          _certificate = :public_key.pem_entry_decode(pem_entry)
-          :ok
+    case :public_key.pem_decode(cert_pem) do
+      [pem_entry | _] ->
+        # Try to decode the certificate to ensure it's valid
+        _certificate = :public_key.pem_entry_decode(pem_entry)
+        :ok
 
-        [] ->
-          {:error, "no valid PEM entries found"}
-      end
-    rescue
-      error ->
-        {:error, "PEM decode failed: #{inspect(error)}"}
+      [] ->
+        {:error, "no valid PEM entries found"}
     end
+  rescue
+    error ->
+      {:error, "PEM decode failed: #{inspect(error)}"}
   end
 
   defp parse_and_validate_private_key(key_pem) do
-    try do
-      case :public_key.pem_decode(key_pem) do
-        [pem_entry | _] ->
-          # Try to decode the private key to ensure it's valid
-          _private_key = :public_key.pem_entry_decode(pem_entry)
-          :ok
+    case :public_key.pem_decode(key_pem) do
+      [pem_entry | _] ->
+        # Try to decode the private key to ensure it's valid
+        _private_key = :public_key.pem_entry_decode(pem_entry)
+        :ok
 
-        [] ->
-          {:error, "no valid PEM entries found"}
-      end
-    rescue
-      error ->
-        {:error, "PEM decode failed: #{inspect(error)}"}
+      [] ->
+        {:error, "no valid PEM entries found"}
     end
+  rescue
+    error ->
+      {:error, "PEM decode failed: #{inspect(error)}"}
   end
 
   defp validate_key_pair_match(changeset) do

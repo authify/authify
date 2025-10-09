@@ -11,56 +11,26 @@ defmodule Authify.SAML.XML do
   Parse a SAML AuthnRequest from XML or Base64-encoded XML.
   """
   def parse_authn_request(saml_request_data) when is_binary(saml_request_data) do
-    case decode_saml_data(saml_request_data) do
-      {:ok, xml} ->
-        try do
-          parsed_request =
-            xml
-            |> xmap(
-              request_id: ~x"//saml2p:AuthnRequest/@ID"s,
-              issuer: ~x"//saml2:Issuer/text()"s,
-              acs_url: ~x"//saml2p:AuthnRequest/@AssertionConsumerServiceURL"s,
-              destination: ~x"//saml2p:AuthnRequest/@Destination"s,
-              force_authn: ~x"//saml2p:AuthnRequest/@ForceAuthn"s,
-              issue_instant: ~x"//saml2p:AuthnRequest/@IssueInstant"s,
-              protocol_binding: ~x"//saml2p:AuthnRequest/@ProtocolBinding"s,
-              version: ~x"//saml2p:AuthnRequest/@Version"s
-            )
-
-          # Validate required fields
-          cond do
-            is_nil(parsed_request.request_id) or parsed_request.request_id == "" ->
-              {:error, "Missing or empty Request ID"}
-
-            is_nil(parsed_request.issuer) or parsed_request.issuer == "" ->
-              {:error, "Missing or empty Issuer"}
-
-            is_nil(parsed_request.acs_url) or parsed_request.acs_url == "" ->
-              {:error, "Missing or empty AssertionConsumerServiceURL"}
-
-            true ->
-              {:ok,
-               %{
-                 request_id: parsed_request.request_id,
-                 issuer: parsed_request.issuer,
-                 acs_url: parsed_request.acs_url,
-                 destination: parsed_request.destination,
-                 force_authn: parsed_request.force_authn == "true",
-                 issue_instant: parsed_request.issue_instant,
-                 protocol_binding: parsed_request.protocol_binding,
-                 version: parsed_request.version,
-                 # RelayState comes from query params, not XML
-                 relay_state: nil
-               }}
-          end
-        rescue
-          error ->
-            {:error, "Failed to parse SAML AuthnRequest: #{inspect(error)}"}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
+    with {:ok, xml} <- decode_saml_data(saml_request_data),
+         parsed_request <- parse_authn_request_xml(xml),
+         :ok <- validate_authn_request_fields(parsed_request) do
+      {:ok,
+       %{
+         request_id: parsed_request.request_id,
+         issuer: parsed_request.issuer,
+         acs_url: parsed_request.acs_url,
+         destination: parsed_request.destination,
+         force_authn: parsed_request.force_authn == "true",
+         issue_instant: parsed_request.issue_instant,
+         protocol_binding: parsed_request.protocol_binding,
+         version: parsed_request.version,
+         # RelayState comes from query params, not XML
+         relay_state: nil
+       }}
     end
+  rescue
+    error ->
+      {:error, "Failed to parse SAML AuthnRequest: #{inspect(error)}"}
   end
 
   def parse_authn_request(nil), do: {:error, "SAML request cannot be empty"}
@@ -70,51 +40,24 @@ defmodule Authify.SAML.XML do
   Parse a SAML LogoutRequest from XML or Base64-encoded XML.
   """
   def parse_logout_request(saml_request_data) when is_binary(saml_request_data) do
-    case decode_saml_data(saml_request_data) do
-      {:ok, xml} ->
-        try do
-          parsed_request =
-            xml
-            |> xmap(
-              request_id: ~x"//saml2p:LogoutRequest/@ID"s,
-              issuer: ~x"//saml2:Issuer/text()"s,
-              destination: ~x"//saml2p:LogoutRequest/@Destination"s,
-              name_id: ~x"//saml2:NameID/text()"s,
-              name_id_format: ~x"//saml2:NameID/@Format"s,
-              session_index: ~x"//saml2p:SessionIndex/text()"s,
-              issue_instant: ~x"//saml2p:LogoutRequest/@IssueInstant"s,
-              version: ~x"//saml2p:LogoutRequest/@Version"s
-            )
-
-          # Validate required fields
-          cond do
-            is_nil(parsed_request.request_id) or parsed_request.request_id == "" ->
-              {:error, "Missing or empty Request ID"}
-
-            is_nil(parsed_request.issuer) or parsed_request.issuer == "" ->
-              {:error, "Missing or empty Issuer"}
-
-            true ->
-              {:ok,
-               %{
-                 request_id: parsed_request.request_id,
-                 issuer: parsed_request.issuer,
-                 destination: parsed_request.destination,
-                 name_id: parsed_request.name_id,
-                 name_id_format: parsed_request.name_id_format,
-                 session_index: parsed_request.session_index,
-                 issue_instant: parsed_request.issue_instant,
-                 version: parsed_request.version
-               }}
-          end
-        rescue
-          error ->
-            {:error, "Failed to parse SAML LogoutRequest: #{inspect(error)}"}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
+    with {:ok, xml} <- decode_saml_data(saml_request_data),
+         parsed_request <- parse_logout_request_xml(xml),
+         :ok <- validate_logout_request_fields(parsed_request) do
+      {:ok,
+       %{
+         request_id: parsed_request.request_id,
+         issuer: parsed_request.issuer,
+         destination: parsed_request.destination,
+         name_id: parsed_request.name_id,
+         name_id_format: parsed_request.name_id_format,
+         session_index: parsed_request.session_index,
+         issue_instant: parsed_request.issue_instant,
+         version: parsed_request.version
+       }}
     end
+  rescue
+    error ->
+      {:error, "Failed to parse SAML LogoutRequest: #{inspect(error)}"}
   end
 
   def parse_logout_request(nil), do: {:error, "SAML logout request cannot be empty"}
@@ -303,27 +246,93 @@ defmodule Authify.SAML.XML do
 
   # Private helper functions
 
-  defp decode_saml_data(data) when is_binary(data) do
-    # Try to decode if it looks like Base64
-    if String.match?(data, ~r/^[A-Za-z0-9+\/]+=*$/) and String.length(data) > 50 do
-      case Base.decode64(data) do
-        {:ok, decoded} ->
-          if String.contains?(decoded, "<") do
-            {:ok, decoded}
-          else
-            {:error, "Decoded data is not valid XML"}
-          end
+  defp parse_authn_request_xml(xml) do
+    xml
+    |> xmap(
+      request_id: ~x"//saml2p:AuthnRequest/@ID"s,
+      issuer: ~x"//saml2:Issuer/text()"s,
+      acs_url: ~x"//saml2p:AuthnRequest/@AssertionConsumerServiceURL"s,
+      destination: ~x"//saml2p:AuthnRequest/@Destination"s,
+      force_authn: ~x"//saml2p:AuthnRequest/@ForceAuthn"s,
+      issue_instant: ~x"//saml2p:AuthnRequest/@IssueInstant"s,
+      protocol_binding: ~x"//saml2p:AuthnRequest/@ProtocolBinding"s,
+      version: ~x"//saml2p:AuthnRequest/@Version"s
+    )
+  end
 
-        :error ->
-          {:error, "Invalid Base64 encoding"}
-      end
+  defp validate_authn_request_fields(parsed_request) do
+    cond do
+      is_nil(parsed_request.request_id) or parsed_request.request_id == "" ->
+        {:error, "Missing or empty Request ID"}
+
+      is_nil(parsed_request.issuer) or parsed_request.issuer == "" ->
+        {:error, "Missing or empty Issuer"}
+
+      is_nil(parsed_request.acs_url) or parsed_request.acs_url == "" ->
+        {:error, "Missing or empty AssertionConsumerServiceURL"}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp parse_logout_request_xml(xml) do
+    xml
+    |> xmap(
+      request_id: ~x"//saml2p:LogoutRequest/@ID"s,
+      issuer: ~x"//saml2:Issuer/text()"s,
+      destination: ~x"//saml2p:LogoutRequest/@Destination"s,
+      name_id: ~x"//saml2:NameID/text()"s,
+      name_id_format: ~x"//saml2:NameID/@Format"s,
+      session_index: ~x"//saml2p:SessionIndex/text()"s,
+      issue_instant: ~x"//saml2p:LogoutRequest/@IssueInstant"s,
+      version: ~x"//saml2p:LogoutRequest/@Version"s
+    )
+  end
+
+  defp validate_logout_request_fields(parsed_request) do
+    cond do
+      is_nil(parsed_request.request_id) or parsed_request.request_id == "" ->
+        {:error, "Missing or empty Request ID"}
+
+      is_nil(parsed_request.issuer) or parsed_request.issuer == "" ->
+        {:error, "Missing or empty Issuer"}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp decode_saml_data(data) when is_binary(data) do
+    if looks_like_base64?(data) do
+      decode_base64_saml(data)
     else
-      # Assume it's already XML
-      if String.contains?(data, "<") do
-        {:ok, data}
-      else
-        {:error, "Data is neither valid Base64 nor XML"}
-      end
+      validate_xml_data(data)
+    end
+  end
+
+  defp looks_like_base64?(data) do
+    String.match?(data, ~r/^[A-Za-z0-9+\/]+=*$/) and String.length(data) > 50
+  end
+
+  defp decode_base64_saml(data) do
+    with {:ok, decoded} <- Base.decode64(data),
+         true <- String.contains?(decoded, "<") do
+      {:ok, decoded}
+    else
+      :error ->
+        {:error, "Invalid Base64 encoding"}
+
+      false ->
+        {:error, "Decoded data is not valid XML"}
+    end
+  end
+
+  defp validate_xml_data(data) do
+    if String.contains?(data, "<") do
+      {:ok, data}
+    else
+      {:error, "Data is neither valid Base64 nor XML"}
     end
   end
 

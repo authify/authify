@@ -14,49 +14,45 @@ defmodule Authify.SAML.XMLSignature do
   Signs an XML document by inserting a ds:Signature element.
   """
   def sign_xml(xml_string, %Certificate{} = certificate, options \\ []) do
-    try do
-      # Parse XML to ensure it's well-formed
-      SweetXml.parse(xml_string)
+    # Parse XML to ensure it's well-formed
+    SweetXml.parse(xml_string)
 
-      # Canonicalize the XML
-      canonical_xml = canonicalize_xml(xml_string)
+    # Canonicalize the XML
+    canonical_xml = canonicalize_xml(xml_string)
 
-      # Create the signature
-      signature_element = create_signature(canonical_xml, certificate, options)
+    # Create the signature
+    signature_element = create_signature(canonical_xml, certificate, options)
 
-      # Insert the signature into the XML
-      signed_xml = insert_signature(xml_string, signature_element, options)
+    # Insert the signature into the XML
+    signed_xml = insert_signature(xml_string, signature_element, options)
 
-      {:ok, signed_xml}
-    rescue
-      error ->
-        {:error, "Failed to sign XML: #{inspect(error)}"}
-    catch
-      :exit, reason ->
-        {:error, "Failed to sign XML: #{inspect(reason)}"}
-    end
+    {:ok, signed_xml}
+  rescue
+    error ->
+      {:error, "Failed to sign XML: #{inspect(error)}"}
+  catch
+    :exit, reason ->
+      {:error, "Failed to sign XML: #{inspect(reason)}"}
   end
 
   @doc """
   Verifies an XML digital signature.
   """
   def verify_signature(signed_xml, %Certificate{} = certificate) do
-    try do
-      # Extract signature from XML
-      signature_info = extract_signature_info(signed_xml)
+    # Extract signature from XML
+    signature_info = extract_signature_info(signed_xml)
 
-      # Remove signature from XML for verification
-      unsigned_xml = remove_signature(signed_xml)
+    # Remove signature from XML for verification
+    unsigned_xml = remove_signature(signed_xml)
 
-      # Canonicalize the unsigned XML
-      canonical_xml = canonicalize_xml(unsigned_xml)
+    # Canonicalize the unsigned XML
+    canonical_xml = canonicalize_xml(unsigned_xml)
 
-      # Verify the signature
-      verify_signature_info(canonical_xml, signature_info, certificate)
-    rescue
-      error ->
-        {:error, "Failed to verify signature: #{inspect(error)}"}
-    end
+    # Verify the signature
+    verify_signature_info(canonical_xml, signature_info, certificate)
+  rescue
+    error ->
+      {:error, "Failed to verify signature: #{inspect(error)}"}
   end
 
   @doc """
@@ -232,47 +228,43 @@ defmodule Authify.SAML.XMLSignature do
   end
 
   defp sign_data(data, %Certificate{private_key: private_key_pem}) do
-    try do
-      # Private key is already decrypted by Authify.Encrypted.Binary Ecto type
-      # Parse the PEM private key
-      case parse_private_key(private_key_pem) do
-        {:ok, private_key} ->
-          # Sign the data using RSA-SHA256
-          :public_key.sign(data, :sha256, private_key)
+    # Private key is already decrypted by Authify.Encrypted.Binary Ecto type
+    # Parse the PEM private key
+    case parse_private_key(private_key_pem) do
+      {:ok, private_key} ->
+        # Sign the data using RSA-SHA256
+        :public_key.sign(data, :sha256, private_key)
 
-        {:error, reason} ->
-          # Return a recognizable error signature
-          :crypto.hash(:sha256, "ERROR_PARSING_PRIVATE_KEY_#{reason}")
-      end
-    rescue
-      error ->
+      {:error, reason} ->
         # Return a recognizable error signature
-        :crypto.hash(:sha256, "ERROR_SIGNING_DATA_#{inspect(error)}")
+        :crypto.hash(:sha256, "ERROR_PARSING_PRIVATE_KEY_#{reason}")
     end
+  rescue
+    error ->
+      # Return a recognizable error signature
+      :crypto.hash(:sha256, "ERROR_SIGNING_DATA_#{inspect(error)}")
   end
 
   defp parse_private_key(private_key_pem) when is_binary(private_key_pem) do
-    try do
-      # Remove the placeholder check and try to parse real PEM
-      if String.contains?(private_key_pem, "PLACEHOLDER") do
-        {:error, "placeholder_key_not_supported"}
-      else
-        # Parse PEM entries
-        pem_entries = :public_key.pem_decode(private_key_pem)
+    # Remove the placeholder check and try to parse real PEM
+    if String.contains?(private_key_pem, "PLACEHOLDER") do
+      {:error, "placeholder_key_not_supported"}
+    else
+      # Parse PEM entries
+      pem_entries = :public_key.pem_decode(private_key_pem)
 
-        case pem_entries do
-          [pem_entry | _] ->
-            private_key = :public_key.pem_entry_decode(pem_entry)
-            {:ok, private_key}
+      case pem_entries do
+        [pem_entry | _] ->
+          private_key = :public_key.pem_entry_decode(pem_entry)
+          {:ok, private_key}
 
-          [] ->
-            {:error, "no_pem_entries_found"}
-        end
+        [] ->
+          {:error, "no_pem_entries_found"}
       end
-    rescue
-      error ->
-        {:error, "pem_decode_failed_#{inspect(error)}"}
     end
+  rescue
+    error ->
+      {:error, "pem_decode_failed_#{inspect(error)}"}
   end
 
   defp insert_signature(xml_string, signature_element, options) do
@@ -299,82 +291,74 @@ defmodule Authify.SAML.XMLSignature do
   end
 
   defp extract_signature_info(signed_xml) do
-    try do
-      # Parse the signed XML
-      parsed = SweetXml.parse(signed_xml)
+    # Parse the signed XML
+    parsed = SweetXml.parse(signed_xml)
 
-      # Extract signature components using XPath-like selectors
-      signature_value = extract_signature_value(parsed)
-      signed_info = extract_signed_info(parsed)
-      certificate_data = extract_certificate_from_signature(parsed)
+    # Extract signature components using XPath-like selectors
+    signature_value = extract_signature_value(parsed)
+    signed_info = extract_signed_info(parsed)
+    certificate_data = extract_certificate_from_signature(parsed)
 
+    %{
+      signature_value: signature_value,
+      signed_info: signed_info,
+      certificate: certificate_data
+    }
+  rescue
+    error ->
+      # Return empty values if extraction fails - this maintains backward compatibility
+      # but allows the verification to fail properly
       %{
-        signature_value: signature_value,
-        signed_info: signed_info,
-        certificate: certificate_data
+        signature_value: "",
+        signed_info: "",
+        certificate: "",
+        error: "Failed to extract signature info: #{inspect(error)}"
       }
-    rescue
-      error ->
-        # Return empty values if extraction fails - this maintains backward compatibility
-        # but allows the verification to fail properly
-        %{
-          signature_value: "",
-          signed_info: "",
-          certificate: "",
-          error: "Failed to extract signature info: #{inspect(error)}"
-        }
-    end
   end
 
   defp extract_signature_value(parsed_xml) do
-    try do
-      # Look for ds:SignatureValue element
-      case find_element_text(parsed_xml, "SignatureValue") do
-        nil -> ""
-        value -> String.trim(value)
-      end
-    rescue
-      _ -> ""
+    # Look for ds:SignatureValue element
+    case find_element_text(parsed_xml, "SignatureValue") do
+      nil -> ""
+      value -> String.trim(value)
     end
+  rescue
+    _ -> ""
   end
 
   defp extract_signed_info(parsed_xml) do
-    try do
-      # Find the ds:SignedInfo element and canonicalize it
-      case find_element(parsed_xml, "SignedInfo") do
-        nil ->
-          ""
+    # Find the ds:SignedInfo element and canonicalize it
+    case find_element(parsed_xml, "SignedInfo") do
+      nil ->
+        ""
 
-        signed_info_element ->
-          # Convert the element back to XML string for canonicalization
-          xml_string = element_to_xml_string(signed_info_element)
-          canonicalize_xml(xml_string)
-      end
-    rescue
-      _ -> ""
+      signed_info_element ->
+        # Convert the element back to XML string for canonicalization
+        xml_string = element_to_xml_string(signed_info_element)
+        canonicalize_xml(xml_string)
     end
+  rescue
+    _ -> ""
   end
 
   defp extract_certificate_from_signature(parsed_xml) do
-    try do
-      # Look for ds:X509Certificate element within ds:KeyInfo
-      case find_element_text(parsed_xml, "X509Certificate") do
-        nil ->
-          ""
+    # Look for ds:X509Certificate element within ds:KeyInfo
+    case find_element_text(parsed_xml, "X509Certificate") do
+      nil ->
+        ""
 
-        cert_data ->
-          # Add PEM headers if not present
-          cleaned_cert = String.trim(cert_data)
+      cert_data ->
+        # Add PEM headers if not present
+        cleaned_cert = String.trim(cert_data)
 
-          if String.starts_with?(cleaned_cert, "-----BEGIN") do
-            cleaned_cert
-          else
-            "-----BEGIN CERTIFICATE-----\n#{cleaned_cert}\n-----END CERTIFICATE-----"
-          end
-      end
-    rescue
-      _ -> ""
+        if String.starts_with?(cleaned_cert, "-----BEGIN") do
+          cleaned_cert
+        else
+          "-----BEGIN CERTIFICATE-----\n#{cleaned_cert}\n-----END CERTIFICATE-----"
+        end
     end
+  rescue
+    _ -> ""
   end
 
   # Helper function to find an element by name in parsed XML
@@ -476,113 +460,90 @@ defmodule Authify.SAML.XMLSignature do
   end
 
   defp verify_signature_info(canonical_xml, signature_info, %Certificate{} = certificate) do
-    try do
-      # Extract public key from certificate
-      case extract_public_key(certificate.certificate) do
-        {:ok, public_key} ->
-          # Get the signature value and signed info
-          signature_value = Map.get(signature_info, :signature_value, "")
-          signed_info = Map.get(signature_info, :signed_info, "")
+    signature_value = Map.get(signature_info, :signature_value, "")
+    signed_info = Map.get(signature_info, :signed_info, "")
 
-          if signature_value != "" and signed_info != "" do
-            # The signature is over the SignedInfo, not the canonical XML
-            # First verify the digest in SignedInfo matches the canonical XML
-            case verify_digest(canonical_xml, signed_info) do
-              {:ok, true} ->
-                # Now verify the signature over the SignedInfo
-                case Base.decode64(signature_value) do
-                  {:ok, signature_bytes} ->
-                    if :public_key.verify(signed_info, :sha256, signature_bytes, public_key) do
-                      {:ok, true}
-                    else
-                      {:ok, false}
-                    end
-
-                  :error ->
-                    {:error, "invalid_base64_signature"}
-                end
-
-              {:ok, false} ->
-                {:error, "digest_mismatch"}
-
-              {:error, reason} ->
-                {:error, "digest_verification_failed_#{reason}"}
-            end
-          else
-            {:error, "missing_signature_data"}
-          end
-
-        {:error, reason} ->
-          {:error, "certificate_error_#{reason}"}
+    with true <- signature_value != "" and signed_info != "",
+         {:ok, public_key} <- extract_public_key(certificate.certificate),
+         {:ok, true} <- verify_digest(canonical_xml, signed_info),
+         {:ok, signature_bytes} <- Base.decode64(signature_value) do
+      if :public_key.verify(signed_info, :sha256, signature_bytes, public_key) do
+        {:ok, true}
+      else
+        {:ok, false}
       end
-    rescue
-      error ->
-        {:error, "verification_failed_#{inspect(error)}"}
+    else
+      false ->
+        {:error, "missing_signature_data"}
+
+      {:ok, false} ->
+        {:error, "digest_mismatch"}
+
+      {:error, reason} when is_binary(reason) ->
+        if String.starts_with?(reason, "digest_verification_failed") or
+             String.starts_with?(reason, "certificate_error") do
+          {:error, reason}
+        else
+          {:error, "certificate_error_#{reason}"}
+        end
+
+      :error ->
+        {:error, "invalid_base64_signature"}
     end
+  rescue
+    error ->
+      {:error, "verification_failed_#{inspect(error)}"}
   end
 
   defp verify_digest(canonical_xml, signed_info) do
-    try do
-      # Extract the digest value from SignedInfo
-      parsed_signed_info = SweetXml.parse(signed_info)
+    # Extract the digest value from SignedInfo
+    parsed_signed_info = SweetXml.parse(signed_info)
 
-      case find_element_text(parsed_signed_info, "DigestValue") do
-        nil ->
-          {:error, "digest_value_not_found"}
+    case find_element_text(parsed_signed_info, "DigestValue") do
+      nil ->
+        {:error, "digest_value_not_found"}
 
-        digest_base64 ->
-          # Calculate the digest of the canonical XML
-          calculated_digest = calculate_sha256_digest(canonical_xml)
-          calculated_digest_base64 = Base.encode64(calculated_digest)
+      digest_base64 ->
+        # Calculate the digest of the canonical XML
+        calculated_digest = calculate_sha256_digest(canonical_xml)
+        calculated_digest_base64 = Base.encode64(calculated_digest)
 
-          # Compare digests
-          if String.trim(digest_base64) == calculated_digest_base64 do
-            {:ok, true}
-          else
-            {:ok, false}
-          end
-      end
-    rescue
-      error ->
-        {:error, "digest_extraction_failed_#{inspect(error)}"}
+        # Compare digests
+        if String.trim(digest_base64) == calculated_digest_base64 do
+          {:ok, true}
+        else
+          {:ok, false}
+        end
     end
+  rescue
+    error ->
+      {:error, "digest_extraction_failed_#{inspect(error)}"}
   end
 
   defp extract_public_key(certificate_pem) when is_binary(certificate_pem) do
-    try do
-      if String.contains?(certificate_pem, "PLACEHOLDER") do
-        {:error, "placeholder_certificate_not_supported"}
+    if String.contains?(certificate_pem, "PLACEHOLDER") do
+      {:error, "placeholder_certificate_not_supported"}
+    else
+      with pem_entries when pem_entries != [] <- :public_key.pem_decode(certificate_pem),
+           [pem_entry | _] <- pem_entries,
+           certificate <- :public_key.pem_entry_decode(pem_entry),
+           {:Certificate, tbs_certificate, _signature_algorithm, _signature_value} <- certificate,
+           {:TBSCertificate, _version, _serial, _signature, _issuer, _validity, _subject,
+            subject_public_key_info, _issuer_unique_id, _subject_unique_id,
+            _extensions} <- tbs_certificate,
+           {:SubjectPublicKeyInfo, _algorithm, public_key_data} <- subject_public_key_info do
+        {:ok, public_key_data}
       else
-        # Parse PEM certificate
-        pem_entries = :public_key.pem_decode(certificate_pem)
+        [] ->
+          {:error, "no_certificate_entries_found"}
 
-        case pem_entries do
-          [pem_entry | _] ->
-            # Decode the certificate
-            certificate = :public_key.pem_entry_decode(pem_entry)
-
-            # Extract public key from certificate
-            case certificate do
-              {:Certificate, tbs_certificate, _signature_algorithm, _signature_value} ->
-                {:TBSCertificate, _version, _serial, _signature, _issuer, _validity, _subject,
-                 subject_public_key_info, _issuer_unique_id, _subject_unique_id,
-                 _extensions} = tbs_certificate
-
-                {:SubjectPublicKeyInfo, _algorithm, public_key_data} = subject_public_key_info
-                {:ok, public_key_data}
-
-              _ ->
-                {:error, "unsupported_certificate_format"}
-            end
-
-          [] ->
-            {:error, "no_certificate_entries_found"}
-        end
+        _ ->
+          {:error, "unsupported_certificate_format"}
       end
-    rescue
-      error ->
-        {:error, "certificate_decode_failed_#{inspect(error)}"}
     end
+  rescue
+    error ->
+      {:error, "certificate_decode_failed_#{inspect(error)}"}
   end
 
   defp generate_signature_id do

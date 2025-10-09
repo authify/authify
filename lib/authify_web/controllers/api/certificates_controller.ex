@@ -39,7 +39,8 @@ defmodule AuthifyWeb.API.CertificatesController do
           }
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -71,7 +72,8 @@ defmodule AuthifyWeb.API.CertificatesController do
             )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -116,7 +118,8 @@ defmodule AuthifyWeb.API.CertificatesController do
             end
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -130,7 +133,8 @@ defmodule AuthifyWeb.API.CertificatesController do
           "Request must include certificate parameters"
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -168,7 +172,8 @@ defmodule AuthifyWeb.API.CertificatesController do
             )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -182,7 +187,8 @@ defmodule AuthifyWeb.API.CertificatesController do
           "Request must include certificate parameters"
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -217,7 +223,8 @@ defmodule AuthifyWeb.API.CertificatesController do
             )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -255,7 +262,8 @@ defmodule AuthifyWeb.API.CertificatesController do
             )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -293,7 +301,8 @@ defmodule AuthifyWeb.API.CertificatesController do
             )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -336,7 +345,8 @@ defmodule AuthifyWeb.API.CertificatesController do
             )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 

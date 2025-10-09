@@ -957,40 +957,38 @@ defmodule Authify.Accounts do
   end
 
   defp create_self_signed_certificate(_private_key, subject, validity_days) do
-    try do
-      # Generate RSA private key using X509 library
-      private_key = X509.PrivateKey.new_rsa(2048)
+    # Generate RSA private key using X509 library
+    private_key = X509.PrivateKey.new_rsa(2048)
 
-      # Create self-signed certificate
-      certificate =
-        X509.Certificate.self_signed(
-          private_key,
-          subject,
-          validity: validity_days
-        )
+    # Create self-signed certificate
+    certificate =
+      X509.Certificate.self_signed(
+        private_key,
+        subject,
+        validity: validity_days
+      )
 
-      # Convert to PEM format
-      private_key_pem = X509.PrivateKey.to_pem(private_key)
-      certificate_pem = X509.Certificate.to_pem(certificate)
+    # Convert to PEM format
+    private_key_pem = X509.PrivateKey.to_pem(private_key)
+    certificate_pem = X509.Certificate.to_pem(certificate)
+
+    {String.trim(private_key_pem), String.trim(certificate_pem)}
+  rescue
+    error ->
+      # Fallback to placeholder if certificate generation fails
+      private_key_pem = """
+      -----BEGIN RSA PRIVATE KEY-----
+      PLACEHOLDER_PRIVATE_KEY_DATA_ERROR_#{inspect(error)}
+      -----END RSA PRIVATE KEY-----
+      """
+
+      certificate_pem = """
+      -----BEGIN CERTIFICATE-----
+      PLACEHOLDER_CERTIFICATE_DATA_ERROR_#{inspect(error)}
+      -----END CERTIFICATE-----
+      """
 
       {String.trim(private_key_pem), String.trim(certificate_pem)}
-    rescue
-      error ->
-        # Fallback to placeholder if certificate generation fails
-        private_key_pem = """
-        -----BEGIN RSA PRIVATE KEY-----
-        PLACEHOLDER_PRIVATE_KEY_DATA_ERROR_#{inspect(error)}
-        -----END RSA PRIVATE KEY-----
-        """
-
-        certificate_pem = """
-        -----BEGIN CERTIFICATE-----
-        PLACEHOLDER_CERTIFICATE_DATA_ERROR_#{inspect(error)}
-        -----END CERTIFICATE-----
-        """
-
-        {String.trim(private_key_pem), String.trim(certificate_pem)}
-    end
   end
 
   ## Personal Access Tokens

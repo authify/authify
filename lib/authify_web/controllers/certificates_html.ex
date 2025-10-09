@@ -65,31 +65,29 @@ defmodule AuthifyWeb.CertificatesHTML do
   Calculates certificate fingerprints (SHA-1 and SHA-256).
   """
   def certificate_fingerprints(certificate_pem) do
-    try do
-      # Parse PEM certificate
-      pem_entries = :public_key.pem_decode(certificate_pem)
+    # Parse PEM certificate
+    pem_entries = :public_key.pem_decode(certificate_pem)
 
-      case pem_entries do
-        [pem_entry | _] ->
-          # Get the DER-encoded certificate
-          {:Certificate, cert_der, :not_encrypted} = pem_entry
+    case pem_entries do
+      [pem_entry | _] ->
+        # Get the DER-encoded certificate
+        {:Certificate, cert_der, :not_encrypted} = pem_entry
 
-          # Calculate fingerprints
-          sha1_hash = :crypto.hash(:sha, cert_der)
-          sha256_hash = :crypto.hash(:sha256, cert_der)
+        # Calculate fingerprints
+        sha1_hash = :crypto.hash(:sha, cert_der)
+        sha256_hash = :crypto.hash(:sha256, cert_der)
 
-          %{
-            sha1: format_fingerprint(sha1_hash),
-            sha256: format_fingerprint(sha256_hash)
-          }
+        %{
+          sha1: format_fingerprint(sha1_hash),
+          sha256: format_fingerprint(sha256_hash)
+        }
 
-        [] ->
-          %{sha1: "Invalid certificate", sha256: "Invalid certificate"}
-      end
-    rescue
-      _ ->
+      [] ->
         %{sha1: "Invalid certificate", sha256: "Invalid certificate"}
     end
+  rescue
+    _ ->
+      %{sha1: "Invalid certificate", sha256: "Invalid certificate"}
   end
 
   # Formats a binary hash as a colon-separated hex fingerprint.

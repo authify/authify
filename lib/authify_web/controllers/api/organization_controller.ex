@@ -19,7 +19,8 @@ defmodule AuthifyWeb.API.OrganizationController do
           exclude: [:settings]
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -57,7 +58,8 @@ defmodule AuthifyWeb.API.OrganizationController do
 
         render_api_response(conn, configuration_data, resource_type: "configuration")
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -129,7 +131,8 @@ defmodule AuthifyWeb.API.OrganizationController do
           )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -143,7 +146,8 @@ defmodule AuthifyWeb.API.OrganizationController do
           "Request must include settings parameters"
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 

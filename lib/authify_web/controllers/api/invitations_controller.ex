@@ -48,7 +48,8 @@ defmodule AuthifyWeb.API.InvitationsController do
           }
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -89,7 +90,8 @@ defmodule AuthifyWeb.API.InvitationsController do
             )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -120,7 +122,8 @@ defmodule AuthifyWeb.API.InvitationsController do
             render_validation_errors(conn, changeset)
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -134,7 +137,8 @@ defmodule AuthifyWeb.API.InvitationsController do
           "Request must include invitation parameters"
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -181,7 +185,8 @@ defmodule AuthifyWeb.API.InvitationsController do
             )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -195,7 +200,8 @@ defmodule AuthifyWeb.API.InvitationsController do
           "Request must include invitation parameters"
         )
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 
@@ -240,7 +246,8 @@ defmodule AuthifyWeb.API.InvitationsController do
             )
         end
 
-      {:error, response} -> response
+      {:error, response} ->
+        response
     end
   end
 end
