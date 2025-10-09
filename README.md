@@ -5,6 +5,7 @@
 <p align="center"><strong>Multi-tenant OpenID Connect & SAML Identity Provider</strong></p>
 
 <p align="center">
+  <a href="https://github.com/authify/authify/releases"><img src="https://img.shields.io/github/v/release/authify/authify?display_name=tag&sort=semver" alt="Latest Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
   <a href="#📖-documentation"><img src="https://img.shields.io/badge/OpenAPI-3.1.1-blue" alt="OpenAPI 3.1.1"></a>
 </p>

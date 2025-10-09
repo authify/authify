@@ -40,5 +40,23 @@
   <body>
     {@inner_content}
     <.logout_modal />
+    <footer class="footer mt-auto py-3 bg-body-tertiary border-top">
+      <div class="container-fluid">
+        <div class="row">
+          <div class="col-md-6 text-muted">
+            <small>
+              Authify v{Application.spec(:authify, :vsn) |> to_string()}
+            </small>
+          </div>
+          <div class="col-md-6 text-md-end text-muted">
+            <small>
+              <a href="https://github.com/authify/authify" class="text-decoration-none text-muted">GitHub</a>
+              <span class="mx-2">·</span>
+              <a href="https://github.com/authify/authify/wiki" class="text-decoration-none text-muted">Documentation</a>
+            </small>
+          </div>
+        </div>
+      </div>
+    </footer>
   </body>
 </html>
