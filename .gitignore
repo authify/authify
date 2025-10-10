@@ -38,5 +38,7 @@ npm-debug.log
 # macOS files
 .DS_Store
 
+# stop updates to local dev environment settings
+config/dev.exs
+
 TODO.md
-ENCRYPTION_INVENTORY.md

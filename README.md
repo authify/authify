@@ -67,7 +67,7 @@ Authify is a self-hosted, open-source identity provider built with Elixir and Ph
 
 3. **Configure database**
    ```bash
-   cp config/dev.exs.example config/dev.exs
+   vim config/dev.exs # setup your local MySQL credentials
    mix ecto.setup
    ```
 
