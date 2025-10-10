@@ -320,10 +320,17 @@ defmodule Authify.Accounts.User do
   end
 
   @doc """
-  Checks if user is a member of a specific organization.
+  Checks if user is an active member of a specific organization.
+  """
+  def active_member_of?(%__MODULE__{} = user, organization_id) when is_integer(organization_id) do
+    member_of?(user, organization_id) and user.active
+  end
+
+  @doc """
+  Checks if user is an active member of a specific organization.
   """
   def member_of?(%__MODULE__{} = user, organization_id) when is_integer(organization_id) do
-    user.organization_id == organization_id and user.active
+    user.organization_id == organization_id
   end
 
   @doc """

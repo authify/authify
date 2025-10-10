@@ -208,7 +208,7 @@ defmodule AuthifyWeb.NavigationComponents do
             <small class="text-muted">{@user.email}</small>
           </div>
           <ul class="nav flex-column">
-            <%= if Authify.Accounts.User.member_of?(@user, @organization.id) do %>
+            <%= if Authify.Accounts.User.active_member_of?(@user, @organization.id) do %>
               <li class="nav-item">
                 <a
                   class={["nav-link", if(@current_page == "profile", do: "active", else: "")]}
