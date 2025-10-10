@@ -2,6 +2,7 @@ defmodule AuthifyWeb.SessionController do
   use AuthifyWeb, :controller
 
   alias Authify.Accounts
+  alias Authify.AuditLog
   alias Authify.Configurations
   alias Authify.Guardian
 
@@ -41,6 +42,17 @@ defmodule AuthifyWeb.SessionController do
       organization ->
         case Accounts.authenticate_user(email, password, organization.id) do
           {:ok, user} ->
+            # Log successful login
+            AuditLog.log_event_async(:login_success, %{
+              organization_id: organization.id,
+              user_id: user.id,
+              actor_type: "user",
+              actor_name: "#{user.first_name} #{user.last_name}",
+              outcome: "success",
+              ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+              user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first()
+            })
+
             # Clear any existing session before signing in, then set the selected organization
             conn
             |> Guardian.Plug.sign_out()
@@ -50,6 +62,17 @@ defmodule AuthifyWeb.SessionController do
             |> redirect(to: get_dashboard_path_for_user(user, organization))
 
           {:error, :invalid_password} ->
+            # Log failed login attempt
+            AuditLog.log_event_async(:login_failure, %{
+              organization_id: organization.id,
+              actor_type: "user",
+              actor_name: email,
+              outcome: "failure",
+              ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+              user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+              metadata: %{reason: "invalid_password", attempted_email: email}
+            })
+
             conn
             |> put_flash(:error, "Invalid email or password.")
             |> render(:new,
@@ -59,6 +82,17 @@ defmodule AuthifyWeb.SessionController do
             )
 
           {:error, :user_not_found} ->
+            # Log failed login attempt
+            AuditLog.log_event_async(:login_failure, %{
+              organization_id: organization.id,
+              actor_type: "user",
+              actor_name: email,
+              outcome: "failure",
+              ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+              user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+              metadata: %{reason: "user_not_found", attempted_email: email}
+            })
+
             conn
             |> put_flash(:error, "Invalid email or password.")
             |> render(:new,
@@ -73,6 +107,20 @@ defmodule AuthifyWeb.SessionController do
   def delete(conn, params) do
     current_user = conn.assigns[:current_user]
     slo_complete = params["slo_complete"]
+
+    # Log logout event if user is present
+    if current_user do
+      AuditLog.log_event_async(:logout, %{
+        organization_id: current_user.organization_id,
+        user_id: current_user.id,
+        actor_type: "user",
+        actor_name: "#{current_user.first_name} #{current_user.last_name}",
+        outcome: "success",
+        ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+        user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+        metadata: %{saml_slo: slo_complete == "true"}
+      })
+    end
 
     # Sign out the user from Guardian
     conn = Guardian.Plug.sign_out(conn)
