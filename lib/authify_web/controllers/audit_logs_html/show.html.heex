@@ -1,0 +1,171 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar user={@user} organization={@organization} current_page="audit_logs" />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Audit Event Details</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <a href={~p"/#{@organization.slug}/audit_logs"} class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-arrow-left me-2"></i>Back to Audit Logs
+        </a>
+      </div>
+    </div>
+
+    <div class="row">
+      <!-- Main Event Information -->
+      <div class="col-lg-8">
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5 class="mb-0">Event Information</h5>
+          </div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-md-4">
+                <strong>Event ID:</strong>
+              </div>
+              <div class="col-md-8">
+                <code>{@event.id}</code>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-md-4">
+                <strong>Timestamp:</strong>
+              </div>
+              <div class="col-md-8">
+                {format_datetime(@event.inserted_at)}
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-md-4">
+                <strong>Event Type:</strong>
+              </div>
+              <div class="col-md-8">
+                <span class={event_type_badge_class(@event.event_type)}>
+                  {format_event_type(@event.event_type)}
+                </span>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-md-4">
+                <strong>Outcome:</strong>
+              </div>
+              <div class="col-md-8">
+                <span class={outcome_badge_class(@event.outcome)}>
+                  {String.capitalize(@event.outcome)}
+                </span>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-md-4">
+                <strong>Organization:</strong>
+              </div>
+              <div class="col-md-8">
+                <%= if @event.organization do %>
+                  {@event.organization.name}
+                <% else %>
+                  Organization ID {@event.organization_id}
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+<!-- Metadata Card (if present) -->
+        <%= if @event.metadata && map_size(@event.metadata) > 0 do %>
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5 class="mb-0">Event Metadata</h5>
+            </div>
+            <div class="card-body">
+              <pre class="mb-0"><code><%= format_metadata(@event.metadata) %></code></pre>
+            </div>
+          </div>
+        <% end %>
+      </div>
+      
+<!-- Actor and Context Information -->
+      <div class="col-lg-4">
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5 class="mb-0">Actor Information</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <strong>Actor Type:</strong>
+              <div class="mt-1">
+                <span class="badge bg-secondary">{@event.actor_type}</span>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <strong>Actor Name:</strong>
+              <div class="mt-1">
+                {@event.actor_name || "Unknown"}
+              </div>
+            </div>
+
+            <%= if @event.user do %>
+              <div class="mb-3">
+                <strong>User:</strong>
+                <div class="mt-1">
+                  <a href={~p"/#{@organization.slug}/users/#{@event.user.id}"}>
+                    {@event.user.email}
+                  </a>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5 class="mb-0">Request Context</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <strong>IP Address:</strong>
+              <div class="mt-1">
+                <code>{@event.ip_address || "N/A"}</code>
+              </div>
+            </div>
+
+            <%= if @event.user_agent do %>
+              <div class="mb-3">
+                <strong>User Agent:</strong>
+                <div class="mt-1">
+                  <small class="text-muted">{@event.user_agent}</small>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+
+        <%= if @event.resource_type do %>
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5 class="mb-0">Resource Information</h5>
+            </div>
+            <div class="card-body">
+              <div class="mb-3">
+                <strong>Resource Type:</strong>
+                <div class="mt-1">{@event.resource_type}</div>
+              </div>
+
+              <%= if @event.resource_id do %>
+                <div class="mb-3">
+                  <strong>Resource ID:</strong>
+                  <div class="mt-1"><code>{@event.resource_id}</code></div>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

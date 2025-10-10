@@ -235,6 +235,17 @@ defmodule Authify.AuditLog do
       {:resource_id, resource_id}, q when not is_nil(resource_id) ->
         where(q, [e], e.resource_id == ^resource_id)
 
+      {:actor_name, actor_name}, q when not is_nil(actor_name) and actor_name != "" ->
+        where(q, [e], ilike(e.actor_name, ^"%#{actor_name}%"))
+
+      {:date_from, date_from}, q when not is_nil(date_from) ->
+        {:ok, datetime} = DateTime.new(date_from, ~T[00:00:00])
+        where(q, [e], e.inserted_at >= ^datetime)
+
+      {:date_to, date_to}, q when not is_nil(date_to) ->
+        {:ok, datetime} = DateTime.new(date_to, ~T[23:59:59])
+        where(q, [e], e.inserted_at <= ^datetime)
+
       {:from_date, from_date}, q when not is_nil(from_date) ->
         where(q, [e], e.inserted_at >= ^from_date)
 
@@ -263,6 +274,35 @@ defmodule Authify.AuditLog do
     |> select([e], {field(e, ^field), count(e.id)})
     |> Repo.all()
     |> Map.new()
+  end
+
+  @doc """
+  Gets a single event by ID, raising if not found.
+
+  ## Examples
+
+      iex> get_event!(123)
+      %Event{}
+
+      iex> get_event!(999)
+      ** (Ecto.NoResultsError)
+
+  """
+  def get_event!(id) do
+    Repo.get!(Event, id)
+  end
+
+  @doc """
+  Preloads associations for an event.
+
+  ## Examples
+
+      iex> preload_event(event)
+      %Event{user: %User{}, organization: %Organization{}}
+
+  """
+  def preload_event(event) do
+    Repo.preload(event, [:user, :organization])
   end
 
   @doc """

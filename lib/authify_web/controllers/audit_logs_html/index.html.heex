@@ -1,0 +1,168 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar user={@user} organization={@organization} current_page="audit_logs" />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Audit Logs</h1>
+    </div>
+    
+<!-- Filter Form -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="mb-0">Filters</h5>
+      </div>
+      <div class="card-body">
+        <form method="get" action={~p"/#{@organization.slug}/audit_logs"}>
+          <div class="row g-3">
+            <!-- Event Type Filter -->
+            <div class="col-md-3">
+              <label for="event_type" class="form-label">Event Type</label>
+              <select name="event_type" id="event_type" class="form-select">
+                <option value="">All Events</option>
+                <%= for event_type <- @event_types do %>
+                  <option
+                    value={event_type}
+                    selected={@filters.event_type == to_string(event_type)}
+                  >
+                    {format_event_type(to_string(event_type))}
+                  </option>
+                <% end %>
+              </select>
+            </div>
+            
+<!-- Outcome Filter -->
+            <div class="col-md-2">
+              <label for="outcome" class="form-label">Outcome</label>
+              <select name="outcome" id="outcome" class="form-select">
+                <option value="">All Outcomes</option>
+                <%= for outcome <- @outcomes do %>
+                  <option value={outcome} selected={@filters.outcome == to_string(outcome)}>
+                    {String.capitalize(to_string(outcome))}
+                  </option>
+                <% end %>
+              </select>
+            </div>
+            
+<!-- Actor Name Filter -->
+            <div class="col-md-3">
+              <label for="actor_name" class="form-label">Actor Name</label>
+              <input
+                type="text"
+                name="actor_name"
+                id="actor_name"
+                class="form-control"
+                placeholder="Search by name..."
+                value={@filters.actor_name}
+              />
+            </div>
+            
+<!-- Date From Filter -->
+            <div class="col-md-2">
+              <label for="date_from" class="form-label">From Date</label>
+              <input
+                type="date"
+                name="date_from"
+                id="date_from"
+                class="form-control"
+                value={@filters.date_from}
+              />
+            </div>
+            
+<!-- Date To Filter -->
+            <div class="col-md-2">
+              <label for="date_to" class="form-label">To Date</label>
+              <input
+                type="date"
+                name="date_to"
+                id="date_to"
+                class="form-control"
+                value={@filters.date_to}
+              />
+            </div>
+          </div>
+
+          <div class="row mt-3">
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary">Apply Filters</button>
+              <a href={~p"/#{@organization.slug}/audit_logs"} class="btn btn-secondary">
+                Clear Filters
+              </a>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+<!-- Results Count -->
+    <div class="mb-3">
+      <p class="text-muted">
+        Showing {length(@events)} events
+        <%= if length(@events) == 100 do %>
+          (limited to 100 most recent)
+        <% end %>
+      </p>
+    </div>
+    
+<!-- Events Table -->
+    <%= if Enum.empty?(@events) do %>
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        No audit events found matching the selected filters.
+      </div>
+    <% else %>
+      <div class="card">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Event Type</th>
+                <th>Actor</th>
+                <th>Outcome</th>
+                <th>IP Address</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              <%= for event <- @events do %>
+                <tr>
+                  <td class="text-nowrap">
+                    {format_datetime(event.inserted_at)}
+                  </td>
+                  <td>
+                    <span class={event_type_badge_class(event.event_type)}>
+                      {format_event_type(event.event_type)}
+                    </span>
+                  </td>
+                  <td>
+                    <div>
+                      <strong>{event.actor_name || "Unknown"}</strong>
+                    </div>
+                    <small class="text-muted">{event.actor_type}</small>
+                  </td>
+                  <td>
+                    <span class={outcome_badge_class(event.outcome)}>
+                      {String.capitalize(event.outcome)}
+                    </span>
+                  </td>
+                  <td class="text-nowrap">
+                    {event.ip_address || "N/A"}
+                  </td>
+                  <td>
+                    <a
+                      href={~p"/#{@organization.slug}/audit_logs/#{event.id}"}
+                      class="btn btn-sm btn-outline-primary"
+                    >
+                      View Details
+                    </a>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% end %>
+  </:main>
+</.two_column_layout>

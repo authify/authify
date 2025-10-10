@@ -185,6 +185,9 @@ defmodule AuthifyWeb.Router do
     # Invitations management
     resources "/invitations", InvitationController, only: [:index, :new, :create, :show, :delete]
 
+    # Audit Logs (admin only)
+    resources "/audit_logs", AuditLogsController, only: [:index, :show]
+
     # OAuth Applications management
     resources "/applications", ApplicationsController
 
