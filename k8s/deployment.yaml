@@ -22,7 +22,7 @@ spec:
     spec:
       initContainers:
         - name: migrate
-          image: ghcr.io/your-org/authify:latest  # Change this to your image
+          image: ghcr.io/authify/authify:latest  # Change this to your image
           command: ["/app/bin/authify"]
           args: ["eval", "Authify.Release.migrate"]
           envFrom:
@@ -32,7 +32,7 @@ spec:
                 name: authify-secrets
       containers:
         - name: authify
-          image: ghcr.io/your-org/authify:latest  # Change this to your image
+          image: ghcr.io/authify/authify:latest  # Change this to your image
           ports:
             - containerPort: 4000
               name: http
