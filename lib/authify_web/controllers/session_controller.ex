@@ -105,7 +105,7 @@ defmodule AuthifyWeb.SessionController do
   end
 
   def delete(conn, params) do
-    current_user = conn.assigns[:current_user]
+    current_user = conn.assigns.current_user
     slo_complete = params["slo_complete"]
 
     # Log logout event if user is present

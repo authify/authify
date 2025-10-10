@@ -3,6 +3,7 @@ defmodule AuthifyWeb.InvitationController do
 
   alias Authify.Accounts
   alias Authify.Accounts.{Invitation, User}
+  alias Authify.AuditLog
 
   def index(conn, _params) do
     user = conn.assigns.current_user
@@ -37,7 +38,23 @@ defmodule AuthifyWeb.InvitationController do
     invitation_params_with_org = Map.put(invitation_params, "organization_id", organization.id)
 
     case Accounts.create_invitation_and_send_email(invitation_params_with_org, current_user) do
-      {:ok, _invitation} ->
+      {:ok, invitation} ->
+        # Log invitation creation
+        AuditLog.log_event_async(:user_invited, %{
+          organization_id: organization.id,
+          user_id: current_user.id,
+          actor_type: "user",
+          actor_name: "#{current_user.first_name} #{current_user.last_name}",
+          outcome: "success",
+          ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+          user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+          metadata: %{
+            invitation_id: invitation.id,
+            invited_email: invitation.email,
+            invited_role: invitation.role
+          }
+        })
+
         conn
         |> put_flash(:info, "Invitation sent successfully!")
         |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/invitations")
@@ -78,11 +95,27 @@ defmodule AuthifyWeb.InvitationController do
 
   def delete(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
+    current_user = conn.assigns.current_user
     invitation = Accounts.get_invitation!(id)
 
     # Ensure invitation belongs to current organization
     if invitation.organization_id == organization.id do
       {:ok, _invitation} = Accounts.delete_invitation(invitation)
+
+      # Log invitation revocation
+      AuditLog.log_event_async(:invitation_revoked, %{
+        organization_id: organization.id,
+        user_id: current_user.id,
+        actor_type: "user",
+        actor_name: "#{current_user.first_name} #{current_user.last_name}",
+        outcome: "success",
+        ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+        user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+        metadata: %{
+          invitation_id: invitation.id,
+          invited_email: invitation.email
+        }
+      })
 
       conn
       |> put_flash(:info, "Invitation cancelled successfully.")
@@ -134,10 +167,25 @@ defmodule AuthifyWeb.InvitationController do
 
       invitation ->
         case Accounts.accept_invitation(invitation, user_params) do
-          {:ok, _user} ->
+          {:ok, user} ->
+            # Log invitation revocation
+            AuditLog.log_event_async(:user_invitation_accepted, %{
+              organization_id: invitation.organization_id,
+              user_id: user.id,
+              actor_type: "user",
+              actor_name: "#{user.first_name} #{user.last_name}",
+              outcome: "success",
+              ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+              user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+              metadata: %{
+                invitation_id: invitation.id,
+                invited_email: invitation.email
+              }
+            })
+
             conn
             |> put_flash(:info, "Welcome! Your account has been created successfully.")
-            |> redirect(to: ~p"/login?org=#{invitation.organization.slug}")
+            |> redirect(to: ~p"/login?org_slug=#{invitation.organization.slug}")
 
           {:error, %Ecto.Changeset{} = changeset} ->
             render(conn, :accept,

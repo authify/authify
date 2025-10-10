@@ -114,7 +114,7 @@ defmodule AuthifyWeb.Router do
 
   # Logout doesn't need rate limiting (it's a DELETE and terminates sessions)
   scope "/", AuthifyWeb do
-    pipe_through :browser
+    pipe_through [:browser, :auth]
 
     delete "/logout", SessionController, :delete
   end
