@@ -16,8 +16,9 @@ defmodule Authify.AuditLog.Event do
     login_success login_failure
     logout session_expired
     password_reset_requested password_reset_completed password_changed
-    oauth_authorization_requested oauth_consent_given oauth_token_granted oauth_token_refreshed
-    saml_sso_requested saml_assertion_issued saml_slo_requested
+    oauth_authorization_requested oauth_authorization_granted oauth_authorization_denied
+    oauth_consent_given oauth_token_granted oauth_token_denied oauth_token_refreshed
+    saml_sso_requested saml_assertion_issued saml_slo_requested saml_slo_completed
     user_created user_updated user_deleted user_invited user_invitation_accepted
     role_assigned role_revoked
     oauth_client_created oauth_client_updated oauth_client_deleted
@@ -29,7 +30,7 @@ defmodule Authify.AuditLog.Event do
     suspicious_activity
   )a
 
-  @actor_types ~w(user api_client system)a
+  @actor_types ~w(user api_client application system)a
   @outcome_types ~w(success failure denied)a
 
   schema "audit_events" do

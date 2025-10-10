@@ -1,6 +1,7 @@
 defmodule AuthifyWeb.SAMLController do
   use AuthifyWeb, :controller
 
+  alias Authify.AuditLog
   alias Authify.SAML
 
   @doc """
@@ -89,6 +90,24 @@ defmodule AuthifyWeb.SAMLController do
 
               case generate_and_send_response(conn, saml_session, current_user) do
                 {:ok, form_html} ->
+                  # Log successful SAML assertion
+                  AuditLog.log_event_async(:saml_assertion_issued, %{
+                    organization_id: organization.id,
+                    user_id: current_user.id,
+                    actor_type: "user",
+                    actor_name: "#{current_user.first_name} #{current_user.last_name}",
+                    outcome: "success",
+                    ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+                    user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+                    metadata: %{
+                      service_provider_id: sp.id,
+                      service_provider_name: sp.name,
+                      entity_id: sp.entity_id,
+                      session_id: saml_session.session_id,
+                      relay_state: saml_session.relay_state
+                    }
+                  })
+
                   conn
                   |> put_resp_content_type("text/html")
                   |> send_resp(200, form_html)
@@ -258,6 +277,23 @@ defmodule AuthifyWeb.SAMLController do
             if current_user do
               # Terminate user's SAML sessions
               SAML.terminate_all_sessions_for_user(current_user)
+
+              # Log SAML SLO event
+              AuditLog.log_event_async(:saml_slo_completed, %{
+                organization_id: organization.id,
+                user_id: current_user.id,
+                actor_type: "user",
+                actor_name: "#{current_user.first_name} #{current_user.last_name}",
+                outcome: "success",
+                ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+                user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+                metadata: %{
+                  service_provider_id: sp.id,
+                  service_provider_name: sp.name,
+                  entity_id: sp.entity_id,
+                  initiator: "service_provider"
+                }
+              })
 
               # Generate logout response
               case SAML.generate_saml_logout_response(logout_request, sp) do
