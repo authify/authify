@@ -27,11 +27,11 @@ defmodule Authify.AuditLog do
     * `event_type` - The type of event (atom or string from Event.event_types/0)
     * `attrs` - Map containing:
       * `:organization_id` - Required. The organization this event belongs to
-      * `:actor_type` - Required. One of: "user", "api_client", "system"
+      * `:actor_type` - Required. One of: "user", "api_client", "application", "system"
       * `:outcome` - Required. One of: "success", "failure", "denied"
-      * `:user_id` - Optional. The user who performed the action (if actor_type is "user")
-      * `:actor_name` - Optional. Display name for the actor (useful for API clients)
-      * `:resource_type` - Optional. The type of resource affected
+      * `:actor_id` - Optional. Polymorphic ID of the actor (user_id, application_id, etc.)
+      * `:actor_name` - Optional. Display name for the actor
+      * `:resource_type` - Optional. The type of resource affected (e.g., "user", "oauth_application")
       * `:resource_id` - Optional. The ID of the resource affected
       * `:ip_address` - Optional. IP address of the actor
       * `:user_agent` - Optional. User agent string
@@ -41,8 +41,8 @@ defmodule Authify.AuditLog do
 
       iex> log_event(:login_success, %{
       ...>   organization_id: 1,
-      ...>   user_id: 123,
       ...>   actor_type: "user",
+      ...>   actor_id: 123,
       ...>   outcome: "success",
       ...>   ip_address: "192.168.1.1"
       ...> })
@@ -50,9 +50,12 @@ defmodule Authify.AuditLog do
 
       iex> log_event(:oauth_token_granted, %{
       ...>   organization_id: 1,
-      ...>   actor_type: "api_client",
+      ...>   actor_type: "application",
+      ...>   actor_id: 456,
       ...>   actor_name: "Mobile App",
       ...>   outcome: "success",
+      ...>   resource_type: "oauth_token",
+      ...>   resource_id: 789,
       ...>   metadata: %{client_id: "abc123", scopes: ["read", "write"]}
       ...> })
       {:ok, %Event{}}
@@ -118,9 +121,9 @@ defmodule Authify.AuditLog do
   ## Options
 
     * `:organization_id` - Filter by organization (required for non-global admins)
-    * `:user_id` - Filter by user
+    * `:actor_type` - Filter by actor type ("user", "application", "system")
+    * `:actor_id` - Filter by actor ID (polymorphic)
     * `:event_type` - Filter by event type
-    * `:actor_type` - Filter by actor type
     * `:outcome` - Filter by outcome
     * `:resource_type` - Filter by resource type
     * `:resource_id` - Filter by resource ID
@@ -217,14 +220,14 @@ defmodule Authify.AuditLog do
       {:organization_id, org_id}, q when not is_nil(org_id) ->
         where(q, [e], e.organization_id == ^org_id)
 
-      {:user_id, user_id}, q when not is_nil(user_id) ->
-        where(q, [e], e.user_id == ^user_id)
+      {:actor_type, actor_type}, q when not is_nil(actor_type) ->
+        where(q, [e], e.actor_type == ^actor_type)
+
+      {:actor_id, actor_id}, q when not is_nil(actor_id) ->
+        where(q, [e], e.actor_id == ^actor_id)
 
       {:event_type, event_type}, q when not is_nil(event_type) ->
         where(q, [e], e.event_type == ^event_type)
-
-      {:actor_type, actor_type}, q when not is_nil(actor_type) ->
-        where(q, [e], e.actor_type == ^actor_type)
 
       {:outcome, outcome}, q when not is_nil(outcome) ->
         where(q, [e], e.outcome == ^outcome)
@@ -298,11 +301,11 @@ defmodule Authify.AuditLog do
   ## Examples
 
       iex> preload_event(event)
-      %Event{user: %User{}, organization: %Organization{}}
+      %Event{organization: %Organization{}}
 
   """
   def preload_event(event) do
-    Repo.preload(event, [:user, :organization])
+    Repo.preload(event, [:organization])
   end
 
   @doc """
@@ -313,7 +316,7 @@ defmodule Authify.AuditLog do
       iex> actor_from_conn(conn, current_user)
       %{
         actor_type: "user",
-        user_id: 123,
+        actor_id: 123,
         actor_name: "John Doe",
         ip_address: "192.168.1.1",
         user_agent: "Mozilla/5.0..."
@@ -323,7 +326,7 @@ defmodule Authify.AuditLog do
   def actor_from_conn(conn, user \\ nil) do
     %{
       actor_type: if(user, do: "user", else: "system"),
-      user_id: user && user.id,
+      actor_id: user && user.id,
       actor_name: user && "#{user.first_name} #{user.last_name}",
       ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
       user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first()
@@ -331,26 +334,28 @@ defmodule Authify.AuditLog do
   end
 
   @doc """
-  Helper to extract actor information from an API client.
+  Helper to extract actor information from an API client/application.
 
   ## Examples
 
-      iex> actor_from_api_client(oauth_client, conn)
+      iex> actor_from_application(oauth_app, conn)
       %{
-        actor_type: "api_client",
+        actor_type: "application",
+        actor_id: 456,
         actor_name: "Mobile App",
         ip_address: "192.168.1.1",
         metadata: %{client_id: "abc123"}
       }
 
   """
-  def actor_from_api_client(client, conn) do
+  def actor_from_application(application, conn) do
     %{
-      actor_type: "api_client",
-      actor_name: client.name,
+      actor_type: "application",
+      actor_id: application.id,
+      actor_name: application.name,
       ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
       user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-      metadata: %{client_id: client.client_id}
+      metadata: %{client_id: application.client_id}
     }
   end
 end

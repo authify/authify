@@ -205,8 +205,7 @@ defmodule AuthifyWeb.UsersController do
     case Accounts.update_user_role(target_user, new_role) do
       {:ok, updated_user} ->
         # Log role change
-        log_audit_event(conn, :role_assigned, %{
-          target_user_id: target_user.id,
+        log_audit_event(conn, :role_assigned, updated_user, %{
           target_user_email: target_user.email,
           old_role: target_user.role,
           new_role: new_role
@@ -294,10 +293,9 @@ defmodule AuthifyWeb.UsersController do
     end
 
     case Accounts.disable_user(target_user) do
-      {:ok, _user} ->
+      {:ok, disabled_user} ->
         # Log user disable
-        log_audit_event(conn, :user_disabled, %{
-          target_user_id: target_user.id,
+        log_audit_event(conn, :user_disabled, disabled_user, %{
           target_user_email: target_user.email
         })
 
@@ -319,10 +317,9 @@ defmodule AuthifyWeb.UsersController do
       target_user = Accounts.get_user_globally!(id)
 
       case Accounts.enable_user(target_user) do
-        {:ok, _user} ->
+        {:ok, enabled_user} ->
           # Log user enable
-          log_audit_event(conn, :user_enabled, %{
-            target_user_id: target_user.id,
+          log_audit_event(conn, :user_enabled, enabled_user, %{
             target_user_email: target_user.email
           })
 
@@ -340,10 +337,9 @@ defmodule AuthifyWeb.UsersController do
       # For enable action, check organization membership without active status
       if user.organization_id == organization.id do
         case Accounts.enable_user(user) do
-          {:ok, _user} ->
+          {:ok, enabled_user} ->
             # Log user enable
-            log_audit_event(conn, :user_enabled, %{
-              target_user_id: user.id,
+            log_audit_event(conn, :user_enabled, enabled_user, %{
               target_user_email: user.email
             })
 
@@ -388,14 +384,17 @@ defmodule AuthifyWeb.UsersController do
   end
 
   # Private helper for audit logging to reduce repetition
-  defp log_audit_event(conn, event_type, metadata) do
+  defp log_audit_event(conn, event_type, target_user, metadata) do
     organization = conn.assigns.current_organization
     current_user = conn.assigns.current_user
 
     AuditLog.log_event_async(event_type, %{
       organization_id: organization.id,
       actor_type: "user",
+      actor_id: current_user.id,
       actor_name: "#{current_user.first_name} #{current_user.last_name}",
+      resource_type: "user",
+      resource_id: target_user && target_user.id,
       outcome: "success",
       ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
       user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
@@ -418,8 +417,7 @@ defmodule AuthifyWeb.UsersController do
       case Accounts.create_user_with_role(user_attrs, organization.id, role) do
         {:ok, user} ->
           # Log user creation
-          log_audit_event(conn, :user_created, %{
-            created_user_id: user.id,
+          log_audit_event(conn, :user_created, user, %{
             created_user_email: user.email,
             created_user_role: role
           })

@@ -110,11 +110,11 @@ defmodule AuthifyWeb.CertificatesController do
     {content, filename, content_type} =
       case type do
         "certificate" ->
-          {certificate.certificate, "#{certificate.name}_certificate.pem",
+          {certificate.certificate, "#{sanitize_filename(certificate.name)}_certificate.pem",
            "application/x-pem-file"}
 
         "private_key" ->
-          {certificate.private_key, "#{certificate.name}_private_key.pem",
+          {certificate.private_key, "#{sanitize_filename(certificate.name)}_private_key.pem",
            "application/x-pem-file"}
       end
 
@@ -122,6 +122,13 @@ defmodule AuthifyWeb.CertificatesController do
     |> put_resp_content_type(content_type)
     |> put_resp_header("content-disposition", "attachment; filename=\"#{filename}\"")
     |> send_resp(200, content)
+  end
+
+  # Sanitize filename to prevent header injection
+  defp sanitize_filename(name) do
+    name
+    |> String.replace(~r/[^\w\-\.]/, "_")
+    |> String.slice(0, 200)
   end
 
   def activate(conn, %{"id" => id}) do

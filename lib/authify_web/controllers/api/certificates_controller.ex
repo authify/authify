@@ -323,11 +323,13 @@ defmodule AuthifyWeb.API.CertificatesController do
           {content, filename, content_type} =
             case type do
               "certificate" ->
-                {certificate.certificate, "#{certificate.name}_certificate.pem",
+                {certificate.certificate,
+                 "#{sanitize_filename(certificate.name)}_certificate.pem",
                  "application/x-pem-file"}
 
               "private_key" ->
-                {certificate.private_key, "#{certificate.name}_private_key.pem",
+                {certificate.private_key,
+                 "#{sanitize_filename(certificate.name)}_private_key.pem",
                  "application/x-pem-file"}
             end
 
@@ -357,5 +359,12 @@ defmodule AuthifyWeb.API.CertificatesController do
       "invalid_request",
       "Invalid download type: #{type}. Must be 'certificate' or 'private_key'"
     )
+  end
+
+  # Sanitize filename to prevent header injection
+  defp sanitize_filename(name) do
+    name
+    |> String.replace(~r/[^\w\-\.]/, "_")
+    |> String.slice(0, 200)
   end
 end

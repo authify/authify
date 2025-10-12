@@ -109,13 +109,18 @@
               </div>
             </div>
 
-            <%= if @event.user do %>
+            <%= if @event.actor_id do %>
               <div class="mb-3">
-                <strong>User:</strong>
+                <strong>Actor ID:</strong>
                 <div class="mt-1">
-                  <a href={~p"/#{@organization.slug}/users/#{@event.user.id}"}>
-                    {@event.user.email}
-                  </a>
+                  <%= if @event.actor_type == "user" do %>
+                    <a href={~p"/#{@organization.slug}/users/#{@event.actor_id}"}>
+                      <code>{@event.actor_id}</code>
+                    </a>
+                  <% else %>
+                    <code>{@event.actor_id}</code>
+                  <% end %>
+                  <span class="text-muted ms-2">({@event.actor_type})</span>
                 </div>
               </div>
             <% end %>

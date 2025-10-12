@@ -57,9 +57,11 @@ defmodule AuthifyWeb.OAuthController do
           # Log successful authorization
           AuditLog.log_event_async(:oauth_authorization_granted, %{
             organization_id: organization.id,
-            user_id: user.id,
             actor_type: "user",
+            actor_id: user.id,
             actor_name: "#{user.first_name} #{user.last_name}",
+            resource_type: "oauth_authorization",
+            resource_id: auth_code.id,
             outcome: "success",
             ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
             user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
@@ -103,8 +105,8 @@ defmodule AuthifyWeb.OAuthController do
     if user do
       AuditLog.log_event_async(:oauth_authorization_denied, %{
         organization_id: organization.id,
-        user_id: user.id,
         actor_type: "user",
+        actor_id: user.id,
         actor_name: "#{user.first_name} #{user.last_name}",
         outcome: "denied",
         ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
@@ -299,9 +301,11 @@ defmodule AuthifyWeb.OAuthController do
       # Log successful token exchange
       AuditLog.log_event_async(:oauth_token_granted, %{
         organization_id: organization.id,
-        user_id: access_token.user_id,
         actor_type: "application",
+        actor_id: application.id,
         actor_name: application.name,
+        resource_type: "oauth_token",
+        resource_id: access_token.id,
         outcome: "success",
         ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
         user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
@@ -404,9 +408,11 @@ defmodule AuthifyWeb.OAuthController do
       # Log successful token refresh
       AuditLog.log_event_async(:oauth_token_refreshed, %{
         organization_id: organization.id,
-        user_id: access_token.user_id,
         actor_type: "application",
+        actor_id: application.id,
         actor_name: application.name,
+        resource_type: "oauth_token",
+        resource_id: access_token.id,
         outcome: "success",
         ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
         user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
@@ -487,7 +493,10 @@ defmodule AuthifyWeb.OAuthController do
           AuditLog.log_event_async(:oauth_token_granted, %{
             organization_id: organization.id,
             actor_type: "application",
+            actor_id: application.id,
             actor_name: application.name,
+            resource_type: "oauth_token",
+            resource_id: access_token.id,
             outcome: "success",
             ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
             user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),

@@ -240,7 +240,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
 
       conn = post(conn, ~p"/invite/#{invitation.token}/accept", user: user_params)
 
-      assert redirected_to(conn) == ~p"/login?org=#{organization.slug}"
+      assert redirected_to(conn) == ~p"/login?org_slug=#{organization.slug}"
 
       # Check user was created
       user = Accounts.get_user_by_email_and_organization(invitation.email, organization.id)

@@ -14,8 +14,8 @@ defmodule Authify.AuditLogTest do
 
       attrs = %{
         organization_id: org.id,
-        user_id: user.id,
         actor_type: "user",
+        actor_id: user.id,
         actor_name: "#{user.first_name} #{user.last_name}",
         outcome: "success",
         ip_address: "192.168.1.1",
@@ -25,7 +25,7 @@ defmodule Authify.AuditLogTest do
       assert {:ok, %Event{} = event} = AuditLog.log_event(:login_success, attrs)
       assert event.event_type == "login_success"
       assert event.organization_id == org.id
-      assert event.user_id == user.id
+      assert event.actor_id == user.id
       assert event.actor_type == "user"
       assert event.outcome == "success"
       assert event.ip_address == "192.168.1.1"
@@ -49,16 +49,17 @@ defmodule Authify.AuditLogTest do
       assert event.metadata.reason == "invalid_credentials"
     end
 
-    test "logs an OAuth token grant event with API client" do
+    test "logs an OAuth token grant event with application" do
       org = organization_fixture()
 
       attrs = %{
         organization_id: org.id,
-        actor_type: "api_client",
+        actor_type: "application",
+        actor_id: 123,
         actor_name: "Mobile App",
         outcome: "success",
-        resource_type: "OAuthClient",
-        resource_id: 123,
+        resource_type: "oauth_token",
+        resource_id: 456,
         metadata: %{
           client_id: "abc123",
           scopes: ["read", "write"],
@@ -68,8 +69,11 @@ defmodule Authify.AuditLogTest do
 
       assert {:ok, %Event{} = event} = AuditLog.log_event(:oauth_token_granted, attrs)
       assert event.event_type == "oauth_token_granted"
-      assert event.actor_type == "api_client"
+      assert event.actor_type == "application"
+      assert event.actor_id == 123
       assert event.actor_name == "Mobile App"
+      assert event.resource_type == "oauth_token"
+      assert event.resource_id == 456
       assert event.metadata.scopes == ["read", "write"]
     end
 
@@ -79,10 +83,10 @@ defmodule Authify.AuditLogTest do
 
       attrs = %{
         organization_id: org.id,
-        user_id: user.id,
         actor_type: "user",
+        actor_id: user.id,
         outcome: "success",
-        resource_type: "SAMLServiceProvider",
+        resource_type: "saml_assertion",
         resource_id: 456,
         metadata: %{
           sp_entity_id: "https://sp.example.com",
@@ -92,6 +96,9 @@ defmodule Authify.AuditLogTest do
 
       assert {:ok, %Event{} = event} = AuditLog.log_event(:saml_assertion_issued, attrs)
       assert event.event_type == "saml_assertion_issued"
+      assert event.actor_id == user.id
+      assert event.resource_type == "saml_assertion"
+      assert event.resource_id == 456
       assert event.metadata.sp_entity_id == "https://sp.example.com"
     end
 
@@ -101,16 +108,19 @@ defmodule Authify.AuditLogTest do
 
       attrs = %{
         organization_id: org.id,
-        user_id: user.id,
         actor_type: "user",
+        actor_id: user.id,
         outcome: "denied",
-        resource_type: "Organization",
+        resource_type: "organization",
         resource_id: 999,
         metadata: %{attempted_action: "delete", reason: "insufficient_permissions"}
       }
 
       assert {:ok, %Event{} = event} = AuditLog.log_event(:permission_denied, attrs)
       assert event.outcome == "denied"
+      assert event.actor_id == user.id
+      assert event.resource_type == "organization"
+      assert event.resource_id == 999
       assert event.metadata.attempted_action == "delete"
     end
 

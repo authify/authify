@@ -10,7 +10,7 @@ defmodule Authify.AuditLog.Event do
 
   import Ecto.Changeset
 
-  alias Authify.Accounts.{Organization, User}
+  alias Authify.Accounts.Organization
 
   @event_types ~w(
     login_success login_failure
@@ -20,7 +20,7 @@ defmodule Authify.AuditLog.Event do
     oauth_consent_given oauth_token_granted oauth_token_denied oauth_token_refreshed
     saml_sso_requested saml_assertion_issued saml_slo_requested saml_slo_completed
     user_created user_updated user_deleted user_enabled user_disabled
-    user_invited user_invitation_accepted
+    user_invited user_invitation_accepted invitation_revoked
     role_assigned role_revoked
     oauth_client_created oauth_client_updated oauth_client_deleted
     saml_sp_created saml_sp_updated saml_sp_deleted
@@ -37,6 +37,7 @@ defmodule Authify.AuditLog.Event do
   schema "audit_events" do
     field :event_type, :string
     field :actor_type, :string
+    field :actor_id, :integer
     field :actor_name, :string
     field :resource_type, :string
     field :resource_id, :integer
@@ -46,7 +47,6 @@ defmodule Authify.AuditLog.Event do
     field :metadata, :map
 
     belongs_to :organization, Organization
-    belongs_to :user, User
 
     timestamps(updated_at: false, type: :utc_datetime)
   end
@@ -57,11 +57,11 @@ defmodule Authify.AuditLog.Event do
     |> cast(attrs, [
       :event_type,
       :actor_type,
+      :actor_id,
       :actor_name,
       :resource_type,
       :resource_id,
       :organization_id,
-      :user_id,
       :ip_address,
       :user_agent,
       :outcome,
@@ -72,7 +72,6 @@ defmodule Authify.AuditLog.Event do
     |> validate_inclusion(:actor_type, Enum.map(@actor_types, &to_string/1))
     |> validate_inclusion(:outcome, Enum.map(@outcome_types, &to_string/1))
     |> foreign_key_constraint(:organization_id)
-    |> foreign_key_constraint(:user_id)
   end
 
   @doc """

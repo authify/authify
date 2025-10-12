@@ -427,7 +427,7 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
       assert String.starts_with?(content_type, "application/x-pem-file")
 
       assert get_resp_header(conn, "content-disposition") == [
-               "attachment; filename=\"#{certificate.name}_certificate.pem\""
+               "attachment; filename=\"SAML_Signing_Cert_certificate.pem\""
              ]
     end
 
@@ -444,7 +444,7 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
       assert String.starts_with?(content_type, "application/x-pem-file")
 
       assert get_resp_header(conn, "content-disposition") == [
-               "attachment; filename=\"#{certificate.name}_private_key.pem\""
+               "attachment; filename=\"SAML_Signing_Cert_private_key.pem\""
              ]
     end
 

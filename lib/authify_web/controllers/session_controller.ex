@@ -45,8 +45,8 @@ defmodule AuthifyWeb.SessionController do
             # Log successful login
             AuditLog.log_event_async(:login_success, %{
               organization_id: organization.id,
-              user_id: user.id,
               actor_type: "user",
+              actor_id: user.id,
               actor_name: "#{user.first_name} #{user.last_name}",
               outcome: "success",
               ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
@@ -112,8 +112,8 @@ defmodule AuthifyWeb.SessionController do
     if current_user do
       AuditLog.log_event_async(:logout, %{
         organization_id: current_user.organization_id,
-        user_id: current_user.id,
         actor_type: "user",
+        actor_id: current_user.id,
         actor_name: "#{current_user.first_name} #{current_user.last_name}",
         outcome: "success",
         ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),

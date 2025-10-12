@@ -5,6 +5,7 @@ defmodule Authify.Repo.Migrations.CreateAuditEvents do
     create table(:audit_events) do
       add :event_type, :string, null: false, size: 50
       add :actor_type, :string, null: false, size: 20
+      add :actor_id, :integer
       add :actor_name, :string, size: 255
       add :resource_type, :string, size: 100
       add :resource_id, :integer
@@ -14,13 +15,12 @@ defmodule Authify.Repo.Migrations.CreateAuditEvents do
       add :metadata, :json
 
       add :organization_id, references(:organizations, on_delete: :delete_all), null: false
-      add :user_id, references(:users, on_delete: :nilify_all)
 
       add :inserted_at, :utc_datetime, null: false
     end
 
     create index(:audit_events, [:organization_id])
-    create index(:audit_events, [:user_id])
+    create index(:audit_events, [:actor_type, :actor_id])
     create index(:audit_events, [:event_type])
     create index(:audit_events, [:actor_type])
     create index(:audit_events, [:inserted_at])

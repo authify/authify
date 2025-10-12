@@ -42,9 +42,11 @@ defmodule AuthifyWeb.InvitationController do
         # Log invitation creation
         AuditLog.log_event_async(:user_invited, %{
           organization_id: organization.id,
-          user_id: current_user.id,
           actor_type: "user",
+          actor_id: current_user.id,
           actor_name: "#{current_user.first_name} #{current_user.last_name}",
+          resource_type: "invitation",
+          resource_id: invitation.id,
           outcome: "success",
           ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
           user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
@@ -105,9 +107,11 @@ defmodule AuthifyWeb.InvitationController do
       # Log invitation revocation
       AuditLog.log_event_async(:invitation_revoked, %{
         organization_id: organization.id,
-        user_id: current_user.id,
         actor_type: "user",
+        actor_id: current_user.id,
         actor_name: "#{current_user.first_name} #{current_user.last_name}",
+        resource_type: "invitation",
+        resource_id: invitation.id,
         outcome: "success",
         ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
         user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
@@ -168,12 +172,14 @@ defmodule AuthifyWeb.InvitationController do
       invitation ->
         case Accounts.accept_invitation(invitation, user_params) do
           {:ok, user} ->
-            # Log invitation revocation
+            # Log invitation acceptance
             AuditLog.log_event_async(:user_invitation_accepted, %{
               organization_id: invitation.organization_id,
-              user_id: user.id,
               actor_type: "user",
+              actor_id: user.id,
               actor_name: "#{user.first_name} #{user.last_name}",
+              resource_type: "user",
+              resource_id: user.id,
               outcome: "success",
               ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
               user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
