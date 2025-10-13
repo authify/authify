@@ -1,13 +1,13 @@
 defmodule AuthifyWeb.Helpers.AuditHelper do
   @moduledoc """
-  Helper functions for audit logging in controllers.
+  Helper functions for audit logging in controllers and APIs.
 
-  Supports both user actors (web UI, personal access tokens) and
-  application actors (OAuth client credentials flow). Also provides utilities
-  for logging configuration changes with structured metadata.
+  Provides helpers for recording generic events, configuration updates, and
+  certificate lifecycle actions with consistent metadata.
   """
 
   alias Authify.AuditLog
+  alias Ecto.Changeset
 
   @rate_limit_fields MapSet.new(~w(
     quota_auth_rate_limit
@@ -20,9 +20,7 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
     api_rate_limit
   ))
 
-  @sensitive_fields MapSet.new(~w(
-    smtp_password
-  ))
+  @sensitive_fields MapSet.new(~w(smtp_password))
 
   @doc """
   Logs an audit event using the connection assigns to determine actor metadata.
@@ -122,6 +120,68 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
       "failure",
       metadata
     )
+  end
+
+  @doc """
+  Logs certificate lifecycle events (creation, activation, deactivation, deletion).
+  """
+  def log_certificate_event(conn, event_type, certificate, opts \\ []) do
+    metadata =
+      %{
+        "certificate_id" => certificate.id,
+        "certificate_name" => certificate.name,
+        "usage" => certificate.usage,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_put_generated(opts[:generated])
+      |> maybe_put_previous_state(opts[:previous_state])
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      event_type,
+      opts[:resource_type] || "certificate",
+      opts[:resource_id] || certificate.id,
+      opts[:outcome] || "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs failed certificate lifecycle attempts with error details.
+  """
+  def log_certificate_failure(conn, event_type, errors, opts \\ []) do
+    certificate = opts[:certificate]
+
+    metadata =
+      %{
+        "errors" => normalize_errors(errors),
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+      |> maybe_attach_certificate(certificate)
+
+    log_event_async(
+      conn,
+      event_type,
+      opts[:resource_type] || "certificate",
+      opts[:resource_id] || maybe_certificate_id(certificate),
+      "failure",
+      metadata
+    )
+  end
+
+  @doc """
+  Converts changeset errors into a flat list of human-readable strings.
+  """
+  def changeset_errors(%Changeset{} = changeset) do
+    changeset
+    |> Changeset.traverse_errors(&translate_error/1)
+    |> Enum.flat_map(fn {field, messages} ->
+      Enum.map(List.wrap(messages), fn message ->
+        "#{field} #{message}"
+      end)
+    end)
   end
 
   @doc """
@@ -229,5 +289,41 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
     map
     |> Enum.map(fn {key, value} -> {to_string(key), normalize_value(value)} end)
     |> Enum.into(%{})
+  end
+
+  defp maybe_put_generated(map, nil), do: map
+  defp maybe_put_generated(map, value), do: Map.put(map, "generated", value)
+
+  defp maybe_put_previous_state(map, nil), do: map
+
+  defp maybe_put_previous_state(map, value) do
+    Map.put(map, "previous_state", normalize_value(value))
+  end
+
+  defp maybe_attach_certificate(map, nil), do: map
+
+  defp maybe_attach_certificate(map, certificate) do
+    map
+    |> Map.put("certificate_id", certificate.id)
+    |> Map.put("certificate_name", certificate.name)
+    |> maybe_put_usage(certificate.usage)
+  end
+
+  defp maybe_put_usage(map, nil), do: map
+  defp maybe_put_usage(map, usage), do: Map.put(map, "usage", usage)
+
+  defp maybe_certificate_id(nil), do: nil
+  defp maybe_certificate_id(%{id: id}), do: id
+
+  defp normalize_errors(errors) when is_binary(errors), do: [errors]
+  defp normalize_errors(errors) when is_list(errors), do: Enum.map(errors, &to_string/1)
+  defp normalize_errors(%Changeset{} = changeset), do: changeset_errors(changeset)
+  defp normalize_errors(nil), do: []
+  defp normalize_errors(other), do: [inspect(other)]
+
+  defp translate_error({msg, opts}) do
+    Enum.reduce(opts, msg, fn {key, value}, acc ->
+      String.replace(acc, "%{#{key}}", to_string(value))
+    end)
   end
 end

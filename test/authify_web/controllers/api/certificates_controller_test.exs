@@ -2,6 +2,7 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
   use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
+  alias Authify.AuditLog
 
   setup %{conn: conn} do
     organization = organization_fixture()
@@ -187,6 +188,19 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
       assert attributes["is_active"] == false
       refute Map.has_key?(attributes, "private_key")
 
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "certificate_created"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["generated"] == false
+      assert event.metadata["source"] == "api"
+      assert event.metadata["certificate_name"] == "Test Manual Cert"
+
       # Clean up the temp certificate
       Authify.Accounts.delete_certificate(temp_cert)
     end
@@ -212,6 +226,19 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
       assert attributes["name"] == "Generated SAML Cert"
       assert attributes["usage"] == "saml_signing"
       refute Map.has_key?(attributes, "private_key")
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "certificate_created"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["generated"] == true
+      assert event.metadata["source"] == "api"
+      assert event.metadata["certificate_name"] == "Generated SAML Cert"
     end
 
     test "returns validation errors for invalid data", %{conn: conn, organization: organization} do
@@ -233,6 +260,18 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
 
       assert details["name"]
       assert details["usage"]
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "certificate_created"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "usage"))
+      assert event.metadata["source"] == "api"
     end
 
     test "requires appropriate Management API scopes", %{conn: conn, organization: organization} do
@@ -344,6 +383,18 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
       conn = delete(conn, "/#{organization.slug}/api/certificates/#{certificate.id}")
 
       assert response(conn, 204)
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "certificate_deleted"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "api"
+      assert event.metadata["certificate_id"] == certificate.id
     end
 
     test "returns 404 for non-existent certificate", %{conn: conn, organization: organization} do
@@ -372,6 +423,19 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
              } = json_response(conn, 200)
 
       assert attributes["is_active"] == true
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "certificate_activated"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "api"
+      assert event.metadata["certificate_id"] == certificate.id
+      assert event.metadata["previous_state"]["is_active"] == false
     end
 
     test "returns 404 for non-existent certificate", %{conn: conn, organization: organization} do
@@ -391,6 +455,9 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
       certificate1: certificate,
       organization: organization
     } do
+      {:ok, certificate} =
+        Authify.Accounts.update_certificate(certificate, %{"is_active" => true})
+
       conn = patch(conn, "/#{organization.slug}/api/certificates/#{certificate.id}/deactivate")
 
       assert %{
@@ -400,6 +467,19 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
              } = json_response(conn, 200)
 
       assert attributes["is_active"] == false
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "certificate_deactivated"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "api"
+      assert event.metadata["certificate_id"] == certificate.id
+      assert event.metadata["previous_state"]["is_active"] == true
     end
 
     test "returns 404 for non-existent certificate", %{conn: conn, organization: organization} do

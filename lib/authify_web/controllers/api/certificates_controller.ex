@@ -2,6 +2,7 @@ defmodule AuthifyWeb.API.CertificatesController do
   use AuthifyWeb.API.BaseController
 
   alias Authify.Accounts
+  alias AuthifyWeb.Helpers.AuditHelper
 
   @doc """
   GET /{org_slug}/api/certificates
@@ -93,6 +94,11 @@ defmodule AuthifyWeb.API.CertificatesController do
             # Generate a new certificate
             case Accounts.generate_saml_signing_certificate(organization, certificate_params) do
               {:ok, certificate} ->
+                AuditHelper.log_certificate_event(conn, :certificate_created, certificate,
+                  generated: true,
+                  extra_metadata: %{source: "api"}
+                )
+
                 render_api_response(conn, certificate,
                   resource_type: "certificate",
                   exclude: [:private_key],
@@ -100,6 +106,18 @@ defmodule AuthifyWeb.API.CertificatesController do
                 )
 
               {:error, %Ecto.Changeset{} = changeset} ->
+                AuditHelper.log_certificate_failure(
+                  conn,
+                  :certificate_created,
+                  AuditHelper.changeset_errors(changeset),
+                  extra_metadata: %{
+                    source: "api",
+                    attempted_name: certificate_params["name"],
+                    usage: certificate_params["usage"],
+                    generated: true
+                  }
+                )
+
                 render_validation_errors(conn, changeset)
             end
 
@@ -107,6 +125,11 @@ defmodule AuthifyWeb.API.CertificatesController do
             # Manual certificate creation
             case Accounts.create_certificate(organization, certificate_params) do
               {:ok, certificate} ->
+                AuditHelper.log_certificate_event(conn, :certificate_created, certificate,
+                  generated: false,
+                  extra_metadata: %{source: "api"}
+                )
+
                 render_api_response(conn, certificate,
                   resource_type: "certificate",
                   exclude: [:private_key],
@@ -114,6 +137,18 @@ defmodule AuthifyWeb.API.CertificatesController do
                 )
 
               {:error, %Ecto.Changeset{} = changeset} ->
+                AuditHelper.log_certificate_failure(
+                  conn,
+                  :certificate_created,
+                  AuditHelper.changeset_errors(changeset),
+                  extra_metadata: %{
+                    source: "api",
+                    attempted_name: certificate_params["name"],
+                    usage: certificate_params["usage"],
+                    generated: false
+                  }
+                )
+
                 render_validation_errors(conn, changeset)
             end
         end
@@ -154,12 +189,24 @@ defmodule AuthifyWeb.API.CertificatesController do
 
           case Accounts.update_certificate(certificate, certificate_params) do
             {:ok, updated_certificate} ->
+              maybe_log_activation_change(
+                conn,
+                certificate,
+                updated_certificate,
+                certificate_params,
+                source: "api"
+              )
+
               render_api_response(conn, updated_certificate,
                 resource_type: "certificate",
                 exclude: [:private_key]
               )
 
             {:error, %Ecto.Changeset{} = changeset} ->
+              maybe_log_activation_failure(conn, certificate, certificate_params, changeset,
+                source: "api"
+              )
+
               render_validation_errors(conn, changeset)
           end
         rescue
@@ -208,9 +255,21 @@ defmodule AuthifyWeb.API.CertificatesController do
 
           case Accounts.delete_certificate(certificate) do
             {:ok, _deleted_certificate} ->
+              AuditHelper.log_certificate_event(conn, :certificate_deleted, certificate,
+                extra_metadata: %{source: "api"}
+              )
+
               conn |> put_status(:no_content) |> json(%{})
 
             {:error, %Ecto.Changeset{} = changeset} ->
+              AuditHelper.log_certificate_failure(
+                conn,
+                :certificate_deleted,
+                AuditHelper.changeset_errors(changeset),
+                certificate: certificate,
+                extra_metadata: %{source: "api"}
+              )
+
               render_validation_errors(conn, changeset)
           end
         rescue
@@ -244,12 +303,25 @@ defmodule AuthifyWeb.API.CertificatesController do
 
           case Accounts.update_certificate(certificate, %{"is_active" => true}) do
             {:ok, updated_certificate} ->
+              AuditHelper.log_certificate_event(conn, :certificate_activated, updated_certificate,
+                previous_state: %{"is_active" => certificate.is_active},
+                extra_metadata: %{source: "api"}
+              )
+
               render_api_response(conn, updated_certificate,
                 resource_type: "certificate",
                 exclude: [:private_key]
               )
 
             {:error, %Ecto.Changeset{} = changeset} ->
+              AuditHelper.log_certificate_failure(
+                conn,
+                :certificate_activated,
+                AuditHelper.changeset_errors(changeset),
+                certificate: certificate,
+                extra_metadata: %{source: "api"}
+              )
+
               render_validation_errors(conn, changeset)
           end
         rescue
@@ -283,12 +355,28 @@ defmodule AuthifyWeb.API.CertificatesController do
 
           case Accounts.update_certificate(certificate, %{"is_active" => false}) do
             {:ok, updated_certificate} ->
+              AuditHelper.log_certificate_event(
+                conn,
+                :certificate_deactivated,
+                updated_certificate,
+                previous_state: %{"is_active" => certificate.is_active},
+                extra_metadata: %{source: "api"}
+              )
+
               render_api_response(conn, updated_certificate,
                 resource_type: "certificate",
                 exclude: [:private_key]
               )
 
             {:error, %Ecto.Changeset{} = changeset} ->
+              AuditHelper.log_certificate_failure(
+                conn,
+                :certificate_deactivated,
+                AuditHelper.changeset_errors(changeset),
+                certificate: certificate,
+                extra_metadata: %{source: "api"}
+              )
+
               render_validation_errors(conn, changeset)
           end
         rescue
@@ -320,21 +408,19 @@ defmodule AuthifyWeb.API.CertificatesController do
         try do
           certificate = Accounts.get_certificate!(id, organization)
 
-          {content, filename, content_type} =
+          {content, filename} =
             case type do
               "certificate" ->
                 {certificate.certificate,
-                 "#{sanitize_filename(certificate.name)}_certificate.pem",
-                 "application/x-pem-file"}
+                 "#{sanitize_filename(certificate.name)}_certificate.pem"}
 
               "private_key" ->
                 {certificate.private_key,
-                 "#{sanitize_filename(certificate.name)}_private_key.pem",
-                 "application/x-pem-file"}
+                 "#{sanitize_filename(certificate.name)}_private_key.pem"}
             end
 
           conn
-          |> put_resp_content_type(content_type)
+          |> put_resp_content_type("application/x-pem-file")
           |> put_resp_header("content-disposition", "attachment; filename=\"#{filename}\"")
           |> send_resp(200, content)
         rescue
@@ -360,6 +446,46 @@ defmodule AuthifyWeb.API.CertificatesController do
       "Invalid download type: #{type}. Must be 'certificate' or 'private_key'"
     )
   end
+
+  defp maybe_log_activation_change(conn, original, updated, params, opts) do
+    if updated.is_active != original.is_active do
+      event_type =
+        if updated.is_active, do: :certificate_activated, else: :certificate_deactivated
+
+      attempted_state =
+        case Map.fetch(params, "is_active") do
+          {:ok, value} -> truthy?(value)
+          :error -> updated.is_active
+        end
+
+      AuditHelper.log_certificate_event(conn, event_type, updated,
+        previous_state: %{"is_active" => original.is_active},
+        extra_metadata: %{source: opts[:source], attempted_state: attempted_state}
+      )
+    end
+  end
+
+  defp maybe_log_activation_failure(conn, certificate, params, changeset, opts) do
+    case params do
+      %{"is_active" => desired} ->
+        event_type =
+          if truthy?(desired), do: :certificate_activated, else: :certificate_deactivated
+
+        AuditHelper.log_certificate_failure(
+          conn,
+          event_type,
+          AuditHelper.changeset_errors(changeset),
+          certificate: certificate,
+          extra_metadata: %{source: opts[:source], attempted_state: truthy?(desired)}
+        )
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp truthy?(value) when value in [true, "true", 1, "1", "on"], do: true
+  defp truthy?(_value), do: false
 
   # Sanitize filename to prevent header injection
   defp sanitize_filename(name) do
