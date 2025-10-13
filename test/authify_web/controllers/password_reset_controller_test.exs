@@ -3,6 +3,7 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
 
   import Authify.AccountsFixtures
   alias Authify.Accounts
+  alias Authify.AuditLog
 
   describe "GET /password_reset/new" do
     test "renders password reset request form", %{conn: conn} do
@@ -122,7 +123,12 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
       %{organization: organization, user: user, token: token}
     end
 
-    test "resets password with valid token and params", %{conn: conn, token: token, user: user} do
+    test "resets password with valid token and params", %{
+      conn: conn,
+      token: token,
+      user: user,
+      organization: organization
+    } do
       password_params = %{
         "password" => "NewSecureP@ssw0rd!",
         "password_confirmation" => "NewSecureP@ssw0rd!"
@@ -144,6 +150,18 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
       # Verify token was cleared
       assert updated_user.password_reset_token == nil
       assert updated_user.password_reset_expires_at == nil
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "password_reset_completed"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "web"
+      assert event.metadata["user_id"] == user.id
     end
 
     test "shows error for invalid token", %{conn: conn} do
@@ -161,7 +179,7 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Password reset link is invalid"
     end
 
-    test "shows error for expired token", %{conn: conn, user: user} do
+    test "shows error for expired token", %{conn: conn, user: user, organization: organization} do
       # Create expired token
       expired_time = DateTime.add(DateTime.utc_now(), -1, :hour) |> DateTime.truncate(:second)
       plaintext_token = Accounts.User.generate_password_reset_token()
@@ -186,9 +204,26 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
 
       assert redirected_to(conn) == ~p"/password_reset/new"
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Password reset link has expired"
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "password_reset_completed"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["reason"] == "token_expired"
+      assert event.metadata["user_id"] == user.id
     end
 
-    test "renders form with errors for invalid password", %{conn: conn, token: token} do
+    test "renders form with errors for invalid password", %{
+      conn: conn,
+      token: token,
+      user: user,
+      organization: organization
+    } do
       invalid_password_params = %{
         "password" => "weak",
         "password_confirmation" => "different"
@@ -202,9 +237,27 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
       response = html_response(conn, 200)
       assert response =~ "Reset Your Password"
       # Should render the form again with validation errors
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "password_reset_completed"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["reason"] == "validation_failed"
+      assert event.metadata["user_id"] == user.id
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "password"))
     end
 
-    test "renders form with errors for mismatched passwords", %{conn: conn, token: token} do
+    test "renders form with errors for mismatched passwords", %{
+      conn: conn,
+      token: token,
+      user: user,
+      organization: organization
+    } do
       mismatched_password_params = %{
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "DifferentP@ssw0rd!"
@@ -218,9 +271,27 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
       response = html_response(conn, 200)
       assert response =~ "Reset Your Password"
       # Should render the form again with validation errors
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "password_reset_completed"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["reason"] == "validation_failed"
+      assert event.metadata["user_id"] == user.id
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "password"))
     end
 
-    test "renders form with errors for weak password", %{conn: conn, token: token} do
+    test "renders form with errors for weak password", %{
+      conn: conn,
+      token: token,
+      user: user,
+      organization: organization
+    } do
       weak_password_params = %{
         "password" => "123",
         "password_confirmation" => "123"
@@ -234,6 +305,19 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
       response = html_response(conn, 200)
       assert response =~ "Reset Your Password"
       # Should render the form again with validation errors
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "password_reset_completed"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["reason"] == "validation_failed"
+      assert event.metadata["user_id"] == user.id
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "password"))
     end
   end
 

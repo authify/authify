@@ -9,6 +9,7 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   alias Authify.Accounts.PersonalAccessToken
   alias Authify.AuditLog
   alias Ecto.Changeset
+  alias Plug.Conn
 
   @rate_limit_fields MapSet.new(~w(
     quota_auth_rate_limit
@@ -218,6 +219,54 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
       event_type,
       opts[:resource_type] || "personal_access_token",
       opts[:resource_id] || maybe_personal_access_token_id(token),
+      "failure",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs successful password reset completions.
+  """
+  def log_password_reset_completed(conn, user, opts \\ []) do
+    conn = assign_actor_from_user(conn, user)
+
+    metadata =
+      %{
+        "user_id" => user.id,
+        "organization_slug" => user.organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :password_reset_completed,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs failed password reset attempts when the user is known.
+  """
+  def log_password_reset_failure(conn, user, reason, opts \\ []) do
+    conn = assign_actor_from_user(conn, user)
+
+    metadata =
+      %{
+        "user_id" => user.id,
+        "organization_slug" => user.organization.slug,
+        "reason" => to_string(reason)
+      }
+      |> maybe_put("errors", normalize_errors(opts[:errors]))
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :password_reset_completed,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
       "failure",
       metadata
     )
@@ -518,6 +567,13 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   end
 
   defp personal_access_token_scopes(_), do: nil
+
+  defp assign_actor_from_user(conn, user) do
+    conn
+    |> Conn.assign(:actor_type, :user)
+    |> Conn.assign(:current_user, user)
+    |> Conn.assign(:current_organization, user.organization)
+  end
 
   defp normalize_errors(errors) when is_binary(errors), do: [errors]
   defp normalize_errors(errors) when is_list(errors), do: Enum.map(errors, &to_string/1)
