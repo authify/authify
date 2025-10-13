@@ -22,7 +22,7 @@ defmodule Authify.AuditLog.Event do
     user_created user_updated user_deleted user_enabled user_disabled
     user_invited user_invitation_accepted invitation_revoked
     role_assigned role_revoked
-    oauth_client_created oauth_client_updated oauth_client_deleted
+    oauth_client_created oauth_client_updated oauth_client_deleted oauth_client_secret_regenerated
     saml_sp_created saml_sp_updated saml_sp_deleted
     organization_created organization_updated organization_deleted
     certificate_created certificate_activated certificate_deactivated certificate_deleted

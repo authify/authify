@@ -23,13 +23,14 @@ defmodule AuthifyWeb.Auth.APIAuth do
       conn
     else
       case authenticate_request(conn) do
-        {:ok, user, organization, scopes} ->
+        {:ok, actor, organization, scopes, actor_info} ->
           conn =
             conn
-            |> assign(:current_user, user)
+            |> assign(:current_user, actor)
             |> assign(:current_organization, organization)
             |> assign(:current_scopes, scopes || [])
             |> assign(:api_authenticated, true)
+            |> assign_actor_info(actor_info)
 
           # Check if required scopes are present
           if required_scopes == [] or has_required_scopes?(scopes, required_scopes) do
@@ -79,10 +80,10 @@ defmodule AuthifyWeb.Auth.APIAuth do
       # Try Bearer token authentication first
       bearer_token = get_bearer_token(conn) ->
         case authenticate_bearer_token(bearer_token) do
-          {:ok, user, token_organization, scopes} ->
+          {:ok, actor, token_organization, scopes, actor_info} ->
             # Validate token's organization matches URL organization
             if url_organization && token_organization.id == url_organization.id do
-              {:ok, user, token_organization, scopes}
+              {:ok, actor, token_organization, scopes, actor_info}
             else
               {:error, "Token organization mismatch"}
             end
@@ -117,7 +118,8 @@ defmodule AuthifyWeb.Auth.APIAuth do
             "organizations:write"
           ]
 
-          {:ok, user, organization, all_scopes}
+          actor_info = %{type: :user, user: user}
+          {:ok, user, organization, all_scopes, actor_info}
         else
           {:error, "Invalid session state"}
         end
@@ -139,7 +141,15 @@ defmodule AuthifyWeb.Auth.APIAuth do
     if String.starts_with?(token, "authify_pat_") do
       case authenticate_personal_access_token(token) do
         {:ok, pat} ->
-          {:ok, pat.user, pat.organization, Authify.Accounts.PersonalAccessToken.scopes_list(pat)}
+          actor_info = %{
+            type: :user,
+            user: pat.user,
+            token: token,
+            token_type: :personal_access_token
+          }
+
+          {:ok, pat.user, pat.organization, Authify.Accounts.PersonalAccessToken.scopes_list(pat),
+           actor_info}
 
         {:error, _reason} ->
           {:error, "Invalid or expired personal access token"}
@@ -147,8 +157,8 @@ defmodule AuthifyWeb.Auth.APIAuth do
     else
       # Try OAuth access token
       case validate_oauth_access_token(token) do
-        {:ok, user, organization, scopes} ->
-          {:ok, user, organization, scopes}
+        {:ok, actor, organization, scopes, actor_info} ->
+          {:ok, actor, organization, scopes, actor_info}
 
         {:error, _oauth_error} ->
           # Fall back to Guardian JWT validation
@@ -177,7 +187,8 @@ defmodule AuthifyWeb.Auth.APIAuth do
                 "organizations:write"
               ]
 
-              {:ok, user, organization, all_scopes}
+              actor_info = %{type: :user, user: user, token: token, token_type: :guardian_jwt}
+              {:ok, user, organization, all_scopes, actor_info}
 
             {:error, _reason} ->
               {:error, "Invalid or expired token"}
@@ -215,13 +226,23 @@ defmodule AuthifyWeb.Auth.APIAuth do
             scopes = String.split(access_token.scopes, " ") |> Enum.reject(&(&1 == ""))
 
             # For client credentials flow, user_id is nil
-            # We'll create a virtual "service account" representation
             if access_token.user_id do
-              # User-bound token
+              # User-bound token (authorization code flow)
               user = Authify.Accounts.get_user!(access_token.user_id)
-              {:ok, user, organization, scopes}
+
+              actor_info = %{
+                type: :user,
+                user: user,
+                token: token,
+                token_type: :oauth_access_token,
+                application: application,
+                access_token: access_token
+              }
+
+              {:ok, user, organization, scopes, actor_info}
             else
-              # Service account token - create a virtual user representing the service
+              # Service account token (client credentials flow)
+              # Create a virtual user for backwards compatibility
               service_user = %{
                 id: nil,
                 email: "service@#{application.name}",
@@ -231,7 +252,15 @@ defmodule AuthifyWeb.Auth.APIAuth do
                 application_id: application.id
               }
 
-              {:ok, service_user, organization, scopes}
+              actor_info = %{
+                type: :application,
+                application: application,
+                token: token,
+                token_type: :oauth_access_token,
+                access_token: access_token
+              }
+
+              {:ok, service_user, organization, scopes, actor_info}
             end
           end
         end
@@ -256,5 +285,23 @@ defmodule AuthifyWeb.Auth.APIAuth do
     user_scope == required_scope or
       (String.ends_with?(user_scope, ":write") and
          String.replace_suffix(user_scope, ":write", ":read") == required_scope)
+  end
+
+  defp assign_actor_info(conn, %{type: :user} = actor_info) do
+    # For user actors, keep backwards compatibility
+    conn
+    |> assign(:actor_type, :user)
+    |> assign(:current_token, actor_info[:token])
+    |> assign(:token_type, actor_info[:token_type])
+  end
+
+  defp assign_actor_info(conn, %{type: :application} = actor_info) do
+    # For application actors (service accounts), set current_application
+    conn
+    |> assign(:actor_type, :application)
+    |> assign(:current_application, actor_info.application)
+    |> assign(:current_token, actor_info.token)
+    |> assign(:token_type, actor_info.token_type)
+    |> assign(:access_token, actor_info[:access_token])
   end
 end
