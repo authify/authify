@@ -166,6 +166,19 @@ defmodule AuthifyWeb.ProfileControllerTest do
       assert PersonalAccessToken.scopes_list(token) == ["profile:read", "profile:write"]
       assert token.user_id == user.id
       assert token.organization_id == organization.id
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "personal_access_token_created"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "web"
+      assert event.metadata["personal_access_token_id"] == token.id
+      assert Enum.sort(event.metadata["scopes"]) == ["profile:read", "profile:write"]
     end
 
     test "shows validation errors for invalid token", %{conn: conn, user: user} do
@@ -184,6 +197,18 @@ defmodule AuthifyWeb.ProfileControllerTest do
 
       response = html_response(conn, 200)
       assert response =~ "can&#39;t be blank"
+
+      events =
+        AuditLog.list_events(
+          organization_id: org.id,
+          event_type: "personal_access_token_created"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["source"] == "web"
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "name"))
     end
 
     test "deletes personal access token", %{conn: conn, user: user} do
@@ -210,6 +235,18 @@ defmodule AuthifyWeb.ProfileControllerTest do
       # Verify token was deleted from database
       tokens = Accounts.list_personal_access_tokens(user)
       assert Enum.empty?(tokens)
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "personal_access_token_deleted"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "web"
+      assert event.metadata["personal_access_token_id"] == token.id
     end
 
     test "cannot delete another user's token", %{conn: conn, user: user} do
@@ -276,6 +313,20 @@ defmodule AuthifyWeb.ProfileControllerTest do
       assert "invitations:read" in scopes_list
       assert "invitations:write" in scopes_list
       assert "users:read" in scopes_list
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "personal_access_token_created"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "web"
+
+      assert Enum.sort(event.metadata["scopes"]) ==
+               ["invitations:read", "invitations:write", "users:read"]
     end
   end
 end

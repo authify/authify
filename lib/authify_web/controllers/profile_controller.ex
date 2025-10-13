@@ -181,6 +181,12 @@ defmodule AuthifyWeb.ProfileController do
 
     case Accounts.create_personal_access_token(current_user, organization, pat_params) do
       {:ok, pat} ->
+        pat = Authify.Repo.preload(pat, :scopes)
+
+        AuditHelper.log_personal_access_token_event(conn, :personal_access_token_created, pat,
+          extra_metadata: %{"source" => "web"}
+        )
+
         conn
         |> put_flash(
           :info,
@@ -193,6 +199,13 @@ defmodule AuthifyWeb.ProfileController do
         )
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        AuditHelper.log_personal_access_token_failure(
+          conn,
+          :personal_access_token_created,
+          changeset,
+          extra_metadata: %{"source" => "web"}
+        )
+
         personal_access_tokens = Accounts.list_personal_access_tokens(current_user)
 
         render(conn, :personal_access_tokens,
@@ -206,18 +219,32 @@ defmodule AuthifyWeb.ProfileController do
 
   def delete_personal_access_token(conn, %{"id" => id}) do
     current_user = conn.assigns.current_user
-
-    pat = Accounts.get_personal_access_token!(id, current_user)
+    pat = Accounts.get_personal_access_token!(id, current_user) |> Authify.Repo.preload(:scopes)
 
     case Accounts.delete_personal_access_token(pat) do
-      {:ok, _pat} ->
+      {:ok, deleted_pat} ->
+        AuditHelper.log_personal_access_token_event(
+          conn,
+          :personal_access_token_deleted,
+          deleted_pat,
+          extra_metadata: %{"source" => "web"}
+        )
+
         conn
         |> put_flash(:info, "Personal access token deleted successfully.")
         |> redirect(
           to: ~p"/#{conn.assigns.current_organization.slug}/profile/personal-access-tokens"
         )
 
-      {:error, _changeset} ->
+      {:error, changeset} ->
+        AuditHelper.log_personal_access_token_failure(
+          conn,
+          :personal_access_token_deleted,
+          changeset,
+          personal_access_token: pat,
+          extra_metadata: %{"source" => "web"}
+        )
+
         conn
         |> put_flash(:error, "Unable to delete personal access token.")
         |> redirect(

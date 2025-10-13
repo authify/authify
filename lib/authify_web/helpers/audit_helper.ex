@@ -6,6 +6,7 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   certificate lifecycle actions with consistent metadata.
   """
 
+  alias Authify.Accounts.PersonalAccessToken
   alias Authify.AuditLog
   alias Ecto.Changeset
 
@@ -167,6 +168,56 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
       event_type,
       opts[:resource_type] || "certificate",
       opts[:resource_id] || maybe_certificate_id(certificate),
+      "failure",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs personal access token lifecycle events (creation, deletion, etc.).
+  """
+  def log_personal_access_token_event(conn, event_type, token, opts \\ []) do
+    metadata =
+      %{
+        "personal_access_token_id" => token.id,
+        "personal_access_token_name" => token.name,
+        "user_id" => token.user_id,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_put("description", token.description)
+      |> maybe_put("scopes", personal_access_token_scopes(token))
+      |> maybe_put("expires_at", normalize_value(token.expires_at))
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      event_type,
+      opts[:resource_type] || "personal_access_token",
+      opts[:resource_id] || token.id,
+      opts[:outcome] || "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs failed personal access token operations with error details.
+  """
+  def log_personal_access_token_failure(conn, event_type, errors, opts \\ []) do
+    token = opts[:personal_access_token]
+
+    metadata =
+      %{
+        "errors" => normalize_errors(errors),
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+      |> maybe_attach_personal_access_token(token)
+
+    log_event_async(
+      conn,
+      event_type,
+      opts[:resource_type] || "personal_access_token",
+      opts[:resource_id] || maybe_personal_access_token_id(token),
       "failure",
       metadata
     )
@@ -429,6 +480,18 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
     Map.put(map, "previous_state", normalize_value(value))
   end
 
+  defp maybe_attach_personal_access_token(map, nil), do: map
+
+  defp maybe_attach_personal_access_token(map, token) do
+    map
+    |> Map.put("personal_access_token_id", token.id)
+    |> Map.put("personal_access_token_name", token.name)
+    |> maybe_put("user_id", token.user_id)
+    |> maybe_put("description", token.description)
+    |> maybe_put("scopes", personal_access_token_scopes(token))
+    |> maybe_put("expires_at", normalize_value(token.expires_at))
+  end
+
   defp maybe_attach_certificate(map, nil), do: map
 
   defp maybe_attach_certificate(map, certificate) do
@@ -443,6 +506,18 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
 
   defp maybe_certificate_id(nil), do: nil
   defp maybe_certificate_id(%{id: id}), do: id
+
+  defp maybe_personal_access_token_id(nil), do: nil
+  defp maybe_personal_access_token_id(%{id: id}), do: id
+
+  defp personal_access_token_scopes(%PersonalAccessToken{} = token) do
+    case PersonalAccessToken.scopes_list(token) do
+      [] -> nil
+      scopes -> scopes
+    end
+  end
+
+  defp personal_access_token_scopes(_), do: nil
 
   defp normalize_errors(errors) when is_binary(errors), do: [errors]
   defp normalize_errors(errors) when is_list(errors), do: Enum.map(errors, &to_string/1)
