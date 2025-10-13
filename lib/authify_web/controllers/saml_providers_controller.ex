@@ -1,6 +1,7 @@
 defmodule AuthifyWeb.SAMLProvidersController do
   use AuthifyWeb, :controller
 
+  alias Authify.AuditLog
   alias Authify.SAML
   alias Authify.SAML.ServiceProvider
 
@@ -60,6 +61,12 @@ defmodule AuthifyWeb.SAMLProvidersController do
 
     case SAML.create_service_provider(service_provider_params) do
       {:ok, service_provider} ->
+        # Log SAML service provider creation
+        log_saml_provider_event(conn, :saml_sp_created, service_provider, %{
+          entity_id: service_provider.entity_id,
+          acs_url: service_provider.acs_url
+        })
+
         conn
         |> put_flash(:info, "SAML service provider created successfully.")
         |> redirect(
@@ -88,11 +95,18 @@ defmodule AuthifyWeb.SAMLProvidersController do
     service_provider = SAML.get_service_provider!(id, organization)
 
     case SAML.update_service_provider(service_provider, service_provider_params) do
-      {:ok, service_provider} ->
+      {:ok, updated_service_provider} ->
+        # Log SAML service provider update
+        log_saml_provider_event(conn, :saml_sp_updated, updated_service_provider, %{
+          entity_id: updated_service_provider.entity_id,
+          acs_url: updated_service_provider.acs_url
+        })
+
         conn
         |> put_flash(:info, "SAML service provider updated successfully.")
         |> redirect(
-          to: ~p"/#{conn.assigns.current_organization.slug}/saml_providers/#{service_provider}"
+          to:
+            ~p"/#{conn.assigns.current_organization.slug}/saml_providers/#{updated_service_provider}"
         )
 
       {:error, %Ecto.Changeset{} = changeset} ->
@@ -109,8 +123,37 @@ defmodule AuthifyWeb.SAMLProvidersController do
     service_provider = SAML.get_service_provider!(id, organization)
     {:ok, _service_provider} = SAML.delete_service_provider(service_provider)
 
+    # Log SAML service provider deletion
+    log_saml_provider_event(conn, :saml_sp_deleted, service_provider, %{
+      entity_id: service_provider.entity_id,
+      acs_url: service_provider.acs_url
+    })
+
     conn
     |> put_flash(:info, "SAML service provider deleted successfully.")
     |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/saml_providers")
+  end
+
+  # Helper for audit logging SAML service providers
+  defp log_saml_provider_event(conn, event_type, service_provider, metadata) do
+    organization = conn.assigns.current_organization
+    current_user = conn.assigns.current_user
+
+    AuditLog.log_event_async(event_type, %{
+      organization_id: organization.id,
+      actor_type: "user",
+      actor_id: current_user.id,
+      actor_name: "#{current_user.first_name} #{current_user.last_name}",
+      resource_type: "saml_service_provider",
+      resource_id: service_provider.id,
+      outcome: "success",
+      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+      metadata:
+        Map.merge(metadata, %{
+          service_provider_name: service_provider.name,
+          service_provider_id: service_provider.id
+        })
+    })
   end
 end
