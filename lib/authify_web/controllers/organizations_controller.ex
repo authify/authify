@@ -2,6 +2,7 @@ defmodule AuthifyWeb.OrganizationsController do
   use AuthifyWeb, :controller
 
   alias Authify.Accounts
+  alias Authify.AuditLog
 
   # Safely convert string to atom, only for known valid values
   defp safe_to_atom(string)
@@ -87,6 +88,11 @@ defmodule AuthifyWeb.OrganizationsController do
   def create(conn, %{"organization" => org_params}) do
     case Accounts.create_organization(org_params) do
       {:ok, organization} ->
+        # Log organization creation
+        log_organization_event(conn, :organization_created, organization, %{
+          slug: organization.slug
+        })
+
         conn
         |> put_flash(:info, "Organization '#{organization.name}' created successfully.")
         |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/organizations")
@@ -121,11 +127,18 @@ defmodule AuthifyWeb.OrganizationsController do
     target_organization = Accounts.get_organization!(id)
 
     case Accounts.update_organization(target_organization, org_params) do
-      {:ok, organization} ->
+      {:ok, updated_organization} ->
+        # Log organization update
+        log_organization_event(conn, :organization_updated, updated_organization, %{
+          slug: updated_organization.slug,
+          active: updated_organization.active
+        })
+
         conn
-        |> put_flash(:info, "Organization '#{organization.name}' updated successfully.")
+        |> put_flash(:info, "Organization '#{updated_organization.name}' updated successfully.")
         |> redirect(
-          to: ~p"/#{conn.assigns.current_organization.slug}/organizations/#{organization.id}"
+          to:
+            ~p"/#{conn.assigns.current_organization.slug}/organizations/#{updated_organization.id}"
         )
 
       {:error, changeset} ->
@@ -154,6 +167,11 @@ defmodule AuthifyWeb.OrganizationsController do
 
     case Accounts.delete_organization(target_organization) do
       {:ok, _organization} ->
+        # Log organization deletion
+        log_organization_event(conn, :organization_deleted, target_organization, %{
+          slug: target_organization.slug
+        })
+
         conn
         |> put_flash(:info, "Organization '#{target_organization.name}' deleted successfully.")
         |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/organizations")
@@ -166,6 +184,29 @@ defmodule AuthifyWeb.OrganizationsController do
             ~p"/#{conn.assigns.current_organization.slug}/organizations/#{target_organization.id}"
         )
     end
+  end
+
+  # Helper for audit logging organizations
+  defp log_organization_event(conn, event_type, target_organization, metadata) do
+    organization = conn.assigns.current_organization
+    current_user = conn.assigns.current_user
+
+    AuditLog.log_event_async(event_type, %{
+      organization_id: organization.id,
+      actor_type: "user",
+      actor_id: current_user.id,
+      actor_name: "#{current_user.first_name} #{current_user.last_name}",
+      resource_type: "organization",
+      resource_id: target_organization.id,
+      outcome: "success",
+      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+      metadata:
+        Map.merge(metadata, %{
+          organization_name: target_organization.name,
+          organization_id: target_organization.id
+        })
+    })
   end
 
   def switch_to_organization(conn, %{"id" => id}) do
