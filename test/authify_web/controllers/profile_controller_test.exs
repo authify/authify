@@ -5,8 +5,120 @@ defmodule AuthifyWeb.ProfileControllerTest do
 
   alias Authify.Accounts
   alias Authify.Accounts.PersonalAccessToken
+  alias Authify.AuditLog
 
   setup :register_and_log_in_user
+
+  describe "profile" do
+    test "successful profile update logs audit event", %{conn: conn, user: user} do
+      params = %{
+        "first_name" => "Updated",
+        "last_name" => "User",
+        "username" => user.username
+      }
+
+      conn =
+        patch(conn, ~p"/#{user.organization.slug}/profile", %{
+          "user" => params
+        })
+
+      assert redirected_to(conn) == ~p"/#{user.organization.slug}/profile"
+
+      events =
+        AuditLog.list_events(
+          organization_id: user.organization_id,
+          event_type: "user_updated"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "web"
+      assert event.metadata["user_id"] == user.id
+
+      assert Enum.any?(event.metadata["changes"], fn change ->
+               change["field"] == "first_name" && change["new"] == "Updated"
+             end)
+    end
+
+    test "failed profile update logs failure", %{conn: conn, user: user} do
+      conn =
+        patch(conn, ~p"/#{user.organization.slug}/profile", %{
+          "user" => %{"email" => ""}
+        })
+
+      assert html_response(conn, 200)
+
+      events =
+        AuditLog.list_events(
+          organization_id: user.organization_id,
+          event_type: "user_updated"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["source"] == "web"
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "email"))
+    end
+  end
+
+  describe "password" do
+    test "successful password update logs audit event", %{conn: conn, user: user} do
+      params = %{
+        "current_password" => "SecureP@ssw0rd!",
+        "password" => "NewP@ss1word!",
+        "password_confirmation" => "NewP@ss1word!"
+      }
+
+      conn =
+        patch(conn, ~p"/#{user.organization.slug}/profile/password", %{
+          "user" => params
+        })
+
+      assert redirected_to(conn) == ~p"/#{user.organization.slug}/profile"
+
+      events =
+        AuditLog.list_events(
+          organization_id: user.organization_id,
+          event_type: "password_changed"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "web"
+      assert event.metadata["method"] == "self_service"
+      assert event.metadata["user_id"] == user.id
+    end
+
+    test "invalid current password logs failure", %{conn: conn, user: user} do
+      params = %{
+        "current_password" => "wrong-password",
+        "password" => "AnotherP@ss1!",
+        "password_confirmation" => "AnotherP@ss1!"
+      }
+
+      conn =
+        patch(conn, ~p"/#{user.organization.slug}/profile/password", %{
+          "user" => params
+        })
+
+      assert html_response(conn, 200)
+
+      events =
+        AuditLog.list_events(
+          organization_id: user.organization_id,
+          event_type: "password_changed"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["source"] == "web"
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "current_password"))
+    end
+  end
 
   describe "personal_access_tokens" do
     test "renders personal access tokens page", %{conn: conn, user: user} do

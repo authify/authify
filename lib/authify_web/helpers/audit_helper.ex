@@ -21,6 +21,7 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   ))
 
   @sensitive_fields MapSet.new(~w(smtp_password))
+  @user_profile_fields ~w(email first_name last_name username theme_preference)a
 
   @doc """
   Logs an audit event using the connection assigns to determine actor metadata.
@@ -172,6 +173,98 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   end
 
   @doc """
+  Logs profile updates for the current user, capturing changed fields.
+  """
+  def log_user_profile_update(conn, old_user, new_user, opts \\ []) do
+    fields = opts[:fields] || @user_profile_fields
+    sensitive_fields = kwargs_to_set(opts[:sensitive_fields], MapSet.new())
+
+    changes = diff_struct_fields(old_user, new_user, fields, sensitive_fields)
+
+    metadata =
+      %{
+        "user_id" => new_user.id,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_put("changes", changes)
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :user_updated,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || new_user.id,
+      opts[:outcome] || "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs failed attempts to update a user profile.
+  """
+  def log_user_profile_failure(conn, user, errors, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "organization_slug" => conn.assigns.current_organization.slug,
+        "errors" => normalize_errors(errors)
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :user_updated,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "failure",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs successful password change attempts.
+  """
+  def log_password_change(conn, user, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :password_changed,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      opts[:outcome] || "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs failed password change attempts.
+  """
+  def log_password_change_failure(conn, user, errors, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "organization_slug" => conn.assigns.current_organization.slug,
+        "errors" => normalize_errors(errors)
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :password_changed,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "failure",
+      metadata
+    )
+  end
+
+  @doc """
   Converts changeset errors into a flat list of human-readable strings.
   """
   def changeset_errors(%Changeset{} = changeset) do
@@ -234,6 +327,42 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
       end
     end)
     |> Enum.reverse()
+  end
+
+  defp diff_struct_fields(old_struct, new_struct, fields, sensitive_fields) do
+    old_map = extract_fields(old_struct, fields)
+    new_map = extract_fields(new_struct, fields)
+
+    fields
+    |> Enum.reduce([], fn field, acc ->
+      old_val = Map.get(old_map, field)
+      new_val = Map.get(new_map, field)
+
+      if old_val == new_val do
+        acc
+      else
+        field_str = to_string(field)
+
+        change = %{
+          "field" => field_str,
+          "old" => mask_sensitive(field_str, normalize_value(old_val), sensitive_fields),
+          "new" => mask_sensitive(field_str, normalize_value(new_val), sensitive_fields)
+        }
+
+        [change | acc]
+      end
+    end)
+    |> Enum.reverse()
+  end
+
+  defp extract_fields(%_{} = struct, fields) do
+    struct
+    |> Map.from_struct()
+    |> extract_fields(fields)
+  end
+
+  defp extract_fields(map, fields) when is_map(map) do
+    Map.take(map, fields)
   end
 
   defp normalize_value(nil), do: nil

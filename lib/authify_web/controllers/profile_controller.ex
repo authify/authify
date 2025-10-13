@@ -4,6 +4,7 @@ defmodule AuthifyWeb.ProfileController do
 
   alias Authify.Accounts
   alias Authify.Accounts.PersonalAccessToken
+  alias AuthifyWeb.Helpers.AuditHelper
 
   def show(conn, _params) do
     current_user = conn.assigns.current_user
@@ -32,12 +33,20 @@ defmodule AuthifyWeb.ProfileController do
     organization = conn.assigns.current_organization
 
     case Accounts.update_user_profile(current_user, user_params) do
-      {:ok, _updated_user} ->
+      {:ok, updated_user} ->
+        AuditHelper.log_user_profile_update(conn, current_user, updated_user,
+          extra_metadata: %{"source" => "web"}
+        )
+
         conn
         |> put_flash(:info, "Profile updated successfully.")
         |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        AuditHelper.log_user_profile_failure(conn, current_user, changeset,
+          extra_metadata: %{"source" => "web"}
+        )
+
         render(conn, :edit,
           user: current_user,
           organization: organization,
@@ -66,12 +75,20 @@ defmodule AuthifyWeb.ProfileController do
     if password_params["current_password"] &&
          Accounts.User.valid_password?(current_user, password_params["current_password"]) do
       case Accounts.update_user_password(current_user, password_params) do
-        {:ok, _updated_user} ->
+        {:ok, updated_user} ->
+          AuditHelper.log_password_change(conn, updated_user,
+            extra_metadata: %{"source" => "web", "method" => "self_service"}
+          )
+
           conn
           |> put_flash(:info, "Password updated successfully.")
           |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
 
         {:error, %Ecto.Changeset{} = changeset} ->
+          AuditHelper.log_password_change_failure(conn, current_user, changeset,
+            extra_metadata: %{"source" => "web", "method" => "self_service"}
+          )
+
           render(conn, :edit_password,
             user: current_user,
             organization: organization,
@@ -83,6 +100,10 @@ defmodule AuthifyWeb.ProfileController do
         current_user
         |> Accounts.change_user_password(password_params)
         |> Ecto.Changeset.add_error(:current_password, "is invalid")
+
+      AuditHelper.log_password_change_failure(conn, current_user, changeset,
+        extra_metadata: %{"source" => "web", "method" => "self_service"}
+      )
 
       render(conn, :edit_password,
         user: current_user,
