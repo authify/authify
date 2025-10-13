@@ -3,6 +3,7 @@ defmodule AuthifyWeb.ConfigurationController do
 
   alias Authify.Configurations
   alias Authify.Organizations
+  alias AuthifyWeb.Helpers.AuditHelper
 
   def show(conn, _params) do
     user = conn.assigns.current_user
@@ -98,7 +99,6 @@ defmodule AuthifyWeb.ConfigurationController do
     authify_domain = Map.get(params, "authify_domain")
     custom_domains = Map.get(params, "custom_domains")
 
-    # Determine schema based on organization
     schema_name =
       if organization.slug == "authify-global" do
         "global"
@@ -106,9 +106,10 @@ defmodule AuthifyWeb.ConfigurationController do
         "organization"
       end
 
-    # Ensure configuration exists
     _config =
       Configurations.get_or_create_configuration("Organization", organization.id, schema_name)
+
+    old_settings = Configurations.get_all_settings("Organization", organization.id)
 
     # Get the schema module to know which settings are boolean
     schema_module =
@@ -185,6 +186,14 @@ defmodule AuthifyWeb.ConfigurationController do
       match?({:error, _}, authify_domain_result) ->
         {:error, reason} = authify_domain_result
 
+        AuditHelper.log_configuration_update_failure(
+          conn,
+          schema_name,
+          ["authify_domain #{reason}"],
+          resource_id: organization.id,
+          resource_type: "configuration"
+        )
+
         conn
         |> put_flash(:error, "Authify domain #{reason}")
         |> redirect(to: ~p"/#{organization.slug}/settings/configuration")
@@ -192,16 +201,51 @@ defmodule AuthifyWeb.ConfigurationController do
       match?({:error, _}, custom_domains_result) ->
         {:error, reason} = custom_domains_result
 
+        AuditHelper.log_configuration_update_failure(
+          conn,
+          schema_name,
+          ["custom_domains #{reason}"],
+          resource_id: organization.id,
+          resource_type: "configuration"
+        )
+
         conn
         |> put_flash(:error, "Custom domains #{reason}")
         |> redirect(to: ~p"/#{organization.slug}/settings/configuration")
 
       Enum.empty?(errors) ->
+        new_settings = Configurations.get_all_settings("Organization", organization.id)
+
+        AuditHelper.log_configuration_update(
+          conn,
+          schema_name,
+          old_settings,
+          new_settings,
+          resource_id: organization.id,
+          resource_type: "configuration",
+          extra_metadata: %{
+            custom_domains:
+              Organizations.list_organization_cnames(organization) |> Enum.map(& &1.domain)
+          }
+        )
+
         conn
         |> put_flash(:info, "Configuration updated successfully.")
         |> redirect(to: ~p"/#{organization.slug}/settings/configuration")
 
       true ->
+        error_messages =
+          errors
+          |> Enum.map(fn {:error, msg} -> msg end)
+
+        AuditHelper.log_configuration_update_failure(
+          conn,
+          schema_name,
+          error_messages,
+          resource_id: organization.id,
+          resource_type: "configuration"
+        )
+
         conn
         |> put_flash(:error, "Error updating some settings. Please check your input.")
         |> redirect(to: ~p"/#{organization.slug}/settings/configuration")

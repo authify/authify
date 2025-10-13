@@ -3,6 +3,8 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
 
   import Authify.AccountsFixtures
 
+  alias Authify.AuditLog
+
   describe "show" do
     test "shows global configuration for authify-global organization", %{conn: conn} do
       global_org = Authify.Accounts.get_global_organization()
@@ -138,6 +140,22 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
 
       assert Authify.Configurations.get_setting("Organization", organization.id, :description) ==
                "Test organization"
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "settings_updated"
+        )
+
+      assert length(events) == 1
+
+      event = hd(events)
+      assert event.actor_type == "user"
+      assert event.outcome == "success"
+
+      assert Enum.any?(event.metadata["changes"], fn change ->
+               change["field"] == "allow_oauth" and change["new"] == false
+             end)
     end
 
     test "unchecking boolean settings sets them to false (organization)", %{conn: conn} do
@@ -312,6 +330,18 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
       # Should get an error
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
                "Error updating some settings"
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "settings_updated"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["errors"] != []
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "allowed domains"))
     end
 
     test "tenant organization can manage custom domains via textarea", %{conn: conn} do

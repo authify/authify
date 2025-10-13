@@ -3,36 +3,29 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Helper functions for audit logging in controllers.
 
   Supports both user actors (web UI, personal access tokens) and
-  application actors (OAuth client credentials flow).
+  application actors (OAuth client credentials flow). Also provides utilities
+  for logging configuration changes with structured metadata.
   """
 
   alias Authify.AuditLog
 
+  @rate_limit_fields MapSet.new(~w(
+    quota_auth_rate_limit
+    quota_oauth_rate_limit
+    quota_saml_rate_limit
+    quota_api_rate_limit
+    auth_rate_limit
+    oauth_rate_limit
+    saml_rate_limit
+    api_rate_limit
+  ))
+
+  @sensitive_fields MapSet.new(~w(
+    smtp_password
+  ))
+
   @doc """
-  Logs an audit event from a controller connection.
-
-  Automatically extracts actor information from conn.assigns and determines
-  whether the actor is a user or an application (service account).
-
-  ## Parameters
-  - `conn` - The Plug.Conn with authentication assigns
-  - `event_type` - Atom representing the event type (e.g., :oauth_client_created)
-  - `resource_type` - String representing the resource type (e.g., "oauth_application")
-  - `resource_id` - Integer ID of the affected resource
-  - `outcome` - String outcome ("success", "failure", "denied")
-  - `metadata` - Map of additional event metadata (optional)
-
-  ## Examples
-
-      # Log a successful resource creation
-      log_event_async(conn, :oauth_client_created, "oauth_application", app.id, "success", %{
-        application_type: app.application_type
-      })
-
-      # Log a failed action
-      log_event_async(conn, :permission_denied, "organization", org_id, "denied", %{
-        reason: "insufficient_permissions"
-      })
+  Logs an audit event using the connection assigns to determine actor metadata.
   """
   def log_event_async(conn, event_type, resource_type, resource_id, outcome, metadata \\ %{}) do
     organization = conn.assigns.current_organization
@@ -73,7 +66,66 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   end
 
   @doc """
-  Extracts IP address from connection.
+  Logs a configuration change event, summarizing differences between settings.
+  """
+  def log_configuration_update(conn, schema_name, old_settings, new_settings, opts \\ []) do
+    rate_limit_fields = kwargs_to_set(opts[:rate_limit_fields], @rate_limit_fields)
+    sensitive_fields = kwargs_to_set(opts[:sensitive_fields], @sensitive_fields)
+
+    changes = diff_settings(old_settings, new_settings, sensitive_fields)
+
+    if changes != [] do
+      rate_limit_changes =
+        Enum.filter(changes, fn %{"field" => field} ->
+          MapSet.member?(rate_limit_fields, field)
+        end)
+
+      metadata =
+        %{
+          "schema" => schema_name,
+          "organization_slug" => conn.assigns.current_organization.slug,
+          "changes" => changes
+        }
+        |> maybe_put("rate_limit_changes", rate_limit_changes)
+        |> maybe_merge(opts[:extra_metadata])
+
+      log_event_async(
+        conn,
+        :settings_updated,
+        opts[:resource_type] || "configuration",
+        opts[:resource_id] || conn.assigns.current_organization.id,
+        opts[:outcome] || "success",
+        metadata
+      )
+    else
+      :noop
+    end
+  end
+
+  @doc """
+  Logs a failed configuration update attempt with error details.
+  """
+  def log_configuration_update_failure(conn, schema_name, errors, opts \\ []) do
+    metadata =
+      %{
+        "schema" => schema_name,
+        "organization_slug" => conn.assigns.current_organization.slug,
+        "errors" => List.wrap(errors)
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :settings_updated,
+      opts[:resource_type] || "configuration",
+      opts[:resource_id] || conn.assigns.current_organization.id,
+      "failure",
+      metadata
+    )
+  end
+
+  @doc """
+  Extracts the originating IP address from the connection.
   """
   def get_ip_address(conn) do
     case Plug.Conn.get_req_header(conn, "x-forwarded-for") do
@@ -83,7 +135,7 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   end
 
   @doc """
-  Extracts user agent from connection.
+  Extracts the user agent from the connection.
   """
   def get_user_agent(conn) do
     case Plug.Conn.get_req_header(conn, "user-agent") do
@@ -94,5 +146,88 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
 
   defp build_user_name(user) do
     "#{user.first_name} #{user.last_name}"
+  end
+
+  defp diff_settings(old_settings, new_settings, sensitive_fields) do
+    keys =
+      Map.keys(old_settings)
+      |> Enum.concat(Map.keys(new_settings))
+      |> Enum.uniq()
+
+    keys
+    |> Enum.reduce([], fn key, acc ->
+      old_val = Map.get(old_settings, key)
+      new_val = Map.get(new_settings, key)
+
+      if old_val == new_val do
+        acc
+      else
+        field = to_string(key)
+
+        change = %{
+          "field" => field,
+          "old" => mask_sensitive(field, normalize_value(old_val), sensitive_fields),
+          "new" => mask_sensitive(field, normalize_value(new_val), sensitive_fields)
+        }
+
+        [change | acc]
+      end
+    end)
+    |> Enum.reverse()
+  end
+
+  defp normalize_value(nil), do: nil
+  defp normalize_value(value) when is_boolean(value) or is_number(value), do: value
+  defp normalize_value(value) when is_binary(value), do: value
+  defp normalize_value(value) when is_list(value), do: Enum.map(value, &normalize_value/1)
+
+  defp normalize_value(%_{} = struct) do
+    struct
+    |> Map.from_struct()
+    |> normalize_value()
+  end
+
+  defp normalize_value(value) when is_map(value) do
+    value
+    |> Enum.map(fn {key, val} -> {to_string(key), normalize_value(val)} end)
+    |> Enum.into(%{})
+  end
+
+  defp normalize_value(value), do: inspect(value)
+
+  defp mask_sensitive(field, value, sensitive_fields) do
+    if MapSet.member?(sensitive_fields, field) and not is_nil(value) and value != "" do
+      "[FILTERED]"
+    else
+      value
+    end
+  end
+
+  defp kwargs_to_set(nil, default), do: default
+  defp kwargs_to_set(%MapSet{} = set, _default), do: set
+
+  defp kwargs_to_set(values, _default) when is_list(values) do
+    values
+    |> Enum.map(&to_string/1)
+    |> MapSet.new()
+  end
+
+  defp kwargs_to_set(_other, default), do: default
+
+  defp maybe_put(map, _key, []), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp maybe_merge(map, nil), do: map
+
+  defp maybe_merge(map, extra) when is_map(extra) do
+    Map.merge(map, stringify_keys(extra))
+  end
+
+  defp maybe_merge(map, _extra), do: map
+
+  defp stringify_keys(map) do
+    map
+    |> Enum.map(fn {key, value} -> {to_string(key), normalize_value(value)} end)
+    |> Enum.into(%{})
   end
 end

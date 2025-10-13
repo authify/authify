@@ -2,6 +2,7 @@ defmodule AuthifyWeb.API.OrganizationController do
   use AuthifyWeb.API.BaseController
 
   alias Authify.Configurations
+  alias AuthifyWeb.Helpers.AuditHelper
 
   @doc """
   GET /{org_slug}/api/organization
@@ -83,8 +84,9 @@ defmodule AuthifyWeb.API.OrganizationController do
             "organization"
           end
 
-        # Ensure configuration exists
         Configurations.get_or_create_configuration("Organization", organization.id, schema_name)
+
+        old_settings = Configurations.get_all_settings("Organization", organization.id)
 
         # Update each setting
         results =
@@ -108,8 +110,17 @@ defmodule AuthifyWeb.API.OrganizationController do
         errors = Enum.filter(results, fn result -> match?({:error, _}, result) end)
 
         if Enum.empty?(errors) do
-          # Get updated settings
           settings = Configurations.get_all_settings("Organization", organization.id)
+
+          AuditHelper.log_configuration_update(
+            conn,
+            schema_name,
+            old_settings,
+            settings,
+            resource_type: "configuration",
+            resource_id: organization.id,
+            extra_metadata: %{source: "api"}
+          )
 
           configuration_data = %{
             id: organization.id,
@@ -122,6 +133,15 @@ defmodule AuthifyWeb.API.OrganizationController do
         else
           # Extract error messages
           error_messages = Enum.map(errors, fn {:error, msg} -> msg end)
+
+          AuditHelper.log_configuration_update_failure(
+            conn,
+            schema_name,
+            error_messages,
+            resource_type: "configuration",
+            resource_id: organization.id,
+            extra_metadata: %{source: "api"}
+          )
 
           render_error_response(
             conn,
