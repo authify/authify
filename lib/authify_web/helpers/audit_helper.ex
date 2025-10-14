@@ -6,7 +6,7 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   certificate lifecycle actions with consistent metadata.
   """
 
-  alias Authify.Accounts.PersonalAccessToken
+  alias Authify.Accounts.{Invitation, PersonalAccessToken}
   alias Authify.AuditLog
   alias Ecto.Changeset
   alias Plug.Conn
@@ -220,6 +220,103 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
       opts[:resource_type] || "personal_access_token",
       opts[:resource_id] || maybe_personal_access_token_id(token),
       "failure",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs successful invitation creation or resend events.
+  """
+  def log_invitation_sent(conn, invitation, opts \\ []) do
+    conn = ensure_current_organization(conn, invitation.organization)
+
+    metadata =
+      invitation_metadata(invitation)
+      |> maybe_put("invited_by_user_id", invitation.invited_by_id)
+      |> maybe_put("resend", normalize_resend_flag(opts[:resend?]))
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :user_invited,
+      opts[:resource_type] || "invitation",
+      opts[:resource_id] || invitation.id,
+      opts[:outcome] || "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs failed attempts to send invitations.
+  """
+  def log_invitation_send_failure(conn, errors, opts \\ []) do
+    invitation_context =
+      opts[:invitation] ||
+        opts[:invitation_changeset] ||
+        opts[:invitation_attrs]
+
+    base_metadata =
+      case conn.assigns[:current_organization] do
+        %{slug: slug} -> %{"organization_slug" => slug}
+        _ -> %{}
+      end
+
+    metadata =
+      base_metadata
+      |> Map.put("errors", normalize_errors(errors))
+      |> maybe_attach_invitation(invitation_context)
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :user_invited,
+      opts[:resource_type] || "invitation",
+      opts[:resource_id],
+      "failure",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs invitation revocation/cancellation events.
+  """
+  def log_invitation_revoked(conn, invitation, opts \\ []) do
+    conn = ensure_current_organization(conn, invitation.organization)
+
+    metadata =
+      invitation_metadata(invitation)
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :invitation_revoked,
+      opts[:resource_type] || "invitation",
+      opts[:resource_id] || invitation.id,
+      opts[:outcome] || "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs successful invitation acceptance events.
+  """
+  def log_invitation_accepted(conn, invitation, user, opts \\ []) do
+    conn =
+      conn
+      |> assign_actor_from_user(user)
+      |> ensure_current_organization(invitation.organization)
+
+    metadata =
+      invitation_metadata(invitation)
+      |> maybe_put("user_id", user.id)
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :user_invitation_accepted,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      opts[:outcome] || "success",
       metadata
     )
   end
@@ -550,6 +647,50 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
     |> maybe_put_usage(certificate.usage)
   end
 
+  defp maybe_attach_invitation(map, nil), do: map
+
+  defp maybe_attach_invitation(map, %Invitation{} = invitation) do
+    Map.merge(map, invitation_metadata(invitation))
+  end
+
+  defp maybe_attach_invitation(map, %Changeset{} = changeset) do
+    map
+    |> maybe_put("invited_email", Changeset.get_field(changeset, :email))
+    |> maybe_put("invited_role", Changeset.get_field(changeset, :role))
+    |> maybe_put("organization_id", Changeset.get_field(changeset, :organization_id))
+    |> maybe_put("expires_at", normalize_value(Changeset.get_field(changeset, :expires_at)))
+  end
+
+  defp maybe_attach_invitation(map, %{} = attrs) do
+    map
+    |> maybe_put("invitation_id", Map.get(attrs, :id) || Map.get(attrs, "id"))
+    |> maybe_put("invited_email", Map.get(attrs, :email) || Map.get(attrs, "email"))
+    |> maybe_put("invited_role", Map.get(attrs, :role) || Map.get(attrs, "role"))
+    |> maybe_put(
+      "organization_id",
+      Map.get(attrs, :organization_id) || Map.get(attrs, "organization_id")
+    )
+    |> maybe_put(
+      "expires_at",
+      normalize_value(Map.get(attrs, :expires_at) || Map.get(attrs, "expires_at"))
+    )
+  end
+
+  defp invitation_metadata(invitation) do
+    %{
+      "invitation_id" => invitation.id,
+      "invited_email" => invitation.email,
+      "invited_role" => invitation.role,
+      "organization_slug" => organization_slug(invitation),
+      "expires_at" => normalize_value(invitation.expires_at)
+    }
+    |> maybe_put("invited_by_user_id", invitation.invited_by_id)
+    |> maybe_put("accepted_at", normalize_value(invitation.accepted_at))
+  end
+
+  defp organization_slug(%{organization: %{slug: slug}}), do: slug
+  defp organization_slug(_), do: nil
+
   defp maybe_put_usage(map, nil), do: map
   defp maybe_put_usage(map, usage), do: Map.put(map, "usage", usage)
 
@@ -567,6 +708,19 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   end
 
   defp personal_access_token_scopes(_), do: nil
+
+  defp ensure_current_organization(conn, nil), do: conn
+
+  defp ensure_current_organization(conn, organization) do
+    case conn.assigns[:current_organization] do
+      nil -> Conn.assign(conn, :current_organization, organization)
+      _ -> conn
+    end
+  end
+
+  defp normalize_resend_flag(nil), do: []
+  defp normalize_resend_flag(value) when is_boolean(value), do: value
+  defp normalize_resend_flag(value), do: to_string(value)
 
   defp assign_actor_from_user(conn, user) do
     conn

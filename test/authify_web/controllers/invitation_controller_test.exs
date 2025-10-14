@@ -4,6 +4,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
   import Authify.AccountsFixtures
 
   alias Authify.Accounts
+  alias Authify.AuditLog
   alias Authify.Guardian
 
   describe "index" do
@@ -50,6 +51,19 @@ defmodule AuthifyWeb.InvitationControllerTest do
 
       conn = get(conn, ~p"/#{org.slug}/invitations")
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Invitation sent successfully"
+
+      events =
+        AuditLog.list_events(
+          organization_id: org.id,
+          event_type: "user_invited"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["invited_email"] == invitation_params["email"]
+      assert event.metadata["invited_role"] == invitation_params["role"]
+      assert event.metadata["source"] == "web"
     end
 
     test "renders errors when data is invalid", %{conn: conn, organization: org} do
@@ -62,6 +76,18 @@ defmodule AuthifyWeb.InvitationControllerTest do
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
                "There was an error sending the invitation"
+
+      events =
+        AuditLog.list_events(
+          organization_id: org.id,
+          event_type: "user_invited"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["source"] == "web"
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "email"))
     end
 
     test "renders errors when email already invited", %{
@@ -131,6 +157,19 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert_raise Ecto.NoResultsError, fn ->
         Accounts.get_invitation!(invitation.id)
       end
+
+      events =
+        AuditLog.list_events(
+          organization_id: org.id,
+          event_type: "invitation_revoked"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["invitation_id"] == invitation.id
+      assert event.metadata["invited_email"] == invitation.email
+      assert event.metadata["source"] == "web"
     end
 
     test "redirects when invitation belongs to different organization", %{
@@ -256,6 +295,20 @@ defmodule AuthifyWeb.InvitationControllerTest do
       # Check invitation was marked as accepted
       updated_invitation = Accounts.get_invitation!(invitation.id)
       assert updated_invitation.accepted_at != nil
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "user_invitation_accepted"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["invitation_id"] == invitation.id
+      assert event.metadata["invited_email"] == invitation.email
+      assert event.metadata["user_id"] == user.id
+      assert event.metadata["source"] == "web"
     end
 
     test "renders errors when user data is invalid", %{conn: conn} do

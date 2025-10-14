@@ -3,7 +3,7 @@ defmodule AuthifyWeb.InvitationController do
 
   alias Authify.Accounts
   alias Authify.Accounts.{Invitation, User}
-  alias Authify.AuditLog
+  alias AuthifyWeb.Helpers.AuditHelper
 
   def index(conn, _params) do
     user = conn.assigns.current_user
@@ -39,29 +39,18 @@ defmodule AuthifyWeb.InvitationController do
 
     case Accounts.create_invitation_and_send_email(invitation_params_with_org, current_user) do
       {:ok, invitation} ->
-        # Log invitation creation
-        AuditLog.log_event_async(:user_invited, %{
-          organization_id: organization.id,
-          actor_type: "user",
-          actor_id: current_user.id,
-          actor_name: "#{current_user.first_name} #{current_user.last_name}",
-          resource_type: "invitation",
-          resource_id: invitation.id,
-          outcome: "success",
-          ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-          user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-          metadata: %{
-            invitation_id: invitation.id,
-            invited_email: invitation.email,
-            invited_role: invitation.role
-          }
-        })
+        AuditHelper.log_invitation_sent(conn, invitation, extra_metadata: %{"source" => "web"})
 
         conn
         |> put_flash(:info, "Invitation sent successfully!")
         |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/invitations")
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        AuditHelper.log_invitation_send_failure(conn, changeset,
+          invitation_changeset: changeset,
+          extra_metadata: %{"source" => "web"}
+        )
+
         conn
         |> put_flash(:error, "There was an error sending the invitation.")
         |> render(:new,
@@ -97,29 +86,16 @@ defmodule AuthifyWeb.InvitationController do
 
   def delete(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
-    current_user = conn.assigns.current_user
-    invitation = Accounts.get_invitation!(id)
+
+    invitation =
+      Accounts.get_invitation!(id)
+      |> Authify.Repo.preload([:organization, :invited_by])
 
     # Ensure invitation belongs to current organization
     if invitation.organization_id == organization.id do
       {:ok, _invitation} = Accounts.delete_invitation(invitation)
 
-      # Log invitation revocation
-      AuditLog.log_event_async(:invitation_revoked, %{
-        organization_id: organization.id,
-        actor_type: "user",
-        actor_id: current_user.id,
-        actor_name: "#{current_user.first_name} #{current_user.last_name}",
-        resource_type: "invitation",
-        resource_id: invitation.id,
-        outcome: "success",
-        ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-        user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-        metadata: %{
-          invitation_id: invitation.id,
-          invited_email: invitation.email
-        }
-      })
+      AuditHelper.log_invitation_revoked(conn, invitation, extra_metadata: %{"source" => "web"})
 
       conn
       |> put_flash(:info, "Invitation cancelled successfully.")
@@ -172,22 +148,11 @@ defmodule AuthifyWeb.InvitationController do
       invitation ->
         case Accounts.accept_invitation(invitation, user_params) do
           {:ok, user} ->
-            # Log invitation acceptance
-            AuditLog.log_event_async(:user_invitation_accepted, %{
-              organization_id: invitation.organization_id,
-              actor_type: "user",
-              actor_id: user.id,
-              actor_name: "#{user.first_name} #{user.last_name}",
-              resource_type: "user",
-              resource_id: user.id,
-              outcome: "success",
-              ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-              user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-              metadata: %{
-                invitation_id: invitation.id,
-                invited_email: invitation.email
-              }
-            })
+            user = Authify.Repo.preload(user, :organization)
+
+            AuditHelper.log_invitation_accepted(conn, invitation, user,
+              extra_metadata: %{"source" => "web"}
+            )
 
             conn
             |> put_flash(:info, "Welcome! Your account has been created successfully.")
