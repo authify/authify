@@ -486,6 +486,127 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   end
 
   @doc """
+  Logs successful user creation events (admin-initiated).
+  """
+  def log_user_created(conn, user, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "email" => user.email,
+        "role" => user.role,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_put("first_name", user.first_name)
+      |> maybe_put("last_name", user.last_name)
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :user_created,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs successful user deletion events (admin-initiated).
+  """
+  def log_user_deleted(conn, user, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "email" => user.email,
+        "role" => user.role,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_put("first_name", user.first_name)
+      |> maybe_put("last_name", user.last_name)
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :user_deleted,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs role assignment/changes for users.
+  """
+  def log_role_assigned(conn, user, old_role, new_role, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "email" => user.email,
+        "old_role" => old_role,
+        "new_role" => new_role,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :role_assigned,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs SAML service provider lifecycle events (creation, update, deletion).
+  """
+  def log_saml_provider_event(conn, event_type, service_provider, opts \\ []) do
+    metadata =
+      %{
+        "service_provider_id" => service_provider.id,
+        "service_provider_name" => service_provider.name,
+        "entity_id" => service_provider.entity_id,
+        "acs_url" => service_provider.acs_url,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      event_type,
+      opts[:resource_type] || "saml_service_provider",
+      opts[:resource_id] || service_provider.id,
+      opts[:outcome] || "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs application group lifecycle events (creation, update, deletion).
+  """
+  def log_application_group_event(conn, event_type, group, opts \\ []) do
+    metadata =
+      %{
+        "group_id" => group.id,
+        "group_name" => group.name,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_put("description", group.description)
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      event_type,
+      opts[:resource_type] || "application_group",
+      opts[:resource_id] || group.id,
+      opts[:outcome] || "success",
+      metadata
+    )
+  end
+
+  @doc """
   Logs failed password change attempts.
   """
   def log_password_change_failure(conn, user, errors, opts \\ []) do

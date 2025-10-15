@@ -25,6 +25,7 @@ defmodule Authify.AuditLog.Event do
     role_assigned role_revoked
     oauth_client_created oauth_client_updated oauth_client_deleted oauth_client_secret_regenerated
     saml_sp_created saml_sp_updated saml_sp_deleted
+    application_group_created application_group_updated application_group_deleted
     organization_created organization_updated organization_deleted
   certificate_created certificate_activated certificate_deactivated certificate_deleted
   personal_access_token_created personal_access_token_deleted

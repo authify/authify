@@ -2,6 +2,7 @@ defmodule AuthifyWeb.API.UsersController do
   use AuthifyWeb.API.BaseController
 
   alias Authify.Accounts
+  alias AuthifyWeb.Helpers.AuditHelper
 
   @doc """
   GET /{org_slug}/api/users
@@ -80,6 +81,8 @@ defmodule AuthifyWeb.API.UsersController do
 
         case Accounts.create_user(user_params_with_org) do
           {:ok, user} ->
+            AuditHelper.log_user_created(conn, user, extra_metadata: %{"source" => "api"})
+
             render_api_response(conn, user,
               resource_type: "user",
               exclude: [:password_hash, :email_verified_at, :password_reset_token],
@@ -133,12 +136,20 @@ defmodule AuthifyWeb.API.UsersController do
           user ->
             case Accounts.update_user(user, user_params) do
               {:ok, updated_user} ->
+                AuditHelper.log_user_profile_update(conn, user, updated_user,
+                  extra_metadata: %{"source" => "api", "admin_update" => true}
+                )
+
                 render_api_response(conn, updated_user,
                   resource_type: "user",
                   exclude: [:password_hash, :email_verified_at, :password_reset_token]
                 )
 
               {:error, %Ecto.Changeset{} = changeset} ->
+                AuditHelper.log_user_profile_failure(conn, user, changeset,
+                  extra_metadata: %{"source" => "api", "admin_update" => true}
+                )
+
                 render_validation_errors(conn, changeset)
             end
         end
@@ -195,7 +206,11 @@ defmodule AuthifyWeb.API.UsersController do
               )
             else
               case Accounts.delete_user(user) do
-                {:ok, _deleted_user} ->
+                {:ok, deleted_user} ->
+                  AuditHelper.log_user_deleted(conn, deleted_user,
+                    extra_metadata: %{"source" => "api"}
+                  )
+
                   conn |> put_status(:no_content) |> json(%{})
 
                 {:error, %Ecto.Changeset{} = changeset} ->
@@ -231,8 +246,14 @@ defmodule AuthifyWeb.API.UsersController do
 
           user ->
             if role in ["user", "admin"] do
+              old_role = user.role
+
               case Accounts.update_user_role(user, role) do
                 {:ok, updated_user} ->
+                  AuditHelper.log_role_assigned(conn, updated_user, old_role, role,
+                    extra_metadata: %{"source" => "api"}
+                  )
+
                   render_api_response(conn, updated_user,
                     resource_type: "user",
                     exclude: [:password_hash, :email_verified_at, :password_reset_token]

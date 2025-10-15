@@ -2,6 +2,7 @@ defmodule AuthifyWeb.API.SAMLProvidersController do
   use AuthifyWeb.API.BaseController
 
   alias Authify.SAML
+  alias AuthifyWeb.Helpers.AuditHelper
 
   def index(conn, params) do
     organization = conn.assigns.current_organization
@@ -48,6 +49,10 @@ defmodule AuthifyWeb.API.SAMLProvidersController do
 
     case SAML.create_service_provider(attrs) do
       {:ok, saml_provider} ->
+        AuditHelper.log_saml_provider_event(conn, :saml_sp_created, saml_provider,
+          extra_metadata: %{"source" => "api"}
+        )
+
         render_api_response(conn, saml_provider,
           resource_type: "service_provider",
           status: :created
@@ -66,6 +71,10 @@ defmodule AuthifyWeb.API.SAMLProvidersController do
 
       case SAML.update_service_provider(saml_provider, saml_provider_params) do
         {:ok, updated_saml_provider} ->
+          AuditHelper.log_saml_provider_event(conn, :saml_sp_updated, updated_saml_provider,
+            extra_metadata: %{"source" => "api"}
+          )
+
           render_api_response(conn, updated_saml_provider, resource_type: "service_provider")
 
         {:error, changeset} ->
@@ -89,7 +98,11 @@ defmodule AuthifyWeb.API.SAMLProvidersController do
       saml_provider = SAML.get_service_provider!(id, organization)
 
       case SAML.delete_service_provider(saml_provider) do
-        {:ok, _saml_provider} ->
+        {:ok, deleted_saml_provider} ->
+          AuditHelper.log_saml_provider_event(conn, :saml_sp_deleted, deleted_saml_provider,
+            extra_metadata: %{"source" => "api"}
+          )
+
           send_resp(conn, :no_content, "")
 
         {:error, changeset} ->
