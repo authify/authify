@@ -370,6 +370,52 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   end
 
   @doc """
+  Logs successful email verification resend events.
+  """
+  def log_email_verification_resent(conn, user, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "email" => user.email,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :email_verification_resent,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs failed email verification resend attempts.
+  """
+  def log_email_verification_resend_failure(conn, user, reason, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "email" => user.email,
+        "organization_slug" => conn.assigns.current_organization.slug,
+        "reason" => to_string(reason)
+      }
+      |> maybe_put("errors", normalize_errors(opts[:errors]))
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :email_verification_resent,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "failure",
+      metadata
+    )
+  end
+
+  @doc """
   Logs profile updates for the current user, capturing changed fields.
   """
   def log_user_profile_update(conn, old_user, new_user, opts \\ []) do

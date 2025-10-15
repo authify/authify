@@ -534,8 +534,8 @@ defmodule Authify.Email do
   def send_email_verification_email(user, verification_url) do
     organization = user.organization
 
-    # In development, send to local mailbox even without SMTP
-    if dev_mode?() do
+    # In development/test, send to local mailbox even without SMTP
+    if dev_or_test_mode?() do
       user
       |> email_verification_email(verification_url)
       |> Mailer.deliver()
@@ -555,21 +555,27 @@ defmodule Authify.Email do
     end
   end
 
+  # Check if running in development or test mode
+  defp dev_or_test_mode? do
+    env = Application.get_env(:authify, :env) || Mix.env()
+    env in [:dev, :test]
+  end
+
   # Check if running in development mode
   defp dev_mode? do
     Application.get_env(:authify, :env) == :dev ||
       Mix.env() == :dev
   end
 
-  # Get from address from organization settings, or use dev default
+  # Get from address from organization settings, or use dev/test default
   defp get_from_address_or_default(organization) do
     case Mailer.get_from_address(organization) do
       {_name, _email} = address ->
         address
 
       nil ->
-        # In development, use a default from address
-        if dev_mode?() do
+        # In development/test, use a default from address
+        if dev_or_test_mode?() do
           {"Authify (Dev)", "noreply@authify.local"}
         else
           # In production, this should not happen (checked earlier)

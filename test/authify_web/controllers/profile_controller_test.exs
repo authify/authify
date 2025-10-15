@@ -120,6 +120,72 @@ defmodule AuthifyWeb.ProfileControllerTest do
     end
   end
 
+  describe "email verification resend" do
+    test "successful resend logs audit event", %{conn: conn, user: user} do
+      # Ensure user is unverified
+      {:ok, unverified_user} =
+        Accounts.update_user(user, %{email_confirmed_at: nil, email_verification_token: nil})
+
+      conn =
+        conn
+        |> recycle()
+        |> log_in_user(unverified_user)
+        |> post(~p"/#{user.organization.slug}/profile/resend-verification")
+
+      assert redirected_to(conn) == ~p"/#{user.organization.slug}/profile"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Verification email sent!"
+
+      events =
+        AuditLog.list_events(
+          organization_id: user.organization_id,
+          event_type: "email_verification_resent"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "web"
+      assert event.metadata["user_id"] == unverified_user.id
+      assert event.metadata["email"] == unverified_user.email
+      assert event.metadata["organization_slug"] == user.organization.slug
+    end
+
+    test "already verified logs failure", %{conn: conn, user: user} do
+      # Ensure user is verified
+      {:ok, verified_user} =
+        Accounts.update_user(user, %{
+          email_confirmed_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      conn =
+        conn
+        |> recycle()
+        |> log_in_user(verified_user)
+        |> post(~p"/#{user.organization.slug}/profile/resend-verification")
+
+      assert redirected_to(conn) == ~p"/#{user.organization.slug}/profile"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "already verified"
+
+      events =
+        AuditLog.list_events(
+          organization_id: user.organization_id,
+          event_type: "email_verification_resent"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["source"] == "web"
+      assert event.metadata["reason"] == "already_verified"
+      assert event.metadata["user_id"] == verified_user.id
+      assert event.metadata["email"] == verified_user.email
+    end
+
+    # Note: Testing email send failure is challenging with the test adapter since it always succeeds.
+    # The audit logging code for email failure exists in ProfileController at lines 160-170
+    # and includes proper error logging with reason "email_send_failed" and email_error metadata.
+  end
+
   describe "personal_access_tokens" do
     test "renders personal access tokens page", %{conn: conn, user: user} do
       org = user.organization

@@ -118,6 +118,13 @@ defmodule AuthifyWeb.ProfileController do
 
     # Check if already verified
     if current_user.email_confirmed_at do
+      AuditHelper.log_email_verification_resend_failure(
+        conn,
+        current_user,
+        "already_verified",
+        extra_metadata: %{"source" => "web"}
+      )
+
       conn
       |> put_flash(:info, "Your email is already verified.")
       |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
@@ -135,6 +142,10 @@ defmodule AuthifyWeb.ProfileController do
               require Logger
               Logger.info("Email verification resent to #{current_user.email}")
 
+              AuditHelper.log_email_verification_resent(conn, current_user,
+                extra_metadata: %{"source" => "web"}
+              )
+
               conn
               |> put_flash(
                 :info,
@@ -146,12 +157,27 @@ defmodule AuthifyWeb.ProfileController do
               require Logger
               Logger.error("Failed to send verification email: #{inspect(reason)}")
 
+              AuditHelper.log_email_verification_resend_failure(
+                conn,
+                current_user,
+                "email_send_failed",
+                extra_metadata: %{"source" => "web", "email_error" => inspect(reason)}
+              )
+
               conn
               |> put_flash(:error, "Unable to send verification email. Please try again later.")
               |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
           end
 
-        {:error, _changeset} ->
+        {:error, changeset} ->
+          AuditHelper.log_email_verification_resend_failure(
+            conn,
+            current_user,
+            "token_generation_failed",
+            errors: changeset,
+            extra_metadata: %{"source" => "web"}
+          )
+
           conn
           |> put_flash(:error, "Unable to generate verification token. Please try again.")
           |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
