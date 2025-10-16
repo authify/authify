@@ -7,12 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.2] - 2025-01-09
+## [0.2.0] - 2025-10-15
+
+### Added
+- **Comprehensive Audit Logging System** - Complete audit trail for security and compliance
+  - 36 event types covering all system operations:
+    - Authentication events (login success/failure, logout, session expiry)
+    - Password management (reset requested/completed, password changed)
+    - Email verification (resent, confirmed)
+    - OAuth flows (authorization, consent, token grants/refreshes)
+    - SAML operations (SSO, assertion issued, SLO)
+    - User management (created, updated, deleted, enabled/disabled)
+    - Invitation lifecycle (invited, accepted, revoked)
+    - Role changes (assigned, revoked)
+    - OAuth client management (created, updated, deleted, secret regenerated)
+    - SAML service provider management (created, updated, deleted)
+    - Application group management (created, updated, deleted)
+    - Organization management (created, updated, deleted)
+    - Certificate lifecycle (created, activated, deactivated, deleted)
+    - Personal access token management (created, deleted)
+    - Settings changes, rate limit exceeded, permission/scope denied
+    - API access, API key management, suspicious activity
+  - Polymorphic actor support (user, API client, application, system)
+  - Organization-scoped with multi-tenant isolation
+  - Async event logging for high performance
+  - Web UI audit logging for all user-facing operations
+  - Management API audit logging with full parity
+  - Audit logs API endpoint with comprehensive filtering:
+    - Filter by event type, actor, resource, outcome, date range
+    - Pagination support (configurable per_page, max 100)
+    - New `audit_logs:read` OAuth scope
+    - Organization-scoped access control
+  - OpenAPI documentation for audit logs API
+  - 728 passing tests with comprehensive coverage
+
+### Changed
+- Enhanced AuditHelper with additional logging functions for API operations
+- Updated all Management API controllers with audit logging
+- Improved email verification resend with success/failure audit tracking
+- Added source metadata ("web" vs "api") to distinguish event origins
+
+## [0.1.2] - 2025-10-09
 
 ### Fixed
 - Code formatting in footer layout (HEEx formatting compliance)
 
-## [0.1.1] - 2025-01-09
+## [0.1.1] - 2025-10-09
 
 ### Added
 - GitHub issue templates (bug report, feature request, security, documentation)
@@ -29,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Code quality improvements to satisfy `mix credo --strict`
 - Resolved 101 code style issues (documentation, naming conventions, refactoring)
 
-## [0.1.0] - 2025-01-09
+## [0.1.0] - 2025-10-09
 
 Initial release of Authify - Multi-tenant Identity Provider
 
@@ -200,7 +240,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/authify/authify/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/authify/authify/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/authify/authify/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/authify/authify/releases/tag/v0.1.0
