@@ -37,8 +37,10 @@
       })();
     </script>
   </head>
-  <body>
-    {@inner_content}
+  <body class="d-flex flex-column min-vh-100">
+    <div class="flex-grow-1 d-flex flex-column">
+      {@inner_content}
+    </div>
     <.logout_modal />
     <footer class="footer mt-auto py-3 bg-body-tertiary border-top">
       <div class="container-fluid">
