@@ -320,6 +320,10 @@ defmodule AuthifyWeb.Router do
     # Profile Management (user's own profile)
     get "/profile", ProfileController, :show
     put "/profile", ProfileController, :update
+
+    # Audit Logs (read-only)
+    get "/audit-logs", AuditLogsController, :index
+    get "/audit-logs/:id", AuditLogsController, :show
   end
 
   # OIDC Discovery endpoint (organization-scoped, RFC-compliant)
