@@ -3,6 +3,8 @@ defmodule AuthifyWeb.API.OrganizationControllerTest do
 
   import Authify.AccountsFixtures
 
+  alias Authify.AuditLog
+
   setup %{conn: conn} do
     organization = organization_fixture()
     admin_user = user_fixture(organization: organization, role: "admin")
@@ -65,6 +67,64 @@ defmodule AuthifyWeb.API.OrganizationControllerTest do
                  "message" => "Insufficient scope to access this resource"
                }
              } = json_response(conn, 403)
+    end
+  end
+
+  describe "PUT /api/organization/configuration" do
+    test "logs settings_updated event on success", %{conn: conn, organization: organization} do
+      conn =
+        put(conn, "/#{organization.slug}/api/organization/configuration", %{
+          "settings" => %{
+            "allow_invitations" => "false"
+          }
+        })
+
+      assert %{"data" => %{"type" => "configuration"}} = json_response(conn, 200)
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "settings_updated"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.actor_type == "user"
+      assert event.outcome == "success"
+
+      assert Enum.any?(event.metadata["changes"], fn change ->
+               change["field"] == "allow_invitations" and change["new"] == false
+             end)
+
+      assert event.metadata["schema"] == "organization"
+      assert event.metadata["source"] == "api"
+    end
+
+    test "logs settings_updated failure when validation errors", %{
+      conn: conn,
+      organization: organization
+    } do
+      conn =
+        put(conn, "/#{organization.slug}/api/organization/configuration", %{
+          "settings" => %{
+            "auth_rate_limit" => "999999"
+          }
+        })
+
+      assert %{"error" => %{"type" => "validation_error"}} = json_response(conn, 422)
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "settings_updated"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "quota"))
+      assert event.metadata["schema"] == "organization"
+      assert event.metadata["source"] == "api"
     end
   end
 

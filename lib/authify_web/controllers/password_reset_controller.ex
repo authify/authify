@@ -2,6 +2,7 @@ defmodule AuthifyWeb.PasswordResetController do
   use AuthifyWeb, :controller
 
   alias Authify.Accounts
+  alias AuthifyWeb.Helpers.AuditHelper
 
   def new(conn, _params) do
     render(conn, :new)
@@ -99,7 +100,9 @@ defmodule AuthifyWeb.PasswordResetController do
 
   def update(conn, %{"token" => token, "user" => password_params}) do
     case Accounts.reset_password_with_token(token, password_params) do
-      {:ok, _user} ->
+      {:ok, user} ->
+        AuditHelper.log_password_reset_completed(conn, user, extra_metadata: %{"source" => "web"})
+
         conn
         |> put_flash(
           :info,
@@ -108,6 +111,13 @@ defmodule AuthifyWeb.PasswordResetController do
         |> redirect(to: ~p"/login")
 
       {:error, :token_expired} ->
+        with %Accounts.User{} = user <-
+               Accounts.get_user_by_password_reset_token_including_expired(token) do
+          AuditHelper.log_password_reset_failure(conn, user, :token_expired,
+            extra_metadata: %{"source" => "web"}
+          )
+        end
+
         conn
         |> put_flash(:error, "Password reset link has expired. Please request a new one.")
         |> redirect(to: ~p"/password_reset/new")
@@ -123,6 +133,13 @@ defmodule AuthifyWeb.PasswordResetController do
         |> redirect(to: ~p"/password_reset/new")
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        user = Authify.Repo.preload(changeset.data, :organization)
+
+        AuditHelper.log_password_reset_failure(conn, user, :validation_failed,
+          errors: changeset,
+          extra_metadata: %{"source" => "web"}
+        )
+
         render(conn, :edit, token: token, changeset: changeset)
     end
   end

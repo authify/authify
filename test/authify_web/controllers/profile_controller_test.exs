@@ -5,8 +5,186 @@ defmodule AuthifyWeb.ProfileControllerTest do
 
   alias Authify.Accounts
   alias Authify.Accounts.PersonalAccessToken
+  alias Authify.AuditLog
 
   setup :register_and_log_in_user
+
+  describe "profile" do
+    test "successful profile update logs audit event", %{conn: conn, user: user} do
+      params = %{
+        "first_name" => "Updated",
+        "last_name" => "User",
+        "username" => user.username
+      }
+
+      conn =
+        patch(conn, ~p"/#{user.organization.slug}/profile", %{
+          "user" => params
+        })
+
+      assert redirected_to(conn) == ~p"/#{user.organization.slug}/profile"
+
+      events =
+        AuditLog.list_events(
+          organization_id: user.organization_id,
+          event_type: "user_updated"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "web"
+      assert event.metadata["user_id"] == user.id
+
+      assert Enum.any?(event.metadata["changes"], fn change ->
+               change["field"] == "first_name" && change["new"] == "Updated"
+             end)
+    end
+
+    test "failed profile update logs failure", %{conn: conn, user: user} do
+      conn =
+        patch(conn, ~p"/#{user.organization.slug}/profile", %{
+          "user" => %{"email" => ""}
+        })
+
+      assert html_response(conn, 200)
+
+      events =
+        AuditLog.list_events(
+          organization_id: user.organization_id,
+          event_type: "user_updated"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["source"] == "web"
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "email"))
+    end
+  end
+
+  describe "password" do
+    test "successful password update logs audit event", %{conn: conn, user: user} do
+      params = %{
+        "current_password" => "SecureP@ssw0rd!",
+        "password" => "NewP@ss1word!",
+        "password_confirmation" => "NewP@ss1word!"
+      }
+
+      conn =
+        patch(conn, ~p"/#{user.organization.slug}/profile/password", %{
+          "user" => params
+        })
+
+      assert redirected_to(conn) == ~p"/#{user.organization.slug}/profile"
+
+      events =
+        AuditLog.list_events(
+          organization_id: user.organization_id,
+          event_type: "password_changed"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "web"
+      assert event.metadata["method"] == "self_service"
+      assert event.metadata["user_id"] == user.id
+    end
+
+    test "invalid current password logs failure", %{conn: conn, user: user} do
+      params = %{
+        "current_password" => "wrong-password",
+        "password" => "AnotherP@ss1!",
+        "password_confirmation" => "AnotherP@ss1!"
+      }
+
+      conn =
+        patch(conn, ~p"/#{user.organization.slug}/profile/password", %{
+          "user" => params
+        })
+
+      assert html_response(conn, 200)
+
+      events =
+        AuditLog.list_events(
+          organization_id: user.organization_id,
+          event_type: "password_changed"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["source"] == "web"
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "current_password"))
+    end
+  end
+
+  describe "email verification resend" do
+    test "successful resend logs audit event", %{conn: conn, user: user} do
+      # Ensure user is unverified
+      {:ok, unverified_user} =
+        Accounts.update_user(user, %{email_confirmed_at: nil, email_verification_token: nil})
+
+      conn =
+        conn
+        |> recycle()
+        |> log_in_user(unverified_user)
+        |> post(~p"/#{user.organization.slug}/profile/resend-verification")
+
+      assert redirected_to(conn) == ~p"/#{user.organization.slug}/profile"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Verification email sent!"
+
+      events =
+        AuditLog.list_events(
+          organization_id: user.organization_id,
+          event_type: "email_verification_resent"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "web"
+      assert event.metadata["user_id"] == unverified_user.id
+      assert event.metadata["email"] == unverified_user.email
+      assert event.metadata["organization_slug"] == user.organization.slug
+    end
+
+    test "already verified logs failure", %{conn: conn, user: user} do
+      # Ensure user is verified
+      {:ok, verified_user} =
+        Accounts.update_user(user, %{
+          email_confirmed_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      conn =
+        conn
+        |> recycle()
+        |> log_in_user(verified_user)
+        |> post(~p"/#{user.organization.slug}/profile/resend-verification")
+
+      assert redirected_to(conn) == ~p"/#{user.organization.slug}/profile"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "already verified"
+
+      events =
+        AuditLog.list_events(
+          organization_id: user.organization_id,
+          event_type: "email_verification_resent"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["source"] == "web"
+      assert event.metadata["reason"] == "already_verified"
+      assert event.metadata["user_id"] == verified_user.id
+      assert event.metadata["email"] == verified_user.email
+    end
+
+    # Note: Testing email send failure is challenging with the test adapter since it always succeeds.
+    # The audit logging code for email failure exists in ProfileController at lines 160-170
+    # and includes proper error logging with reason "email_send_failed" and email_error metadata.
+  end
 
   describe "personal_access_tokens" do
     test "renders personal access tokens page", %{conn: conn, user: user} do
@@ -54,6 +232,19 @@ defmodule AuthifyWeb.ProfileControllerTest do
       assert PersonalAccessToken.scopes_list(token) == ["profile:read", "profile:write"]
       assert token.user_id == user.id
       assert token.organization_id == organization.id
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "personal_access_token_created"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "web"
+      assert event.metadata["personal_access_token_id"] == token.id
+      assert Enum.sort(event.metadata["scopes"]) == ["profile:read", "profile:write"]
     end
 
     test "shows validation errors for invalid token", %{conn: conn, user: user} do
@@ -72,6 +263,18 @@ defmodule AuthifyWeb.ProfileControllerTest do
 
       response = html_response(conn, 200)
       assert response =~ "can&#39;t be blank"
+
+      events =
+        AuditLog.list_events(
+          organization_id: org.id,
+          event_type: "personal_access_token_created"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.metadata["source"] == "web"
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "name"))
     end
 
     test "deletes personal access token", %{conn: conn, user: user} do
@@ -98,6 +301,18 @@ defmodule AuthifyWeb.ProfileControllerTest do
       # Verify token was deleted from database
       tokens = Accounts.list_personal_access_tokens(user)
       assert Enum.empty?(tokens)
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "personal_access_token_deleted"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "web"
+      assert event.metadata["personal_access_token_id"] == token.id
     end
 
     test "cannot delete another user's token", %{conn: conn, user: user} do
@@ -164,6 +379,20 @@ defmodule AuthifyWeb.ProfileControllerTest do
       assert "invitations:read" in scopes_list
       assert "invitations:write" in scopes_list
       assert "users:read" in scopes_list
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "personal_access_token_created"
+        )
+
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["source"] == "web"
+
+      assert Enum.sort(event.metadata["scopes"]) ==
+               ["invitations:read", "invitations:write", "users:read"]
     end
   end
 end

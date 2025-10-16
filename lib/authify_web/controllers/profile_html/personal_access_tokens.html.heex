@@ -316,6 +316,20 @@
                       <input
                         class="form-check-input pat-scope"
                         type="checkbox"
+                        id="scope_audit_logs_read"
+                        name="personal_access_token[scopes][]"
+                        value="audit_logs:read"
+                      />
+                      <label class="form-check-label" for="scope_audit_logs_read">
+                        <strong>audit_logs:read</strong>
+                        <br />
+                        <small class="text-muted">Read audit logs for organization</small>
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input
+                        class="form-check-input pat-scope"
+                        type="checkbox"
                         id="scope_profile_read"
                         name="personal_access_token[scopes][]"
                         value="profile:read"
@@ -325,6 +339,7 @@
                         <small class="text-muted">Read your own profile information</small>
                       </label>
                     </div>
+
                     <div class="form-check">
                       <input
                         class="form-check-input pat-scope"

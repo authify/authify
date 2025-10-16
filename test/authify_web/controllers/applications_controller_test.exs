@@ -132,6 +132,99 @@ defmodule AuthifyWeb.ApplicationsControllerTest do
     end
   end
 
+  describe "audit logging" do
+    test "logs application creation", %{
+      conn: conn,
+      organization: organization,
+      admin_user: admin_user
+    } do
+      create_attrs = %{
+        name: "Audit Test App",
+        description: "Testing audit logs",
+        redirect_uris: "https://example.com/callback",
+        scopes: "openid profile"
+      }
+
+      post(conn, ~p"/#{organization.slug}/applications", application: create_attrs)
+
+      # Give async task time to complete
+      Process.sleep(100)
+
+      events =
+        Authify.AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "oauth_client_created"
+        )
+
+      assert length(events) == 1
+
+      event = hd(events)
+      assert event.actor_type == "user"
+      assert event.actor_id == admin_user.id
+      assert event.resource_type == "oauth_application"
+      assert event.outcome == "success"
+      assert event.metadata["application_name"] == "Audit Test App"
+    end
+
+    test "logs application updates", %{
+      conn: conn,
+      organization: organization,
+      admin_user: admin_user
+    } do
+      application = application_fixture(organization: organization)
+      update_attrs = %{name: "Updated for Audit"}
+
+      put(conn, ~p"/#{organization.slug}/applications/#{application}", application: update_attrs)
+
+      # Give async task time to complete
+      Process.sleep(100)
+
+      events =
+        Authify.AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "oauth_client_updated"
+        )
+
+      assert length(events) == 1
+
+      event = hd(events)
+      assert event.actor_type == "user"
+      assert event.actor_id == admin_user.id
+      assert event.resource_type == "oauth_application"
+      assert event.resource_id == application.id
+      assert event.outcome == "success"
+    end
+
+    test "logs application deletion", %{
+      conn: conn,
+      organization: organization,
+      admin_user: admin_user
+    } do
+      application = application_fixture(organization: organization)
+
+      delete(conn, ~p"/#{organization.slug}/applications/#{application}")
+
+      # Give async task time to complete
+      Process.sleep(100)
+
+      events =
+        Authify.AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "oauth_client_deleted"
+        )
+
+      assert length(events) == 1
+
+      event = hd(events)
+      assert event.actor_type == "user"
+      assert event.actor_id == admin_user.id
+      assert event.resource_type == "oauth_application"
+      assert event.resource_id == application.id
+      assert event.outcome == "success"
+      assert event.metadata["client_id"] == application.client_id
+    end
+  end
+
   defp create_application(%{organization: organization}) do
     application = application_fixture(organization: organization)
     %{application: application}

@@ -2,6 +2,7 @@ defmodule AuthifyWeb.OAuthController do
   use AuthifyWeb, :controller
 
   alias Authify.Accounts
+  alias Authify.AuditLog
   alias Authify.OAuth
 
   @doc """
@@ -53,6 +54,26 @@ defmodule AuthifyWeb.OAuthController do
 
       case OAuth.create_authorization_code(application, user, redirect_uri, scopes, pkce_params) do
         {:ok, auth_code} ->
+          # Log successful authorization
+          AuditLog.log_event_async(:oauth_authorization_granted, %{
+            organization_id: organization.id,
+            actor_type: "user",
+            actor_id: user.id,
+            actor_name: "#{user.first_name} #{user.last_name}",
+            resource_type: "oauth_authorization",
+            resource_id: auth_code.id,
+            outcome: "success",
+            ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+            user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+            metadata: %{
+              application_id: application.id,
+              application_name: application.name,
+              scopes: scopes,
+              redirect_uri: redirect_uri,
+              pkce_used: Map.has_key?(pkce_params, :code_challenge)
+            }
+          })
+
           query_params = %{"code" => auth_code.code}
 
           query_params =
@@ -77,6 +98,26 @@ defmodule AuthifyWeb.OAuthController do
 
   def consent(conn, %{"approve" => "false"} = params) do
     # User denied authorization
+    user = Authify.Guardian.Plug.current_resource(conn)
+    organization = conn.assigns.current_organization
+
+    # Log denied authorization
+    if user do
+      AuditLog.log_event_async(:oauth_authorization_denied, %{
+        organization_id: organization.id,
+        actor_type: "user",
+        actor_id: user.id,
+        actor_name: "#{user.first_name} #{user.last_name}",
+        outcome: "denied",
+        ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+        user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+        metadata: %{
+          client_id: params["client_id"],
+          redirect_uri: params["redirect_uri"]
+        }
+      })
+    end
+
     if params["redirect_uri"] do
       query_params = %{"error" => "access_denied"}
 
@@ -257,6 +298,27 @@ defmodule AuthifyWeb.OAuthController do
       access_token = result.access_token
       refresh_token = result.refresh_token
 
+      # Log successful token exchange
+      AuditLog.log_event_async(:oauth_token_granted, %{
+        organization_id: organization.id,
+        actor_type: "application",
+        actor_id: application.id,
+        actor_name: application.name,
+        resource_type: "oauth_token",
+        resource_id: access_token.id,
+        outcome: "success",
+        ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+        user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+        metadata: %{
+          grant_type: "authorization_code",
+          application_id: application.id,
+          application_name: application.name,
+          scopes: access_token.scopes,
+          has_refresh_token: !is_nil(refresh_token),
+          pkce_used: !is_nil(params["code_verifier"])
+        }
+      })
+
       response = %{
         access_token: access_token.token,
         token_type: "Bearer",
@@ -283,30 +345,48 @@ defmodule AuthifyWeb.OAuthController do
 
       json(conn, response)
     else
-      {:error, :invalid_client} ->
-        conn
-        |> put_status(:unauthorized)
-        |> json(%{error: "invalid_client"})
+      {:error, error} ->
+        # Log failed token exchange
+        AuditLog.log_event_async(:oauth_token_denied, %{
+          organization_id: organization.id,
+          actor_type: "application",
+          actor_name: params["client_id"],
+          outcome: "failure",
+          ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+          user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+          metadata: %{
+            grant_type: "authorization_code",
+            error: to_string(error),
+            client_id: params["client_id"]
+          }
+        })
 
-      {:error, :invalid_grant} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "invalid_grant"})
+        case error do
+          :invalid_client ->
+            conn
+            |> put_status(:unauthorized)
+            |> json(%{error: "invalid_client"})
 
-      {:error, :invalid_authorization_code} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "invalid_grant"})
+          :invalid_grant ->
+            conn
+            |> put_status(:bad_request)
+            |> json(%{error: "invalid_grant"})
 
-      {:error, :invalid_pkce} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "invalid_grant", error_description: "PKCE verification failed"})
+          :invalid_authorization_code ->
+            conn
+            |> put_status(:bad_request)
+            |> json(%{error: "invalid_grant"})
 
-      {:error, _} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "invalid_request"})
+          :invalid_pkce ->
+            conn
+            |> put_status(:bad_request)
+            |> json(%{error: "invalid_grant", error_description: "PKCE verification failed"})
+
+          _ ->
+            conn
+            |> put_status(:bad_request)
+            |> json(%{error: "invalid_request"})
+        end
     end
   end
 
@@ -324,6 +404,25 @@ defmodule AuthifyWeb.OAuthController do
          {:ok, result} <- OAuth.exchange_refresh_token(refresh_token) do
       access_token = result.access_token
       new_refresh_token = result.refresh_token
+
+      # Log successful token refresh
+      AuditLog.log_event_async(:oauth_token_refreshed, %{
+        organization_id: organization.id,
+        actor_type: "application",
+        actor_id: application.id,
+        actor_name: application.name,
+        resource_type: "oauth_token",
+        resource_id: access_token.id,
+        outcome: "success",
+        ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+        user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+        metadata: %{
+          grant_type: "refresh_token",
+          application_id: application.id,
+          application_name: application.name,
+          scopes: access_token.scopes
+        }
+      })
 
       response = %{
         access_token: access_token.token,
@@ -344,20 +443,41 @@ defmodule AuthifyWeb.OAuthController do
 
       json(conn, response)
     else
-      {:error, :invalid_client} ->
-        conn
-        |> put_status(:unauthorized)
-        |> json(%{error: "invalid_client"})
+      {:error, error} ->
+        # Log failed token refresh
+        AuditLog.log_event_async(:oauth_token_denied, %{
+          organization_id: organization.id,
+          actor_type: "application",
+          actor_name: params["client_id"],
+          outcome: "failure",
+          ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+          user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+          metadata: %{
+            grant_type: "refresh_token",
+            error: to_string(error),
+            client_id: params["client_id"]
+          }
+        })
 
-      {:error, :invalid_refresh_token} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "invalid_grant", error_description: "Invalid or expired refresh token"})
+        case error do
+          :invalid_client ->
+            conn
+            |> put_status(:unauthorized)
+            |> json(%{error: "invalid_client"})
 
-      {:error, _} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "invalid_request"})
+          :invalid_refresh_token ->
+            conn
+            |> put_status(:bad_request)
+            |> json(%{
+              error: "invalid_grant",
+              error_description: "Invalid or expired refresh token"
+            })
+
+          _ ->
+            conn
+            |> put_status(:bad_request)
+            |> json(%{error: "invalid_request"})
+        end
     end
   end
 
@@ -369,6 +489,26 @@ defmodule AuthifyWeb.OAuthController do
          {:ok, scopes} <- validate_requested_scopes(application, params["scope"]) do
       case OAuth.create_management_api_access_token(application, scopes) do
         {:ok, access_token} ->
+          # Log successful client credentials token
+          AuditLog.log_event_async(:oauth_token_granted, %{
+            organization_id: organization.id,
+            actor_type: "application",
+            actor_id: application.id,
+            actor_name: application.name,
+            resource_type: "oauth_token",
+            resource_id: access_token.id,
+            outcome: "success",
+            ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+            user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+            metadata: %{
+              grant_type: "client_credentials",
+              application_id: application.id,
+              application_name: application.name,
+              application_type: "management_api_app",
+              scopes: access_token.scopes
+            }
+          })
+
           response = %{
             access_token: access_token.token,
             token_type: "Bearer",
@@ -378,42 +518,77 @@ defmodule AuthifyWeb.OAuthController do
 
           json(conn, response)
 
-        {:error, :invalid_application_type} ->
-          conn
-          |> put_status(:bad_request)
-          |> json(%{
-            error: "invalid_client",
-            error_description: "Application is not configured for Management API access"
+        {:error, error} ->
+          # Log failed token creation
+          AuditLog.log_event_async(:oauth_token_denied, %{
+            organization_id: organization.id,
+            actor_type: "application",
+            actor_name: params["client_id"],
+            outcome: "failure",
+            ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+            user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+            metadata: %{
+              grant_type: "client_credentials",
+              error: to_string(error),
+              client_id: params["client_id"]
+            }
           })
 
-        {:error, changeset} ->
-          # Token creation failed
-          conn
-          |> put_status(:bad_request)
-          |> json(%{error: "invalid_request", details: changeset.errors})
+          case error do
+            :invalid_application_type ->
+              conn
+              |> put_status(:bad_request)
+              |> json(%{
+                error: "invalid_client",
+                error_description: "Application is not configured for Management API access"
+              })
+
+            _ ->
+              conn
+              |> put_status(:bad_request)
+              |> json(%{error: "invalid_request"})
+          end
       end
     else
-      {:error, :invalid_client} ->
-        conn
-        |> put_status(:unauthorized)
-        |> json(%{error: "invalid_client"})
-
-      {:error, :invalid_application_type} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{
-          error: "unauthorized_client",
-          error_description:
-            "This application is not authorized to use the client_credentials grant type"
+      {:error, error} ->
+        # Log failed authentication
+        AuditLog.log_event_async(:oauth_token_denied, %{
+          organization_id: organization.id,
+          actor_type: "application",
+          actor_name: params["client_id"],
+          outcome: "failure",
+          ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+          user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+          metadata: %{
+            grant_type: "client_credentials",
+            error: to_string(error),
+            client_id: params["client_id"]
+          }
         })
 
-      {:error, :invalid_scope} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{
-          error: "invalid_scope",
-          error_description: "Invalid scope for Management API access"
-        })
+        case error do
+          :invalid_client ->
+            conn
+            |> put_status(:unauthorized)
+            |> json(%{error: "invalid_client"})
+
+          :invalid_application_type ->
+            conn
+            |> put_status(:bad_request)
+            |> json(%{
+              error: "unauthorized_client",
+              error_description:
+                "This application is not authorized to use the client_credentials grant type"
+            })
+
+          :invalid_scope ->
+            conn
+            |> put_status(:bad_request)
+            |> json(%{
+              error: "invalid_scope",
+              error_description: "Invalid scope for Management API access"
+            })
+        end
     end
   end
 

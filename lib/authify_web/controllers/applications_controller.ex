@@ -1,6 +1,7 @@
 defmodule AuthifyWeb.ApplicationsController do
   use AuthifyWeb, :controller
 
+  alias Authify.AuditLog
   alias Authify.OAuth
   alias Authify.OAuth.Application
 
@@ -63,6 +64,12 @@ defmodule AuthifyWeb.ApplicationsController do
 
     case OAuth.create_application(application_params) do
       {:ok, application} ->
+        # Log OAuth application creation
+        log_application_event(conn, :oauth_client_created, application, %{
+          application_type: application.application_type,
+          grant_types: application.grant_types
+        })
+
         conn
         |> put_flash(:info, "OAuth application created successfully.")
         |> redirect(
@@ -93,11 +100,17 @@ defmodule AuthifyWeb.ApplicationsController do
     application_params = normalize_grant_types(application_params)
 
     case OAuth.update_application(application, application_params) do
-      {:ok, application} ->
+      {:ok, updated_application} ->
+        # Log OAuth application update
+        log_application_event(conn, :oauth_client_updated, updated_application, %{
+          application_type: updated_application.application_type,
+          grant_types: updated_application.grant_types
+        })
+
         conn
         |> put_flash(:info, "OAuth application updated successfully.")
         |> redirect(
-          to: ~p"/#{conn.assigns.current_organization.slug}/applications/#{application}"
+          to: ~p"/#{conn.assigns.current_organization.slug}/applications/#{updated_application}"
         )
 
       {:error, %Ecto.Changeset{} = changeset} ->
@@ -114,6 +127,12 @@ defmodule AuthifyWeb.ApplicationsController do
     application = OAuth.get_oauth_application!(id, organization)
     {:ok, _application} = OAuth.delete_application(application)
 
+    # Log OAuth application deletion
+    log_application_event(conn, :oauth_client_deleted, application, %{
+      application_type: application.application_type,
+      client_id: application.client_id
+    })
+
     conn
     |> put_flash(:info, "OAuth application deleted successfully.")
     |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/applications")
@@ -128,4 +147,27 @@ defmodule AuthifyWeb.ApplicationsController do
   end
 
   defp normalize_grant_types(params), do: params
+
+  # Helper for audit logging OAuth applications
+  defp log_application_event(conn, event_type, application, metadata) do
+    organization = conn.assigns.current_organization
+    current_user = conn.assigns.current_user
+
+    AuditLog.log_event_async(event_type, %{
+      organization_id: organization.id,
+      actor_type: "user",
+      actor_id: current_user.id,
+      actor_name: "#{current_user.first_name} #{current_user.last_name}",
+      resource_type: "oauth_application",
+      resource_id: application.id,
+      outcome: "success",
+      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+      metadata:
+        Map.merge(metadata, %{
+          application_name: application.name,
+          application_id: application.id
+        })
+    })
+  end
 end

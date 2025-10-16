@@ -3,6 +3,7 @@ defmodule AuthifyWeb.InvitationController do
 
   alias Authify.Accounts
   alias Authify.Accounts.{Invitation, User}
+  alias AuthifyWeb.Helpers.AuditHelper
 
   def index(conn, _params) do
     user = conn.assigns.current_user
@@ -37,12 +38,19 @@ defmodule AuthifyWeb.InvitationController do
     invitation_params_with_org = Map.put(invitation_params, "organization_id", organization.id)
 
     case Accounts.create_invitation_and_send_email(invitation_params_with_org, current_user) do
-      {:ok, _invitation} ->
+      {:ok, invitation} ->
+        AuditHelper.log_invitation_sent(conn, invitation, extra_metadata: %{"source" => "web"})
+
         conn
         |> put_flash(:info, "Invitation sent successfully!")
         |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/invitations")
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        AuditHelper.log_invitation_send_failure(conn, changeset,
+          invitation_changeset: changeset,
+          extra_metadata: %{"source" => "web"}
+        )
+
         conn
         |> put_flash(:error, "There was an error sending the invitation.")
         |> render(:new,
@@ -78,11 +86,16 @@ defmodule AuthifyWeb.InvitationController do
 
   def delete(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
-    invitation = Accounts.get_invitation!(id)
+
+    invitation =
+      Accounts.get_invitation!(id)
+      |> Authify.Repo.preload([:organization, :invited_by])
 
     # Ensure invitation belongs to current organization
     if invitation.organization_id == organization.id do
       {:ok, _invitation} = Accounts.delete_invitation(invitation)
+
+      AuditHelper.log_invitation_revoked(conn, invitation, extra_metadata: %{"source" => "web"})
 
       conn
       |> put_flash(:info, "Invitation cancelled successfully.")
@@ -134,10 +147,16 @@ defmodule AuthifyWeb.InvitationController do
 
       invitation ->
         case Accounts.accept_invitation(invitation, user_params) do
-          {:ok, _user} ->
+          {:ok, user} ->
+            user = Authify.Repo.preload(user, :organization)
+
+            AuditHelper.log_invitation_accepted(conn, invitation, user,
+              extra_metadata: %{"source" => "web"}
+            )
+
             conn
             |> put_flash(:info, "Welcome! Your account has been created successfully.")
-            |> redirect(to: ~p"/login?org=#{invitation.organization.slug}")
+            |> redirect(to: ~p"/login?org_slug=#{invitation.organization.slug}")
 
           {:error, %Ecto.Changeset{} = changeset} ->
             render(conn, :accept,

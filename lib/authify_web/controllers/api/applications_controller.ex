@@ -2,6 +2,7 @@ defmodule AuthifyWeb.API.ApplicationsController do
   use AuthifyWeb.API.BaseController
 
   alias Authify.OAuth
+  alias AuthifyWeb.Helpers.AuditHelper
 
   # Helper to check if user has permission for an application type
   defp can_access_application_type?(scopes, application_type, :read) do
@@ -130,6 +131,20 @@ defmodule AuthifyWeb.API.ApplicationsController do
 
       case OAuth.create_application(attrs) do
         {:ok, application} ->
+          # Log audit event
+          AuditHelper.log_event_async(
+            conn,
+            :oauth_client_created,
+            "oauth_application",
+            application.id,
+            "success",
+            %{
+              application_type: application.application_type,
+              grant_types: application.grant_types,
+              name: application.name
+            }
+          )
+
           # Include client_secret in creation response only
           application_with_secret =
             application
@@ -171,6 +186,20 @@ defmodule AuthifyWeb.API.ApplicationsController do
       if can_access_application_type?(scopes, application.application_type, :write) do
         case OAuth.update_application(application, application_params) do
           {:ok, updated_application} ->
+            # Log audit event
+            AuditHelper.log_event_async(
+              conn,
+              :oauth_client_updated,
+              "oauth_application",
+              updated_application.id,
+              "success",
+              %{
+                application_type: updated_application.application_type,
+                name: updated_application.name,
+                changes: Map.keys(application_params)
+              }
+            )
+
             render_api_response(conn, updated_application,
               resource_type: "application",
               exclude: [:client_secret]
@@ -214,6 +243,19 @@ defmodule AuthifyWeb.API.ApplicationsController do
       if can_access_application_type?(scopes, application.application_type, :write) do
         case OAuth.delete_application(application) do
           {:ok, _application} ->
+            # Log audit event
+            AuditHelper.log_event_async(
+              conn,
+              :oauth_client_deleted,
+              "oauth_application",
+              application.id,
+              "success",
+              %{
+                application_type: application.application_type,
+                name: application.name
+              }
+            )
+
             send_resp(conn, :no_content, "")
 
           {:error, changeset} ->
@@ -257,6 +299,19 @@ defmodule AuthifyWeb.API.ApplicationsController do
 
         case OAuth.update_application(application, %{"client_secret" => new_secret}) do
           {:ok, updated_application} ->
+            # Log audit event
+            AuditHelper.log_event_async(
+              conn,
+              :oauth_client_secret_regenerated,
+              "oauth_application",
+              updated_application.id,
+              "success",
+              %{
+                application_type: updated_application.application_type,
+                name: updated_application.name
+              }
+            )
+
             # Return the new secret in response (only time it's shown)
             application_with_secret =
               updated_application

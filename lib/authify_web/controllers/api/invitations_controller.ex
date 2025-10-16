@@ -2,6 +2,7 @@ defmodule AuthifyWeb.API.InvitationsController do
   use AuthifyWeb.API.BaseController
 
   alias Authify.Accounts
+  alias AuthifyWeb.Helpers.AuditHelper
 
   @doc """
   GET /{org_slug}/api/invitations
@@ -112,6 +113,10 @@ defmodule AuthifyWeb.API.InvitationsController do
 
         case Accounts.create_invitation_and_send_email(invitation_params_with_org, current_user) do
           {:ok, invitation} ->
+            AuditHelper.log_invitation_sent(conn, invitation,
+              extra_metadata: %{"source" => "api"}
+            )
+
             render_api_response(conn, invitation,
               resource_type: "invitation",
               exclude: [:token],
@@ -119,6 +124,11 @@ defmodule AuthifyWeb.API.InvitationsController do
             )
 
           {:error, %Ecto.Changeset{} = changeset} ->
+            AuditHelper.log_invitation_send_failure(conn, changeset,
+              invitation_changeset: changeset,
+              extra_metadata: %{"source" => "api"}
+            )
+
             render_validation_errors(conn, changeset)
         end
 
@@ -222,7 +232,11 @@ defmodule AuthifyWeb.API.InvitationsController do
           # Ensure invitation belongs to current organization
           if invitation.organization_id == organization.id do
             case Accounts.delete_invitation(invitation) do
-              {:ok, _deleted_invitation} ->
+              {:ok, deleted_invitation} ->
+                AuditHelper.log_invitation_revoked(conn, deleted_invitation,
+                  extra_metadata: %{"source" => "api"}
+                )
+
                 conn |> put_status(:no_content) |> json(%{})
 
               {:error, %Ecto.Changeset{} = changeset} ->

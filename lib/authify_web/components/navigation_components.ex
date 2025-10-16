@@ -110,6 +110,15 @@ defmodule AuthifyWeb.NavigationComponents do
                 <i class="bi bi-envelope-plus"></i> Invitations
               </a>
             </li>
+            <li class="nav-item">
+              <a
+                class={["nav-link", if(@current_page == "audit_logs", do: "active", else: "")]}
+                aria-current={if @current_page == "audit_logs", do: "page", else: false}
+                href={"/#{@organization.slug}/audit_logs"}
+              >
+                <i class="bi bi-shield-check"></i> Audit Logs
+              </a>
+            </li>
           <% end %>
 
           <%= if @is_admin do %>

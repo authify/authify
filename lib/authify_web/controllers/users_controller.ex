@@ -2,6 +2,7 @@ defmodule AuthifyWeb.UsersController do
   use AuthifyWeb, :controller
 
   alias Authify.Accounts
+  alias Authify.AuditLog
 
   # Safely convert string to atom, only for known valid values
   defp safe_to_atom(string)
@@ -203,6 +204,13 @@ defmodule AuthifyWeb.UsersController do
 
     case Accounts.update_user_role(target_user, new_role) do
       {:ok, updated_user} ->
+        # Log role change
+        log_audit_event(conn, :role_assigned, updated_user, %{
+          target_user_email: target_user.email,
+          old_role: target_user.role,
+          new_role: new_role
+        })
+
         conn
         |> put_flash(
           :info,
@@ -285,7 +293,12 @@ defmodule AuthifyWeb.UsersController do
     end
 
     case Accounts.disable_user(target_user) do
-      {:ok, _user} ->
+      {:ok, disabled_user} ->
+        # Log user disable
+        log_audit_event(conn, :user_disabled, disabled_user, %{
+          target_user_email: target_user.email
+        })
+
         conn
         |> put_flash(:info, "#{Accounts.User.full_name(target_user)} has been disabled.")
         |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users/#{target_user.id}")
@@ -304,7 +317,12 @@ defmodule AuthifyWeb.UsersController do
       target_user = Accounts.get_user_globally!(id)
 
       case Accounts.enable_user(target_user) do
-        {:ok, _user} ->
+        {:ok, enabled_user} ->
+          # Log user enable
+          log_audit_event(conn, :user_enabled, enabled_user, %{
+            target_user_email: target_user.email
+          })
+
           conn
           |> put_flash(:info, "#{Accounts.User.full_name(target_user)} has been enabled.")
           |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users/#{target_user.id}")
@@ -319,7 +337,12 @@ defmodule AuthifyWeb.UsersController do
       # For enable action, check organization membership without active status
       if user.organization_id == organization.id do
         case Accounts.enable_user(user) do
-          {:ok, _user} ->
+          {:ok, enabled_user} ->
+            # Log user enable
+            log_audit_event(conn, :user_enabled, enabled_user, %{
+              target_user_email: user.email
+            })
+
             conn
             |> put_flash(:info, "#{Accounts.User.full_name(user)} has been enabled.")
             |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users/#{user.id}")
@@ -360,6 +383,25 @@ defmodule AuthifyWeb.UsersController do
     end
   end
 
+  # Private helper for audit logging to reduce repetition
+  defp log_audit_event(conn, event_type, target_user, metadata) do
+    organization = conn.assigns.current_organization
+    current_user = conn.assigns.current_user
+
+    AuditLog.log_event_async(event_type, %{
+      organization_id: organization.id,
+      actor_type: "user",
+      actor_id: current_user.id,
+      actor_name: "#{current_user.first_name} #{current_user.last_name}",
+      resource_type: "user",
+      resource_id: target_user && target_user.id,
+      outcome: "success",
+      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+      metadata: metadata
+    })
+  end
+
   def create(conn, %{"user" => user_params}) do
     organization = conn.assigns.current_organization
     current_user = conn.assigns.current_user
@@ -374,6 +416,12 @@ defmodule AuthifyWeb.UsersController do
 
       case Accounts.create_user_with_role(user_attrs, organization.id, role) do
         {:ok, user} ->
+          # Log user creation
+          log_audit_event(conn, :user_created, user, %{
+            created_user_email: user.email,
+            created_user_role: role
+          })
+
           conn
           |> put_flash(:info, "#{Accounts.User.full_name(user)} has been created successfully.")
           |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users/#{user.id}")

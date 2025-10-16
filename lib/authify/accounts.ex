@@ -1266,22 +1266,27 @@ defmodule Authify.Accounts do
   end
 
   @doc """
+  Gets user by password reset token regardless of expiration.
+  Useful for auditing scenarios where we need the user even if the token expired.
+  """
+  def get_user_by_password_reset_token_including_expired(nil), do: nil
+
+  def get_user_by_password_reset_token_including_expired(token) do
+    token_hash = User.hash_password_reset_token(token)
+
+    from(u in User,
+      where: u.password_reset_token == ^token_hash,
+      preload: [:organization]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
   Resets password with token.
   Hashes the provided token and looks up by hash.
   """
   def reset_password_with_token(token, password_params) do
-    # Hash the incoming token to look up in database
-    token_hash = User.hash_password_reset_token(token)
-
-    # First check if user exists with this token (regardless of expiration)
-    user_with_token =
-      from(u in User,
-        where: u.password_reset_token == ^token_hash,
-        preload: [:organization]
-      )
-      |> Repo.one()
-
-    case user_with_token do
+    case get_user_by_password_reset_token_including_expired(token) do
       nil ->
         {:error, :token_not_found}
 

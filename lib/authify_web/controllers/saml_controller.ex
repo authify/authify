@@ -1,7 +1,14 @@
 defmodule AuthifyWeb.SAMLController do
   use AuthifyWeb, :controller
 
+  alias Authify.AuditLog
   alias Authify.SAML
+
+  # Helper to escape HTML and convert to string
+  defp html_escape_to_string(value) when is_binary(value) do
+    {:safe, iodata} = Phoenix.HTML.html_escape(value)
+    IO.iodata_to_binary(iodata)
+  end
 
   @doc """
   SAML IdP Metadata endpoint.
@@ -89,6 +96,26 @@ defmodule AuthifyWeb.SAMLController do
 
               case generate_and_send_response(conn, saml_session, current_user) do
                 {:ok, form_html} ->
+                  # Log successful SAML assertion
+                  AuditLog.log_event_async(:saml_assertion_issued, %{
+                    organization_id: organization.id,
+                    actor_type: "user",
+                    actor_id: current_user.id,
+                    actor_name: "#{current_user.first_name} #{current_user.last_name}",
+                    resource_type: "saml_assertion",
+                    resource_id: saml_session.id,
+                    outcome: "success",
+                    ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+                    user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+                    metadata: %{
+                      service_provider_id: sp.id,
+                      service_provider_name: sp.name,
+                      entity_id: sp.entity_id,
+                      session_id: saml_session.session_id,
+                      relay_state: saml_session.relay_state
+                    }
+                  })
+
                   conn
                   |> put_resp_content_type("text/html")
                   |> send_resp(200, form_html)
@@ -204,6 +231,17 @@ defmodule AuthifyWeb.SAMLController do
         # Encode the SAML response
         encoded_response = Base.encode64(saml_response)
 
+        # HTML-escape values to prevent XSS
+        acs_url = html_escape_to_string(service_provider.acs_url)
+
+        relay_state_html =
+          if saml_session.relay_state do
+            escaped_relay = html_escape_to_string(saml_session.relay_state)
+            "<input type=\"hidden\" name=\"RelayState\" value=\"#{escaped_relay}\" />"
+          else
+            ""
+          end
+
         # Generate an HTML form that will auto-submit to the SP's ACS URL
         form_html = """
         <!DOCTYPE html>
@@ -212,9 +250,9 @@ defmodule AuthifyWeb.SAMLController do
           <title>SAML Response</title>
         </head>
         <body onload="document.forms[0].submit()">
-          <form method="post" action="#{service_provider.acs_url}">
+          <form method="post" action="#{acs_url}">
             <input type="hidden" name="SAMLResponse" value="#{encoded_response}" />
-            #{if saml_session.relay_state, do: "<input type=\"hidden\" name=\"RelayState\" value=\"#{saml_session.relay_state}\" />", else: ""}
+            #{relay_state_html}
             <input type="submit" value="Continue" />
           </form>
         </body>
@@ -258,6 +296,23 @@ defmodule AuthifyWeb.SAMLController do
             if current_user do
               # Terminate user's SAML sessions
               SAML.terminate_all_sessions_for_user(current_user)
+
+              # Log SAML SLO event
+              AuditLog.log_event_async(:saml_slo_completed, %{
+                organization_id: organization.id,
+                actor_type: "user",
+                actor_id: current_user.id,
+                actor_name: "#{current_user.first_name} #{current_user.last_name}",
+                outcome: "success",
+                ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+                user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+                metadata: %{
+                  service_provider_id: sp.id,
+                  service_provider_name: sp.name,
+                  entity_id: sp.entity_id,
+                  initiator: "service_provider"
+                }
+              })
 
               # Generate logout response
               case SAML.generate_saml_logout_response(logout_request, sp) do
@@ -378,6 +433,17 @@ defmodule AuthifyWeb.SAMLController do
     # Send SAML logout response back to service provider
     destination_url = sp.sls_url || sp.acs_url
 
+    # HTML-escape values to prevent XSS
+    escaped_destination = html_escape_to_string(destination_url)
+
+    relay_state_html =
+      if relay_state do
+        escaped_relay = html_escape_to_string(relay_state)
+        "<input type=\"hidden\" name=\"RelayState\" value=\"#{escaped_relay}\" />"
+      else
+        ""
+      end
+
     form_html = """
     <!DOCTYPE html>
     <html>
@@ -385,9 +451,9 @@ defmodule AuthifyWeb.SAMLController do
       <title>SAML Logout Response</title>
     </head>
     <body onload="document.forms[0].submit()">
-      <form method="post" action="#{destination_url}">
+      <form method="post" action="#{escaped_destination}">
         <input type="hidden" name="SAMLResponse" value="#{encoded_response}" />
-        #{if relay_state, do: "<input type=\"hidden\" name=\"RelayState\" value=\"#{relay_state}\" />", else: ""}
+        #{relay_state_html}
         <input type="submit" value="Complete Logout" />
       </form>
     </body>

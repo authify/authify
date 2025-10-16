@@ -2,6 +2,7 @@ defmodule AuthifyWeb.API.ApplicationGroupsController do
   use AuthifyWeb.API.BaseController
 
   alias Authify.Accounts
+  alias AuthifyWeb.Helpers.AuditHelper
 
   @doc """
   GET /{org_slug}/api/application-groups
@@ -96,6 +97,10 @@ defmodule AuthifyWeb.API.ApplicationGroupsController do
 
         case Accounts.create_application_group(organization, group_params) do
           {:ok, group} ->
+            AuditHelper.log_application_group_event(conn, :application_group_created, group,
+              extra_metadata: %{"source" => "api"}
+            )
+
             render_api_response(conn, group,
               resource_type: "application_group",
               status: :created
@@ -143,6 +148,13 @@ defmodule AuthifyWeb.API.ApplicationGroupsController do
           if group.organization_id == organization.id do
             case Accounts.update_application_group(group, group_params) do
               {:ok, updated_group} ->
+                AuditHelper.log_application_group_event(
+                  conn,
+                  :application_group_updated,
+                  updated_group,
+                  extra_metadata: %{"source" => "api"}
+                )
+
                 render_api_response(conn, updated_group, resource_type: "application_group")
 
               {:error, %Ecto.Changeset{} = changeset} ->
@@ -203,7 +215,14 @@ defmodule AuthifyWeb.API.ApplicationGroupsController do
           # Ensure group belongs to current organization
           if group.organization_id == organization.id do
             case Accounts.delete_application_group(group) do
-              {:ok, _deleted_group} ->
+              {:ok, deleted_group} ->
+                AuditHelper.log_application_group_event(
+                  conn,
+                  :application_group_deleted,
+                  deleted_group,
+                  extra_metadata: %{"source" => "api"}
+                )
+
                 conn |> put_status(:no_content) |> json(%{})
 
               {:error, %Ecto.Changeset{} = changeset} ->

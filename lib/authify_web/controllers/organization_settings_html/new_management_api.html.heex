@@ -293,6 +293,21 @@
                       <input
                         class="form-check-input create-scope"
                         type="checkbox"
+                        id="scope_audit_logs_read"
+                        name="scopes[]"
+                        value="audit_logs:read"
+                      />
+                      <label class="form-check-label" for="scope_audit_logs_read">
+                        <strong>audit_logs:read</strong>
+                        <br />
+                        <small class="text-muted">Read audit logs for organization</small>
+                      </label>
+                    </div>
+
+                    <div class="form-check mb-2">
+                      <input
+                        class="form-check-input create-scope"
+                        type="checkbox"
                         id="scope_management_read"
                         name="scopes[]"
                         value="management_app:read"
@@ -303,7 +318,6 @@
                         <small class="text-muted">Read/list Management API OAuth2 Apps</small>
                       </label>
                     </div>
-
                     <div class="form-check mb-2">
                       <input
                         class="form-check-input create-scope"

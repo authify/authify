@@ -4,6 +4,7 @@ defmodule AuthifyWeb.ProfileController do
 
   alias Authify.Accounts
   alias Authify.Accounts.PersonalAccessToken
+  alias AuthifyWeb.Helpers.AuditHelper
 
   def show(conn, _params) do
     current_user = conn.assigns.current_user
@@ -32,12 +33,20 @@ defmodule AuthifyWeb.ProfileController do
     organization = conn.assigns.current_organization
 
     case Accounts.update_user_profile(current_user, user_params) do
-      {:ok, _updated_user} ->
+      {:ok, updated_user} ->
+        AuditHelper.log_user_profile_update(conn, current_user, updated_user,
+          extra_metadata: %{"source" => "web"}
+        )
+
         conn
         |> put_flash(:info, "Profile updated successfully.")
         |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        AuditHelper.log_user_profile_failure(conn, current_user, changeset,
+          extra_metadata: %{"source" => "web"}
+        )
+
         render(conn, :edit,
           user: current_user,
           organization: organization,
@@ -66,12 +75,20 @@ defmodule AuthifyWeb.ProfileController do
     if password_params["current_password"] &&
          Accounts.User.valid_password?(current_user, password_params["current_password"]) do
       case Accounts.update_user_password(current_user, password_params) do
-        {:ok, _updated_user} ->
+        {:ok, updated_user} ->
+          AuditHelper.log_password_change(conn, updated_user,
+            extra_metadata: %{"source" => "web", "method" => "self_service"}
+          )
+
           conn
           |> put_flash(:info, "Password updated successfully.")
           |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
 
         {:error, %Ecto.Changeset{} = changeset} ->
+          AuditHelper.log_password_change_failure(conn, current_user, changeset,
+            extra_metadata: %{"source" => "web", "method" => "self_service"}
+          )
+
           render(conn, :edit_password,
             user: current_user,
             organization: organization,
@@ -83,6 +100,10 @@ defmodule AuthifyWeb.ProfileController do
         current_user
         |> Accounts.change_user_password(password_params)
         |> Ecto.Changeset.add_error(:current_password, "is invalid")
+
+      AuditHelper.log_password_change_failure(conn, current_user, changeset,
+        extra_metadata: %{"source" => "web", "method" => "self_service"}
+      )
 
       render(conn, :edit_password,
         user: current_user,
@@ -97,6 +118,13 @@ defmodule AuthifyWeb.ProfileController do
 
     # Check if already verified
     if current_user.email_confirmed_at do
+      AuditHelper.log_email_verification_resend_failure(
+        conn,
+        current_user,
+        "already_verified",
+        extra_metadata: %{"source" => "web"}
+      )
+
       conn
       |> put_flash(:info, "Your email is already verified.")
       |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
@@ -114,6 +142,10 @@ defmodule AuthifyWeb.ProfileController do
               require Logger
               Logger.info("Email verification resent to #{current_user.email}")
 
+              AuditHelper.log_email_verification_resent(conn, current_user,
+                extra_metadata: %{"source" => "web"}
+              )
+
               conn
               |> put_flash(
                 :info,
@@ -125,12 +157,27 @@ defmodule AuthifyWeb.ProfileController do
               require Logger
               Logger.error("Failed to send verification email: #{inspect(reason)}")
 
+              AuditHelper.log_email_verification_resend_failure(
+                conn,
+                current_user,
+                "email_send_failed",
+                extra_metadata: %{"source" => "web", "email_error" => inspect(reason)}
+              )
+
               conn
               |> put_flash(:error, "Unable to send verification email. Please try again later.")
               |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
           end
 
-        {:error, _changeset} ->
+        {:error, changeset} ->
+          AuditHelper.log_email_verification_resend_failure(
+            conn,
+            current_user,
+            "token_generation_failed",
+            errors: changeset,
+            extra_metadata: %{"source" => "web"}
+          )
+
           conn
           |> put_flash(:error, "Unable to generate verification token. Please try again.")
           |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
@@ -160,6 +207,12 @@ defmodule AuthifyWeb.ProfileController do
 
     case Accounts.create_personal_access_token(current_user, organization, pat_params) do
       {:ok, pat} ->
+        pat = Authify.Repo.preload(pat, :scopes)
+
+        AuditHelper.log_personal_access_token_event(conn, :personal_access_token_created, pat,
+          extra_metadata: %{"source" => "web"}
+        )
+
         conn
         |> put_flash(
           :info,
@@ -172,6 +225,13 @@ defmodule AuthifyWeb.ProfileController do
         )
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        AuditHelper.log_personal_access_token_failure(
+          conn,
+          :personal_access_token_created,
+          changeset,
+          extra_metadata: %{"source" => "web"}
+        )
+
         personal_access_tokens = Accounts.list_personal_access_tokens(current_user)
 
         render(conn, :personal_access_tokens,
@@ -185,18 +245,32 @@ defmodule AuthifyWeb.ProfileController do
 
   def delete_personal_access_token(conn, %{"id" => id}) do
     current_user = conn.assigns.current_user
-
-    pat = Accounts.get_personal_access_token!(id, current_user)
+    pat = Accounts.get_personal_access_token!(id, current_user) |> Authify.Repo.preload(:scopes)
 
     case Accounts.delete_personal_access_token(pat) do
-      {:ok, _pat} ->
+      {:ok, deleted_pat} ->
+        AuditHelper.log_personal_access_token_event(
+          conn,
+          :personal_access_token_deleted,
+          deleted_pat,
+          extra_metadata: %{"source" => "web"}
+        )
+
         conn
         |> put_flash(:info, "Personal access token deleted successfully.")
         |> redirect(
           to: ~p"/#{conn.assigns.current_organization.slug}/profile/personal-access-tokens"
         )
 
-      {:error, _changeset} ->
+      {:error, changeset} ->
+        AuditHelper.log_personal_access_token_failure(
+          conn,
+          :personal_access_token_deleted,
+          changeset,
+          personal_access_token: pat,
+          extra_metadata: %{"source" => "web"}
+        )
+
         conn
         |> put_flash(:error, "Unable to delete personal access token.")
         |> redirect(

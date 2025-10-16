@@ -114,7 +114,7 @@ defmodule AuthifyWeb.Router do
 
   # Logout doesn't need rate limiting (it's a DELETE and terminates sessions)
   scope "/", AuthifyWeb do
-    pipe_through :browser
+    pipe_through [:browser, :auth]
 
     delete "/logout", SessionController, :delete
   end
@@ -184,6 +184,9 @@ defmodule AuthifyWeb.Router do
 
     # Invitations management
     resources "/invitations", InvitationController, only: [:index, :new, :create, :show, :delete]
+
+    # Audit Logs (admin only)
+    resources "/audit_logs", AuditLogsController, only: [:index, :show]
 
     # OAuth Applications management
     resources "/applications", ApplicationsController
@@ -317,6 +320,10 @@ defmodule AuthifyWeb.Router do
     # Profile Management (user's own profile)
     get "/profile", ProfileController, :show
     put "/profile", ProfileController, :update
+
+    # Audit Logs (read-only)
+    get "/audit-logs", AuditLogsController, :index
+    get "/audit-logs/:id", AuditLogsController, :show
   end
 
   # OIDC Discovery endpoint (organization-scoped, RFC-compliant)

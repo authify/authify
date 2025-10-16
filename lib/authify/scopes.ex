@@ -38,7 +38,9 @@ defmodule Authify.Scopes do
     "certificates:write",
     # Organization configuration
     "organizations:read",
-    "organizations:write"
+    "organizations:write",
+    # Audit log access
+    "audit_logs:read"
   ]
 
   # Profile scopes are only for Personal Access Tokens
@@ -124,6 +126,9 @@ defmodule Authify.Scopes do
       "Organizations" => [
         {"organizations:read", "Read organization configuration and settings"},
         {"organizations:write", "Manage organization configuration and settings"}
+      ],
+      "Audit Logs" => [
+        {"audit_logs:read", "Read audit logs for organization"}
       ],
       "Profile" => [
         {"profile:read", "Read your own profile information"},
