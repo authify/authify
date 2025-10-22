@@ -7,12 +7,13 @@ defmodule Authify.SAML.Certificate do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @derive {Jason.Encoder, except: [:__meta__, :organization, :private_key]}
   schema "saml_certificates" do
     field :name, :string
     # "signing" or "encryption"
     field :purpose, :string
     field :certificate, :string
-    field :private_key, :string
+    field :private_key, Authify.Encrypted.Binary
     field :is_active, :boolean, default: true
     field :expires_at, :utc_datetime
 
