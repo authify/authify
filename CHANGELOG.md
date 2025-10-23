@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-10-22
+
+### Changed
+- **BREAKING:** `SAML.Certificate.private_key` field now uses `Authify.Encrypted.Binary` type
+  - Private keys are now encrypted at rest using AES-256-GCM
+  - Existing plaintext private keys in `saml_certificates` table are incompatible and must be re-imported
+  - Private keys are excluded from JSON serialization to prevent accidental exposure
+
+### Security
+- **SECURITY FIX:** SAML certificate private keys are now encrypted at rest
+  - Previously stored as plaintext in database
+  - Now encrypted using same mechanism as `Accounts.Certificate` and `OAuth.Application.client_secret`
+  - Adds comprehensive test coverage for encryption/decryption functionality
+
+### Migration Notes
+- For pre-production deployments: Reset database to apply encryption changes
+- For production deployments with existing SAML certificates: Manual migration required to encrypt existing private keys
+- No migration provided as project is in active development with no production users
+
 ## [0.2.0] - 2025-10-15
 
 ### Added
@@ -240,7 +259,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/authify/authify/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/authify/authify/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/authify/authify/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/authify/authify/compare/v0.1.0...v0.1.1

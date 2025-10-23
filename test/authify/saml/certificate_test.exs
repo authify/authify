@@ -16,24 +16,17 @@ defmodule Authify.SAML.CertificateTest do
           slug: "test-org-#{System.unique_integer([:positive])}"
         })
 
-      {:ok, organization: org}
+      # Generate a real certificate for testing
+      {cert_pem, key_pem} = generate_test_certificate()
+
+      {:ok, organization: org, certificate_pem: cert_pem, private_key_pem: key_pem}
     end
 
-    test "encrypts private_key on insert", %{organization: org} do
-      private_key_pem = """
-      -----BEGIN PRIVATE KEY-----
-      MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj
-      MzEfYyjiWA4R4/M2bS1+fWIcPm15A8SE0H0D1WI4OW5GD2+9hBSBo+kgKSkNb8sR
-      -----END PRIVATE KEY-----
-      """
-
-      certificate_pem = """
-      -----BEGIN CERTIFICATE-----
-      MIIDXTCCAkWgAwIBAgIJAKL0UG+mRKUzMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
-      BAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
-      -----END CERTIFICATE-----
-      """
-
+    test "encrypts private_key on insert", %{
+      organization: org,
+      certificate_pem: certificate_pem,
+      private_key_pem: private_key_pem
+    } do
       attrs = %{
         name: "Test SAML Cert",
         purpose: "signing",
@@ -75,20 +68,11 @@ defmodule Authify.SAML.CertificateTest do
       assert match?({:ok, _}, Base.decode64(encrypted_value))
     end
 
-    test "decrypts private_key on load", %{organization: org} do
-      private_key_pem = """
-      -----BEGIN RSA PRIVATE KEY-----
-      MIIEowIBAAKCAQEAu1SU1LfVLPHCozMxH2Mo4lgOEePzNm0tfn1iHD5teQPEhNB9
-      A9ViODluRg9vvYQUgaPpICkpDW/LEQo=
-      -----END RSA PRIVATE KEY-----
-      """
-
-      certificate_pem = """
-      -----BEGIN CERTIFICATE-----
-      MIIDXTCCAkWgAwIBAgIJAKL0UG+mRKUzMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
-      -----END CERTIFICATE-----
-      """
-
+    test "decrypts private_key on load", %{
+      organization: org,
+      certificate_pem: certificate_pem,
+      private_key_pem: private_key_pem
+    } do
       {:ok, cert} =
         %Certificate{}
         |> Certificate.changeset(%{
@@ -124,14 +108,18 @@ defmodule Authify.SAML.CertificateTest do
       assert "can't be blank" in errors_on(changeset).private_key
     end
 
-    test "excludes private_key from JSON encoding", %{organization: org} do
+    test "excludes private_key from JSON encoding", %{
+      organization: org,
+      certificate_pem: certificate_pem,
+      private_key_pem: private_key_pem
+    } do
       {:ok, cert} =
         %Certificate{}
         |> Certificate.changeset(%{
           name: "JSON Test",
           purpose: "signing",
-          certificate: "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
-          private_key: "-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----",
+          certificate: certificate_pem,
+          private_key: private_key_pem,
           expires_at: DateTime.utc_now() |> DateTime.add(365, :day),
           organization_id: org.id
         })
@@ -147,5 +135,86 @@ defmodule Authify.SAML.CertificateTest do
       assert decoded["name"] == "JSON Test"
       assert decoded["purpose"] == "signing"
     end
+  end
+
+  # Generate a real RSA certificate for testing
+  # This avoids hardcoding private keys in the test file
+  defp generate_test_certificate do
+    # Generate RSA key pair
+    private_key = :public_key.generate_key({:rsa, 2048, 65_537})
+
+    # Create certificate using X509 library helpers
+    subject =
+      {:rdnSequence,
+       [
+         [{:AttributeTypeAndValue, {2, 5, 4, 3}, {:utf8String, ~c"Test Certificate"}}]
+       ]}
+
+    validity = {
+      :Validity,
+      {:utcTime, :erlang.universaltime() |> format_time()},
+      {:utcTime, :erlang.universaltime() |> add_years(1) |> format_time()}
+    }
+
+    public_key_info = {
+      :OTPSubjectPublicKeyInfo,
+      {:PublicKeyAlgorithm, {1, 2, 840, 113_549, 1, 1, 1}, :NULL},
+      {:RSAPublicKey, elem(private_key, 2), elem(private_key, 3)}
+    }
+
+    tbs_certificate = {
+      :OTPTBSCertificate,
+      :v3,
+      1,
+      {:SignatureAlgorithm, {1, 2, 840, 113_549, 1, 1, 11}, :NULL},
+      subject,
+      validity,
+      subject,
+      public_key_info,
+      :asn1_NOVALUE,
+      :asn1_NOVALUE,
+      :asn1_NOVALUE
+    }
+
+    # Encode TBS for signing
+    tbs_der = :public_key.pkix_encode(:OTPTBSCertificate, tbs_certificate, :otp)
+
+    # Sign the DER-encoded TBS certificate
+    signature = :public_key.sign(tbs_der, :sha256, private_key)
+
+    certificate = {
+      :OTPCertificate,
+      tbs_certificate,
+      {:SignatureAlgorithm, {1, 2, 840, 113_549, 1, 1, 11}, :NULL},
+      signature
+    }
+
+    # Encode to PEM
+    cert_der = :public_key.pkix_encode(:OTPCertificate, certificate, :otp)
+    cert_pem = :public_key.pem_encode([{:Certificate, cert_der, :not_encrypted}])
+
+    key_der = :public_key.der_encode(:RSAPrivateKey, private_key)
+    key_pem = :public_key.pem_encode([{:RSAPrivateKey, key_der, :not_encrypted}])
+
+    {cert_pem, key_pem}
+  end
+
+  defp format_time({{year, month, day}, {hour, minute, second}}) do
+    year_str = year |> Integer.to_string() |> String.slice(-2, 2)
+
+    :lists.flatten(
+      :io_lib.format(~c"~2..0s~2..0B~2..0B~2..0B~2..0B~2..0BZ", [
+        year_str,
+        month,
+        day,
+        hour,
+        minute,
+        second
+      ])
+    )
+  end
+
+  defp add_years({{year, month, day}, time}, years) do
+    {{year + years, month, day}, time}
   end
 end
