@@ -14,7 +14,7 @@ defmodule Authify.AccountsTest do
       {:ok, org} = Accounts.create_organization(@valid_org_attrs)
       organizations = Accounts.list_organizations()
       # Should include the test org and the global org created by migration
-      assert length(organizations) >= 1
+      refute Enum.empty?(organizations)
       assert Enum.any?(organizations, fn o -> o.id == org.id end)
     end
 

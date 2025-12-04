@@ -64,7 +64,7 @@ defmodule AuthifyWeb.AnalyticsController do
       largest_organization: Enum.max(user_counts, fn -> 0 end),
       smallest_organization: Enum.min(user_counts, fn -> 0 end),
       average_users_per_org:
-        if(length(user_counts) > 0, do: Enum.sum(user_counts) / length(user_counts), else: 0),
+        if(Enum.empty?(user_counts), do: 0, else: Enum.sum(user_counts) / length(user_counts)),
       organizations_by_size:
         Enum.group_by(organizations, fn org ->
           user_count = org.user_count || 0
