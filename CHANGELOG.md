@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-12-04
+
+### Changed
+- Updated Elixir from 1.18.4 to 1.19.4
+- Updated Erlang/OTP from 27.3.4.2 to 28.2
+- Updated 13 dependencies to latest versions:
+  - Phoenix 1.8.1 → 1.8.2
+  - Phoenix LiveView 1.1.14 → 1.1.18
+  - Phoenix Ecto 4.6.5 → 4.7.0
+  - Ecto 3.13.3 → 3.13.5
+  - And 9 other packages
+- Replaced manual ASN.1 certificate generation in test fixtures with X509 library for OTP 28 compatibility
+- Fixed code quality issues: replaced inefficient length/1 checks with Enum.empty?/1
+
+### Added
+- Comprehensive release process documentation in CONTRIBUTING.md
+  - Step-by-step release checklist
+  - Version numbering guidelines
+  - Automated GitHub Actions release workflow documentation
+  - Common issues and troubleshooting
+
 ## [0.3.0] - 2025-10-22
 
 ### Changed
@@ -259,7 +280,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/authify/authify/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/authify/authify/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/authify/authify/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/authify/authify/compare/v0.1.1...v0.1.2
