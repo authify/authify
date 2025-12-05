@@ -529,8 +529,8 @@ defmodule Authify.SAML.XMLSignature do
            certificate <- :public_key.pem_entry_decode(pem_entry),
            {:Certificate, tbs_certificate, _signature_algorithm, _signature_value} <- certificate,
            {:TBSCertificate, _version, _serial, _signature, _issuer, _validity, _subject,
-            subject_public_key_info, _issuer_unique_id, _subject_unique_id,
-            _extensions} <- tbs_certificate,
+            subject_public_key_info, _issuer_unique_id, _subject_unique_id, _extensions} <-
+             tbs_certificate,
            {:SubjectPublicKeyInfo, _algorithm, public_key_data} <- subject_public_key_info do
         {:ok, public_key_data}
       else

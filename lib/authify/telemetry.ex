@@ -84,7 +84,10 @@ defmodule Authify.Telemetry do
 
       # VM Metrics
       last_value("vm.memory.total", unit: :byte, description: "Total memory"),
-      last_value("vm.memory.processes_used", unit: :byte, description: "Memory used by processes"),
+      last_value("vm.memory.processes_used",
+        unit: :byte,
+        description: "Memory used by processes"
+      ),
       last_value("vm.memory.binary", unit: :byte, description: "Memory used by binaries"),
       last_value("vm.memory.ets", unit: :byte, description: "Memory used by ETS tables"),
       last_value("vm.total_run_queue_lengths.total",

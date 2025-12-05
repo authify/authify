@@ -160,8 +160,8 @@ defmodule Authify.Accounts.Certificate do
     case certificate do
       {:Certificate, tbs_certificate, _signature_algorithm, _signature_value} ->
         {:TBSCertificate, _version, _serial, _signature, _issuer, _validity, _subject,
-         subject_public_key_info, _issuer_unique_id, _subject_unique_id,
-         _extensions} = tbs_certificate
+         subject_public_key_info, _issuer_unique_id, _subject_unique_id, _extensions} =
+          tbs_certificate
 
         {:SubjectPublicKeyInfo, _algorithm, public_key_data} = subject_public_key_info
 
@@ -186,8 +186,8 @@ defmodule Authify.Accounts.Certificate do
     case certificate do
       {:Certificate, tbs_certificate, _signature_algorithm, _signature_value} ->
         {:TBSCertificate, _version, _serial, _signature, _issuer, validity, _subject,
-         _subject_public_key_info, _issuer_unique_id, _subject_unique_id,
-         _extensions} = tbs_certificate
+         _subject_public_key_info, _issuer_unique_id, _subject_unique_id, _extensions} =
+          tbs_certificate
 
         case validity do
           {:Validity, not_before, not_after} ->

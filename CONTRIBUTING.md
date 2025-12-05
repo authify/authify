@@ -168,6 +168,92 @@ Regular, high‑quality contributions + code reviews + roadmap alignment discuss
 ## Code of Conduct
 Be respectful, constructive, and security‑minded. (A formal CODE_OF_CONDUCT.md can be added later.)
 
+## Creating Releases
+
+**Note:** Only maintainers with push access can create releases.
+
+Authify uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and automated GitHub Actions workflows for releases.
+
+### Release Checklist
+
+1. **Update the version in `mix.exs`:**
+   ```elixir
+   version: "0.4.0",  # Update this line (currently at line 7)
+   ```
+
+2. **Update `CHANGELOG.md`:**
+   - Move items from `[Unreleased]` to a new version section
+   - Follow the existing format ([Keep a Changelog](https://keepachangelog.com/))
+   - Use categories: Added, Changed, Deprecated, Removed, Fixed, Security
+   - Include the release date in ISO format (YYYY-MM-DD)
+
+   Example:
+   ```markdown
+   ## [Unreleased]
+
+   ## [0.4.0] - 2025-12-04
+
+   ### Changed
+   - Updated Elixir to 1.19.4
+
+   ### Added
+   - New feature description
+   ```
+
+3. **Run full quality checks:**
+   ```bash
+   mix precommit
+   ```
+   Ensure all tests pass and there are no warnings.
+
+4. **Commit the version bump:**
+   ```bash
+   git add mix.exs CHANGELOG.md
+   git commit -m "chore(release): update version to 0.4.0"
+   ```
+
+5. **Create and push the release tag:**
+   ```bash
+   # Create an annotated tag
+   git tag -a v0.4.0 -m "Release v0.4.0"
+
+   # Push the commit and tag
+   git push origin main
+   git push origin v0.4.0
+   ```
+
+6. **Automated release process:**
+   Once the tag is pushed, the `.github/workflows/release.yml` workflow automatically:
+   - Builds the Docker image for multiple architectures
+   - Pushes image to GitHub Container Registry with tags:
+     - `ghcr.io/authify/authify:v0.4.0` (exact version)
+     - `ghcr.io/authify/authify:0.4` (minor version)
+     - `ghcr.io/authify/authify:0` (major version)
+     - `ghcr.io/authify/authify:sha-<commit>` (commit hash)
+   - Creates a GitHub Release with auto-generated changelog from commits
+   - Links to the Docker image in the release notes
+
+7. **Verify the release:**
+   - Check the [Releases page](https://github.com/authify/authify/releases)
+   - Verify the Docker image: `docker pull ghcr.io/authify/authify:v0.4.0`
+   - Review the auto-generated changelog
+
+### Version Number Guidelines
+
+- **Patch version (0.3.1):** Bug fixes, security patches, minor improvements
+- **Minor version (0.4.0):** New features, non-breaking changes
+- **Major version (1.0.0):** Breaking changes, major milestones
+
+### Common Issues
+
+- **Forgot to update version:** Create a new patch version with the corrected version number
+- **Failed Docker build:** Check the Actions tab for build logs; common issues include dependency conflicts or missing assets
+- **Wrong tag pushed:** Delete the tag locally and remotely, fix the issue, and re-tag:
+  ```bash
+  git tag -d v0.4.0
+  git push origin :refs/tags/v0.4.0
+  ```
+
 ## License
 By contributing you agree your contributions are licensed under the MIT License included in this repository.
 
