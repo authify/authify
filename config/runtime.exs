@@ -44,17 +44,19 @@ config :authify,
 # Configure libcluster for distributed Elixir in production (Kubernetes)
 # In development, clustering is disabled
 if config_env() == :prod do
-  # Kubernetes clustering strategy
-  # Requires: RELEASE_NAME (e.g., "authify") and RELEASE_NAMESPACE (e.g., "authify")
-  if System.get_env("RELEASE_NAME") && System.get_env("RELEASE_NAMESPACE") do
+  # Kubernetes clustering strategy using Kubernetes API
+  # Requires: RELEASE_NAMESPACE, POD_NAME, and appropriate RBAC permissions
+  # The Kubernetes strategy uses the K8s API to discover pods and construct proper FQDNs
+  if System.get_env("RELEASE_NAMESPACE") && System.get_env("POD_NAME") do
     config :libcluster,
       topologies: [
         k8s: [
-          strategy: Cluster.Strategy.Kubernetes.DNS,
+          strategy: Cluster.Strategy.Kubernetes,
           config: [
-            service: System.get_env("RELEASE_NAME"),
-            application_name: "authify",
-            namespace: System.get_env("RELEASE_NAMESPACE"),
+            mode: :dns,
+            kubernetes_node_basename: "authify",
+            kubernetes_selector: "app=authify",
+            kubernetes_namespace: System.get_env("RELEASE_NAMESPACE"),
             polling_interval: 10_000
           ]
         ]

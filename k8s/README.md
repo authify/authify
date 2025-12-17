@@ -33,6 +33,9 @@ This directory contains Kubernetes manifests for deploying Authify to a Kubernet
    # Wait for MySQL to be ready
    kubectl wait --for=condition=ready pod -l app=authify-mysql -n authify --timeout=300s
 
+   # Set up RBAC for clustering (required for libcluster)
+   kubectl apply -f rbac.yaml
+
    # Deploy Authify
    kubectl apply -f deployment.yaml
    kubectl apply -f service.yaml
@@ -68,6 +71,8 @@ Non-sensitive configuration:
 - `PORT` - Application port (4000)
 - `POOL_SIZE` - Database connection pool size
 - `ENABLE_METRICS` - Enable Prometheus metrics
+- `RELEASE_NAMESPACE` - Kubernetes namespace for clustering
+- `CLUSTER_SERVICE_NAME` - Headless service name for node discovery (default: `authify-internal`)
 
 ### Secret (`secret.yaml`)
 Sensitive configuration:
@@ -83,17 +88,28 @@ Sensitive configuration:
 - Health checks configured
 - **Production Note**: Consider using a managed database service (AWS RDS, Google Cloud SQL, etc.)
 
+### RBAC (`rbac.yaml`)
+- ServiceAccount for Authify pods
+- Role with permissions to read pods and endpoints
+- RoleBinding to grant permissions
+- **Required for libcluster** to discover pods via Kubernetes API
+
 ### Deployment (`deployment.yaml`)
 - 2 replicas for high availability
 - Init container runs database migrations
 - Health checks (liveness + readiness)
 - Resource requests and limits
+- Erlang clustering configured with EPMD (port 4369)
+- Uses Kubernetes downward API for dynamic node naming
 - **Update image references** to your container registry
 
 ### Service (`service.yaml`)
-- ClusterIP service
-- Port 80 → 4000 (HTTP)
-- Port 9568 (metrics)
+Two services are created:
+- **`authify-internal` (headless)**: ClusterIP: None, ports 4000 (HTTP) and 4369 (EPMD)
+  - Required for Erlang clustering and DNS-based node discovery
+  - Not used for external traffic
+- **`authify`**: ClusterIP service, port 80 → 4000
+  - Used by Ingress for external HTTP traffic
 
 ### Ingress (`ingress.yaml`)
 - NGINX ingress controller
@@ -172,7 +188,11 @@ Consider adding OpenTelemetry
 
 ### High Availability
 1. **Multiple replicas**: Already configured (2 minimum)
-2. **Pod Disruption Budget**:
+2. **Erlang clustering**: Pods automatically discover and connect to each other
+   - Uses libcluster with Kubernetes API strategy
+   - Enables distributed rate limiting and session sharing
+   - Requires RBAC permissions (configured in `rbac.yaml`)
+3. **Pod Disruption Budget**:
    ```yaml
    apiVersion: policy/v1
    kind: PodDisruptionBudget
@@ -186,7 +206,7 @@ Consider adding OpenTelemetry
          app: authify
    ```
 
-3. **Multi-zone deployment**: Use node affinity/anti-affinity
+4. **Multi-zone deployment**: Use node affinity/anti-affinity
 
 ### Scaling
 - HPA handles automatic scaling
@@ -241,6 +261,38 @@ kubectl describe ingress authify -n authify
 # Check ingress controller logs
 kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller
 ```
+
+### Clustering issues
+```bash
+# Check if pods are connected to the cluster
+kubectl exec -n authify deployment/authify -- /app/bin/authify rpc "Node.list()"
+
+# Check libcluster logs for connection issues
+kubectl logs -n authify -l app=authify --tail=100 | grep -i "libcluster\|cluster"
+
+# Verify RBAC permissions are configured
+kubectl get serviceaccount authify -n authify
+kubectl get role authify-pod-reader -n authify
+kubectl get rolebinding authify-pod-reader -n authify
+
+# Check if headless service exists
+kubectl get service authify-internal -n authify -o yaml
+
+# Verify EPMD port is exposed
+kubectl get pods -n authify -o jsonpath='{.items[0].spec.containers[0].ports}'
+
+# Check DNS resolution from within a pod
+kubectl exec -n authify deployment/authify -- nslookup authify.authify.svc.cluster.local
+
+# Check RELEASE_COOKIE matches across all pods
+kubectl exec -n authify deployment/authify -- env | grep RELEASE_COOKIE
+```
+
+**Common issues:**
+- Missing RBAC permissions: Apply `rbac.yaml`
+- Mismatched `RELEASE_COOKIE`: Update in `secret.yaml`
+- Wrong `CLUSTER_SERVICE_NAME`: Update in `configmap.yaml`
+- Headless service missing: Apply `service.yaml`
 
 ## Cleanup
 

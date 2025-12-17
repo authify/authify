@@ -20,6 +20,7 @@ spec:
         prometheus.io/port: "9568"
         prometheus.io/path: "/metrics"
     spec:
+      serviceAccountName: authify
       initContainers:
         - name: migrate
           image: ghcr.io/authify/authify:latest  # Change this to your image
@@ -37,9 +38,39 @@ spec:
             - containerPort: 4000
               name: http
               protocol: TCP
+            - containerPort: 4369
+              name: epmd
+              protocol: TCP
             - containerPort: 9568
               name: metrics
               protocol: TCP
+          env:
+            # Use Kubernetes downward API to get pod and namespace info for clustering
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            # Get cluster service name from ConfigMap for DNS resolution
+            - name: CLUSTER_SERVICE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: authify-config
+                  key: CLUSTER_SERVICE_NAME
+            # Configure Erlang distribution to use long names (FQDN) instead of short names
+            - name: RELEASE_DISTRIBUTION
+              value: "name"
+            # Construct the full Erlang node name for distributed clustering
+            # Format: authify@<pod-name>.<service-name>.<namespace>.svc.cluster.local
+            - name: RELEASE_NODE
+              value: "authify@$(POD_NAME).$(CLUSTER_SERVICE_NAME).$(POD_NAMESPACE).svc.cluster.local"
           envFrom:
             - configMapRef:
                 name: authify-config

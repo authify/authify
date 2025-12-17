@@ -10,6 +10,9 @@ data:
   ENABLE_METRICS: "true"
 
   # Clustering configuration for libcluster
-  RELEASE_NAME: "authify"
+  # Uses Kubernetes API strategy with RBAC permissions
   RELEASE_NAMESPACE: "authify"
-  RELEASE_NODE: "authify"
+  # Headless service name for DNS resolution
+  CLUSTER_SERVICE_NAME: "authify-internal"
+  # RELEASE_NODE is set dynamically in deployment.yaml using Kubernetes downward API
+  # POD_NAME is also set dynamically in deployment.yaml

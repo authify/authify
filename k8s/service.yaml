@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: authify
+  name: authify-internal
   namespace: authify
   labels:
     app: authify
@@ -27,7 +27,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: authify-external
+  name: authify
   namespace: authify
   labels:
     app: authify

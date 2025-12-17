@@ -27,6 +27,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: authify-external
+                name: authify
                 port:
                   number: 80
