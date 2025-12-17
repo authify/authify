@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-12-17
+
+### Added
+
+- Health check endpoint at `/health` for Kubernetes liveness and readiness probes
+  - Verifies application and database connectivity
+  - Returns 200 OK when healthy, 503 Service Unavailable when unhealthy
+  - 1-second response caching to prevent database connection pool exhaustion
+  - ETS-based cache for high-performance and thread-safe operation
+  - No authentication required (designed for infrastructure monitoring)
+  - Comprehensive test coverage including cache behavior and concurrent requests
+
 ## [0.4.2] - 2025-12-16
 
 ### Fixed
@@ -293,7 +305,10 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/authify/authify/compare/v0.4.2...v0.5.0
+[0.4.2]: https://github.com/authify/authify/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/authify/authify/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/authify/authify/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/authify/authify/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/authify/authify/compare/v0.1.2...v0.2.0
