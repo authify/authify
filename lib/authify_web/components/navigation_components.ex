@@ -26,7 +26,7 @@ defmodule AuthifyWeb.NavigationComponents do
         <div class="px-3 pb-3 mb-3 border-bottom">
           <a href="/" class="d-flex align-items-center text-decoration-none">
             <img
-              src="/images/logo-no-text.svg"
+              src={~p"/images/logo-no-text.svg"}
               alt="Authify"
               width="32"
               height="32"

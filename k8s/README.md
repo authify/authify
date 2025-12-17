@@ -33,9 +33,6 @@ This directory contains Kubernetes manifests for deploying Authify to a Kubernet
    # Wait for MySQL to be ready
    kubectl wait --for=condition=ready pod -l app=authify-mysql -n authify --timeout=300s
 
-   # Set up RBAC for clustering (required for libcluster)
-   kubectl apply -f rbac.yaml
-
    # Deploy Authify
    kubectl apply -f deployment.yaml
    kubectl apply -f service.yaml
@@ -88,19 +85,14 @@ Sensitive configuration:
 - Health checks configured
 - **Production Note**: Consider using a managed database service (AWS RDS, Google Cloud SQL, etc.)
 
-### RBAC (`rbac.yaml`)
-- ServiceAccount for Authify pods
-- Role with permissions to read pods and endpoints
-- RoleBinding to grant permissions
-- **Required for libcluster** to discover pods via Kubernetes API
-
 ### Deployment (`deployment.yaml`)
 - 2 replicas for high availability
 - Init container runs database migrations
 - Health checks (liveness + readiness)
 - Resource requests and limits
 - Erlang clustering configured with EPMD (port 4369)
-- Uses Kubernetes downward API for dynamic node naming
+- Uses Kubernetes downward API to expose POD_IP
+- DNS-based clustering via headless service (no RBAC required)
 - **Update image references** to your container registry
 
 ### Service (`service.yaml`)
@@ -189,9 +181,11 @@ Consider adding OpenTelemetry
 ### High Availability
 1. **Multiple replicas**: Already configured (2 minimum)
 2. **Erlang clustering**: Pods automatically discover and connect to each other
-   - Uses libcluster with Kubernetes API strategy
+   - Uses libcluster with Kubernetes.DNS strategy
+   - Discovers nodes via headless service DNS lookups
+   - Node names format: `authify@<pod_ip>`
    - Enables distributed rate limiting and session sharing
-   - Requires RBAC permissions (configured in `rbac.yaml`)
+   - No RBAC required (uses DNS only)
 3. **Pod Disruption Budget**:
    ```yaml
    apiVersion: policy/v1
@@ -270,29 +264,27 @@ kubectl exec -n authify deployment/authify -- /app/bin/authify rpc "Node.list()"
 # Check libcluster logs for connection issues
 kubectl logs -n authify -l app=authify --tail=100 | grep -i "libcluster\|cluster"
 
-# Verify RBAC permissions are configured
-kubectl get serviceaccount authify -n authify
-kubectl get role authify-pod-reader -n authify
-kubectl get rolebinding authify-pod-reader -n authify
-
-# Check if headless service exists
+# Check if headless service exists and returns pod IPs
 kubectl get service authify-internal -n authify -o yaml
 
 # Verify EPMD port is exposed
 kubectl get pods -n authify -o jsonpath='{.items[0].spec.containers[0].ports}'
 
-# Check DNS resolution from within a pod
-kubectl exec -n authify deployment/authify -- nslookup authify.authify.svc.cluster.local
+# Check POD_IP is set correctly
+kubectl exec -n authify deployment/authify -- env | grep POD_IP
+
+# Check RELEASE_NODE is constructed correctly
+kubectl exec -n authify deployment/authify -- env | grep RELEASE_NODE
 
 # Check RELEASE_COOKIE matches across all pods
 kubectl exec -n authify deployment/authify -- env | grep RELEASE_COOKIE
 ```
 
 **Common issues:**
-- Missing RBAC permissions: Apply `rbac.yaml`
 - Mismatched `RELEASE_COOKIE`: Update in `secret.yaml`
 - Wrong `CLUSTER_SERVICE_NAME`: Update in `configmap.yaml`
-- Headless service missing: Apply `service.yaml`
+- Headless service missing or misconfigured: Apply `service.yaml`
+- POD_IP not set: Check deployment.yaml downward API configuration
 
 ## Cleanup
 
