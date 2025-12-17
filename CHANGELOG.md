@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2025-12-16
+
+### Changed
+
+- Updated Docker build action to v6 in GitHub release workflow
+
 ## [0.4.0] - 2025-12-04
 
 ### Changed
