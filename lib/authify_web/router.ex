@@ -73,6 +73,13 @@ defmodule AuthifyWeb.Router do
     plug AuthifyWeb.Plugs.RateLimiter, :auth_rate_limit
   end
 
+  # Health check endpoint (no authentication, for Kubernetes probes)
+  scope "/", AuthifyWeb do
+    pipe_through :api
+
+    get "/health", HealthController, :index
+  end
+
   scope "/", AuthifyWeb do
     pipe_through :browser
 

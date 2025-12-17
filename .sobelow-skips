@@ -1,12 +1,12 @@
-
-Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:345,1958722
 XSS.SendResp: XSS in `send_resp`,lib/authify_web/controllers/saml_controller.ex:424,23E96D7
 Config.CSP: Missing Content-Security-Policy,lib/authify_web/router.ex:56,33445BA
 XSS.SendResp: XSS in `send_resp`,lib/authify_web/controllers/saml_controller.ex:465,39BBDAF
-Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:342,3BC628A
 XSS.SendResp: XSS in `send_resp`,lib/authify_web/controllers/saml_controller.ex:121,3F4CB9B
 Config.CSP: Missing Content-Security-Policy,lib/authify_web/router.ex:10,4723B64
 Config.Secrets: Hardcoded Secret,config/config.exs:55,489500
 Config.CSP: Missing Content-Security-Policy,lib/authify_web/router.ex:17,6E55B0E
 Config.CSP: Missing Content-Security-Policy,lib/authify_web/router.ex:67,7874000
 Config.CSRF: Missing CSRF Protections,lib/authify_web/router.ex:14,88CB4F
+
+Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:352,5D5B0CB
+Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:349,7BCC393
