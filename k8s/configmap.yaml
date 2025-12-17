@@ -8,7 +8,8 @@ data:
   PORT: "4000"
   POOL_SIZE: "10"
   ENABLE_METRICS: "true"
-
+  # Base URL used in API docs
+  API_BASE_URL: "https://api.authify.pw"
   # Clustering configuration for libcluster
   # Uses Kubernetes API strategy with RBAC permissions
   RELEASE_NAMESPACE: "authify"

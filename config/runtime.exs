@@ -39,6 +39,21 @@ config :authify,
          System.get_env("SECRET_KEY_BASE") ||
          "dev_encryption_password_change_in_production"
 
+# ## API Documentation Configuration
+#
+# Base URL for API documentation and OpenAPI spec generation.
+# Set via environment variable: API_BASE_URL
+#
+# If not set, the API docs will auto-detect the URL from incoming requests,
+# checking X-Forwarded-Proto header for proper HTTPS detection behind proxies.
+#
+# Examples:
+#   API_BASE_URL=https://api.authify.pw
+#   API_BASE_URL=https://auth.example.com
+if api_base_url = System.get_env("API_BASE_URL") do
+  config :authify, :api_base_url, api_base_url
+end
+
 # ## Cluster Configuration
 #
 # Configure libcluster for distributed Elixir in production (Kubernetes)

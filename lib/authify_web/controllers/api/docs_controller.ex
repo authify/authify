@@ -2,10 +2,8 @@ defmodule AuthifyWeb.API.DocsController do
   use AuthifyWeb, :controller
 
   def openapi(conn, _params) do
-    # Get the base URL from the current request
-    scheme = if conn.scheme == :https, do: "https", else: "http"
-    host = get_req_header(conn, "host") |> List.first() || "localhost:4000"
-    base_url = "#{scheme}://#{host}"
+    # Get the base URL from configuration or build from current request
+    base_url = get_api_base_url(conn)
 
     # Generate the OpenAPI specification dynamically
     openapi_spec = %{
@@ -94,6 +92,35 @@ defmodule AuthifyWeb.API.DocsController do
     conn
     |> put_resp_content_type("application/json")
     |> json(openapi_spec)
+  end
+
+  # Get API base URL from configuration or build from request
+  # Supports X-Forwarded-Proto header for proper HTTPS detection behind proxies
+  defp get_api_base_url(conn) do
+    # Check if API base URL is configured
+    case Application.get_env(:authify, :api_base_url) do
+      nil ->
+        # Build from request with proper protocol detection
+        scheme = get_scheme(conn)
+        host = get_req_header(conn, "host") |> List.first() || "localhost:4000"
+        "#{scheme}://#{host}"
+
+      configured_url ->
+        configured_url
+    end
+  end
+
+  # Get the scheme (http/https) from the request
+  # Checks X-Forwarded-Proto header first (set by reverse proxies)
+  defp get_scheme(conn) do
+    case get_req_header(conn, "x-forwarded-proto") do
+      [proto | _] when proto in ["http", "https"] ->
+        proto
+
+      _ ->
+        # Fall back to conn.scheme
+        if conn.scheme == :https, do: "https", else: "http"
+    end
   end
 
   defp build_paths do
