@@ -1255,33 +1255,38 @@ defmodule AuthifyWeb.API.DocsController do
 
   defp build_schemas do
     %{
-      # HATEOAS and Pagination
-      "HateoasLink" => %{
+      # HATEOAS Links
+      "ResourceLinks" => %{
         type: "object",
+        description: "Links for individual resource responses",
         properties: %{
-          self: %{type: "string", format: "uri", description: "Link to the current resource"},
+          self: %{type: "string", format: "uri", description: "Link to the current resource"}
+        },
+        required: ["self"]
+      },
+      "CollectionLinks" => %{
+        type: "object",
+        description: "Links for collection/list responses with pagination",
+        properties: %{
+          self: %{type: "string", format: "uri", description: "Link to the current page"},
+          first: %{type: "string", format: "uri", description: "Link to the first page"},
           next: %{
             type: "string",
             format: "uri",
-            description: "Link to the next page (pagination)"
+            description: "Link to the next page (present if not on last page)"
           },
           prev: %{
             type: "string",
             format: "uri",
-            description: "Link to the previous page (pagination)"
-          },
-          first: %{
-            type: "string",
-            format: "uri",
-            description: "Link to the first page (pagination)"
+            description: "Link to the previous page (present if not on first page)"
           },
           last: %{
             type: "string",
             format: "uri",
-            description: "Link to the last page (pagination)"
+            description: "Link to the last page (present when total is known)"
           }
         },
-        required: ["self"]
+        required: ["self", "first"]
       },
       "PaginationMeta" => %{
         type: "object",
@@ -1356,7 +1361,7 @@ defmodule AuthifyWeb.API.DocsController do
         id: %{type: "string", description: "Organization ID"},
         type: %{type: "string", enum: ["organization"], description: "Resource type"},
         attributes: %{"$ref" => "#/components/schemas/OrganizationAttributes"},
-        links: %{"$ref" => "#/components/schemas/HateoasLink"}
+        links: %{"$ref" => "#/components/schemas/ResourceLinks"}
       },
       required: ["id", "type", "attributes", "links"]
     }
@@ -1367,7 +1372,7 @@ defmodule AuthifyWeb.API.DocsController do
       type: "object",
       properties: %{
         data: %{"$ref" => "#/components/schemas/OrganizationResource"},
-        links: %{"$ref" => "#/components/schemas/HateoasLink"}
+        links: %{"$ref" => "#/components/schemas/ResourceLinks"}
       },
       required: ["data", "links"]
     }
@@ -1411,7 +1416,7 @@ defmodule AuthifyWeb.API.DocsController do
             }
           }
         },
-        links: %{"$ref" => "#/components/schemas/HateoasLink"}
+        links: %{"$ref" => "#/components/schemas/ResourceLinks"}
       },
       required: ["data", "links"]
     }
@@ -1503,7 +1508,7 @@ defmodule AuthifyWeb.API.DocsController do
         id: %{type: "string", description: "User ID"},
         type: %{type: "string", enum: ["user"], description: "Resource type"},
         attributes: %{"$ref" => "#/components/schemas/UserAttributes"},
-        links: %{"$ref" => "#/components/schemas/HateoasLink"}
+        links: %{"$ref" => "#/components/schemas/ResourceLinks"}
       },
       required: ["id", "type", "attributes", "links"]
     }
@@ -1514,7 +1519,7 @@ defmodule AuthifyWeb.API.DocsController do
       type: "object",
       properties: %{
         data: %{"$ref" => "#/components/schemas/UserResource"},
-        links: %{"$ref" => "#/components/schemas/HateoasLink"}
+        links: %{"$ref" => "#/components/schemas/ResourceLinks"}
       },
       required: ["data", "links"]
     }
@@ -1525,7 +1530,7 @@ defmodule AuthifyWeb.API.DocsController do
       type: "object",
       properties: %{
         data: %{type: "array", items: %{"$ref" => "#/components/schemas/UserResource"}},
-        links: %{"$ref" => "#/components/schemas/HateoasLink"},
+        links: %{"$ref" => "#/components/schemas/CollectionLinks"},
         meta: %{"$ref" => "#/components/schemas/PaginationMeta"}
       },
       required: ["data", "links", "meta"]
@@ -1633,7 +1638,7 @@ defmodule AuthifyWeb.API.DocsController do
           type: "array",
           items: %{"$ref" => "#/components/schemas/InvitationResource"}
         },
-        links: %{"$ref" => "#/components/schemas/HateoasLink"},
+        links: %{"$ref" => "#/components/schemas/CollectionLinks"},
         meta: %{"$ref" => "#/components/schemas/PaginationMeta"}
       },
       required: ["data", "links", "meta"]
@@ -1713,7 +1718,7 @@ defmodule AuthifyWeb.API.DocsController do
         id: %{type: "string", description: "Application ID"},
         type: %{type: "string", enum: ["application"], description: "Resource type"},
         attributes: %{"$ref" => "#/components/schemas/ApplicationAttributes"},
-        links: %{"$ref" => "#/components/schemas/HateoasLink"}
+        links: %{"$ref" => "#/components/schemas/ResourceLinks"}
       },
       required: ["id", "type", "attributes", "links"]
     }
@@ -1726,7 +1731,7 @@ defmodule AuthifyWeb.API.DocsController do
         id: %{type: "string", description: "Application ID"},
         type: %{type: "string", enum: ["application"], description: "Resource type"},
         attributes: %{"$ref" => "#/components/schemas/ApplicationAttributesWithSecret"},
-        links: %{"$ref" => "#/components/schemas/HateoasLink"}
+        links: %{"$ref" => "#/components/schemas/ResourceLinks"}
       },
       required: ["id", "type", "attributes", "links"]
     }
@@ -1737,7 +1742,7 @@ defmodule AuthifyWeb.API.DocsController do
       type: "object",
       properties: %{
         data: %{"$ref" => "#/components/schemas/ApplicationResource"},
-        links: %{"$ref" => "#/components/schemas/HateoasLink"}
+        links: %{"$ref" => "#/components/schemas/ResourceLinks"}
       },
       required: ["data", "links"]
     }
@@ -1748,7 +1753,7 @@ defmodule AuthifyWeb.API.DocsController do
       type: "object",
       properties: %{
         data: %{"$ref" => "#/components/schemas/ApplicationResourceWithSecret"},
-        links: %{"$ref" => "#/components/schemas/HateoasLink"}
+        links: %{"$ref" => "#/components/schemas/ResourceLinks"}
       },
       required: ["data", "links"]
     }
@@ -1759,7 +1764,7 @@ defmodule AuthifyWeb.API.DocsController do
       type: "object",
       properties: %{
         data: %{type: "array", items: %{"$ref" => "#/components/schemas/ApplicationResource"}},
-        links: %{"$ref" => "#/components/schemas/HateoasLink"},
+        links: %{"$ref" => "#/components/schemas/CollectionLinks"},
         meta: %{"$ref" => "#/components/schemas/PaginationMeta"}
       },
       required: ["data", "links", "meta"]
@@ -1838,7 +1843,7 @@ defmodule AuthifyWeb.API.DocsController do
         id: %{type: "string", description: "Application Group ID"},
         type: %{type: "string", enum: ["application_group"], description: "Resource type"},
         attributes: %{"$ref" => "#/components/schemas/ApplicationGroupAttributes"},
-        links: %{"$ref" => "#/components/schemas/HateoasLink"}
+        links: %{"$ref" => "#/components/schemas/ResourceLinks"}
       },
       required: ["id", "type", "attributes", "links"]
     }
@@ -1849,7 +1854,7 @@ defmodule AuthifyWeb.API.DocsController do
       type: "object",
       properties: %{
         data: %{"$ref" => "#/components/schemas/ApplicationGroupResource"},
-        links: %{"$ref" => "#/components/schemas/HateoasLink"}
+        links: %{"$ref" => "#/components/schemas/ResourceLinks"}
       },
       required: ["data", "links"]
     }
@@ -1863,7 +1868,7 @@ defmodule AuthifyWeb.API.DocsController do
           type: "array",
           items: %{"$ref" => "#/components/schemas/ApplicationGroupResource"}
         },
-        links: %{"$ref" => "#/components/schemas/HateoasLink"},
+        links: %{"$ref" => "#/components/schemas/CollectionLinks"},
         meta: %{"$ref" => "#/components/schemas/PaginationMeta"}
       },
       required: ["data", "links", "meta"]
