@@ -557,14 +557,12 @@ defmodule Authify.Email do
 
   # Check if running in development or test mode
   defp dev_or_test_mode? do
-    env = Application.get_env(:authify, :env) || Mix.env()
-    env in [:dev, :test]
+    Application.get_env(:authify, :env) in [:dev, :test]
   end
 
   # Check if running in development mode
   defp dev_mode? do
-    Application.get_env(:authify, :env) == :dev ||
-      Mix.env() == :dev
+    Application.get_env(:authify, :env) == :dev
   end
 
   # Get from address from organization settings, or use dev/test default

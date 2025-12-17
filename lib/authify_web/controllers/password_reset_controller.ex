@@ -70,7 +70,7 @@ defmodule AuthifyWeb.PasswordResetController do
 
     # Build the reset URL with proper protocol/port for environment
     base_url =
-      if Mix.env() == :dev do
+      if Application.get_env(:authify, :env) == :dev do
         "http://#{domain}:4000"
       else
         "https://#{domain}"

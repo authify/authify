@@ -89,7 +89,7 @@ defmodule Authify.AuditLog do
   """
   def log_event_async(event_type, attrs) do
     # In test environment, use synchronous logging to avoid sandbox issues
-    if Mix.env() == :test do
+    if Application.get_env(:authify, :env) == :test do
       case log_event(event_type, attrs) do
         {:ok, _event} ->
           :ok

@@ -1,5 +1,8 @@
 import Config
 
+# Set the runtime environment (used instead of Mix.env() which isn't available in releases)
+config :authify, env: :test
+
 # Configure your database
 #
 # The MIX_TEST_PARTITION environment variable can be used

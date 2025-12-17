@@ -19,7 +19,7 @@ defmodule AuthifyWeb.Auth.APIAuth do
     required_scopes = opts[:require_scopes] || []
 
     # In test environment, check if API auth is already set up
-    if Mix.env() == :test && conn.assigns[:api_authenticated] do
+    if Application.get_env(:authify, :env) == :test && conn.assigns[:api_authenticated] do
       conn
     else
       case authenticate_request(conn) do

@@ -1,5 +1,8 @@
 import Config
 
+# Set the runtime environment (used instead of Mix.env() which isn't available in releases)
+config :authify, env: :dev
+
 # Configure your database
 config :authify, Authify.Repo,
   username: "root",

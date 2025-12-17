@@ -520,7 +520,7 @@ defmodule Authify.Accounts do
 
   # Build the base URL with proper protocol and port for the environment
   defp build_base_url(domain) do
-    if Mix.env() == :dev do
+    if Application.get_env(:authify, :env) == :dev do
       # In development, use HTTP and port 4000
       "http://#{domain}:4000"
     else
