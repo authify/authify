@@ -36,7 +36,7 @@ defmodule Authify.Application do
   # Defaults to enabled, but can be disabled with ENABLE_METRICS=false
   # Always disabled in test environment
   defp prometheus_children do
-    if Mix.env() != :test and Application.get_env(:authify, :metrics_enabled, true) do
+    if Application.get_env(:authify, :metrics_enabled, true) do
       [Authify.Telemetry]
     else
       []

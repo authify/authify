@@ -52,7 +52,10 @@ config :phoenix, :json_library, Jason
 # Guardian configuration
 config :authify, Authify.Guardian,
   issuer: "authify",
-  secret_key: "your-secret-key-here-please-change-in-production"
+  secret_key:
+    System.get_env("GUARDIAN_SECRET_KEY") ||
+      System.get_env("SECRET_KEY_BASE") ||
+      "your-secret-key-here-please-change-in-production"
 
 # Hammer rate limiting configuration
 config :hammer,

@@ -49,3 +49,6 @@ config :phoenix_live_view,
 # Disable rate limiting by default in tests
 # Individual tests can enable it using the RateLimitTest helper module
 config :authify, :rate_limiting_enabled, false
+
+# Disable metrics in test environment
+config :authify, :metrics_enabled, false

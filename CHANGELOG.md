@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2025-12-16
+
+### Fixed
+
+- Fixed UndefinedFunctionError in production by replacing Mix.env() with Application.get_env() in prometheus_children/0
+- Updated Guardian configuration to use environment variables (GUARDIAN_SECRET_KEY or SECRET_KEY_BASE)
+
 ## [0.4.1] - 2025-12-16
 
 ### Changed
