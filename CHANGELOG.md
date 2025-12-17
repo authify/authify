@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2025-12-17
+
+### Fixed
+
+- Corrected OpenAPI schema references for collection links in API documentation
+  - Updated `links` property in collection responses to reference `CollectionLinks` schema
+  - Fixed incorrect reference to `HateoasLink` schema
+- Fully switched to Kubernetes DNS-based clustering for Erlang nodes
+  - Removed RBAC configuration and dependencies
+  - Simplified deployment manifests by eliminating `rbac.yaml` and related settings
+  - Updated documentation to reflect DNS-based clustering setup
+
 ## [0.6.0] - 2025-12-17
 
 ### Added
@@ -325,7 +337,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/authify/authify/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/authify/authify/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/authify/authify/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/authify/authify/compare/v0.4.1...v0.4.2
