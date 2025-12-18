@@ -12,7 +12,7 @@ erl_crash.dump
 
 # Static artifacts - we build these in the Docker image
 /assets/node_modules
-/priv/static
+/priv/static/assets
 
 # Development/test
 .elixir_ls
