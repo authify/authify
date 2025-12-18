@@ -307,6 +307,8 @@ defmodule Authify.Accounts.User do
     global_admin?(user)
   end
 
+  def super_admin?(_), do: false
+
   @doc """
   Gets the user's role in a specific organization.
   """

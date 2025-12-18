@@ -32,14 +32,14 @@ defmodule AuthifyWeb.API.AuditLogsController do
         filter_opts =
           build_filter_options(params)
           |> Keyword.put(:organization_id, organization.id)
-          |> Keyword.put(:page, page)
-          |> Keyword.put(:per_page, per_page)
+          |> Keyword.put(:limit, per_page)
+          |> Keyword.put(:offset, (page - 1) * per_page)
 
         # Get audit logs with filters
         audit_logs = AuditLog.list_events(filter_opts)
 
         total =
-          AuditLog.count_events(Keyword.delete(filter_opts, :page) |> Keyword.delete(:per_page))
+          AuditLog.count_events(Keyword.delete(filter_opts, :limit) |> Keyword.delete(:offset))
 
         page_info = %{
           page: page,

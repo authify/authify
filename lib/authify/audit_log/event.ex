@@ -39,6 +39,23 @@ defmodule Authify.AuditLog.Event do
   @actor_types ~w(user api_client application system)a
   @outcome_types ~w(success failure denied)a
 
+  @derive {Jason.Encoder,
+           only: [
+             :id,
+             :event_type,
+             :actor_type,
+             :actor_id,
+             :actor_name,
+             :resource_type,
+             :resource_id,
+             :ip_address,
+             :user_agent,
+             :outcome,
+             :metadata,
+             :organization_id,
+             :inserted_at
+           ]}
+
   schema "audit_events" do
     field :event_type, :string
     field :actor_type, :string
