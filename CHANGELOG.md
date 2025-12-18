@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2025-12-18
+
+### Fixed
+
+- Fixed critical UX bug where personal access tokens were not displayed after creation
+  - Controller now passes plaintext token instead of hashed value to flash
+  - Template now uses correct string keys to access flash values
+  - Removed confusing hashed token display from existing tokens list
+  - Improved dark mode styling for token display box
+- Fixed Management API audit logs endpoint JSON serialization errors
+  - Added Jason.Encoder derivation to AuditLog.Event schema
+  - Fixed pagination by converting page/per_page to limit/offset
+  - Added URL pluralization rule for consistent hyphenated URLs
+- Fixed FunctionClauseError in User.super_admin?/1 when called with service account maps
+  - Added catch-all clause to handle non-User struct values
+- Added comprehensive test suite for audit logs API endpoints (12 tests)
+
 ## [0.6.2] - 2025-12-17
 
 ### Fixed
@@ -344,7 +361,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/authify/authify/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/authify/authify/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/authify/authify/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/authify/authify/compare/v0.5.0...v0.6.0
