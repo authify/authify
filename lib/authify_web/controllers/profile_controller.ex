@@ -219,7 +219,7 @@ defmodule AuthifyWeb.ProfileController do
           "Personal access token created successfully. Make sure to copy it now - you won't be able to see it again!"
         )
         # Special flash for showing the token once
-        |> put_flash(:token, pat.token)
+        |> put_flash(:token, pat.plaintext_token)
         |> redirect(
           to: ~p"/#{conn.assigns.current_organization.slug}/profile/personal-access-tokens"
         )

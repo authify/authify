@@ -28,7 +28,7 @@
     <AuthifyWeb.Layouts.flash_group flash={@flash} />
 
     <%!-- Show the newly created token if available --%>
-    <%= if @flash[:token] do %>
+    <%= if @flash["token"] do %>
       <div class="alert alert-success" role="alert">
         <div class="d-flex align-items-start">
           <i class="bi bi-check-circle-fill me-2 mt-1"></i>
@@ -37,9 +37,9 @@
             <p class="mb-2">
               Make sure to copy your personal access token now. You won't be able to see it again!
             </p>
-            <div class="p-3 bg-white border rounded">
+            <div class="p-3 bg-body-secondary border rounded">
               <div class="d-flex align-items-center">
-                <code class="flex-grow-1 text-break">{@flash[:token]}</code>
+                <code class="flex-grow-1 text-break">{@flash["token"]}</code>
                 <button
                   type="button"
                   class="btn btn-sm btn-outline-success ms-2"
@@ -453,43 +453,6 @@
                     <%= if token.description do %>
                       <p class="mb-2 text-muted small">{token.description}</p>
                     <% end %>
-
-                    <%!-- Token Value Display --%>
-                    <div class="mb-3">
-                      <label class="form-label small fw-bold">Token</label>
-                      <div class="input-group input-group-sm">
-                        <input
-                          type="password"
-                          class="form-control font-monospace"
-                          value={token.token}
-                          readonly
-                          id={"token-#{token.id}"}
-                        />
-                        <button
-                          type="button"
-                          class="btn btn-outline-secondary"
-                          onclick={"
-                            const input = document.getElementById('token-#{token.id}');
-                            if (input.type === 'password') {
-                              input.type = 'text';
-                              this.innerHTML = '<i class=\"bi bi-eye-slash\"></i>';
-                            } else {
-                              input.type = 'password';
-                              this.innerHTML = '<i class=\"bi bi-eye\"></i>';
-                            }
-                          "}
-                        >
-                          <i class="bi bi-eye"></i>
-                        </button>
-                        <button
-                          type="button"
-                          class="btn btn-outline-success"
-                          onclick={"navigator.clipboard.writeText('#{token.token}')"}
-                        >
-                          <i class="bi bi-clipboard"></i>
-                        </button>
-                      </div>
-                    </div>
 
                     <div class="d-flex flex-wrap gap-3 small text-muted">
                       <span>
