@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2025-12-20
+
+### Fixed
+
+- Fixed critical configuration settings bugs that prevented organization settings from being saved
+  - Fixed KeyError when accessing user.global_admin field by calling User.global_admin?/1 function instead
+  - Fixed type comparison issue where string form values were compared to integer quota values
+    - In Elixir's term ordering, strings are always greater than integers, causing validation to incorrectly fail
+    - Added proper type casting before comparison in validate_rate_limit_with_quota/3
+  - Fixed empty string handling for rate limit settings
+    - Empty strings are now properly treated as nil (not set), allowing fallback to quota defaults
+    - Users can now leave rate limit fields blank to use the organization's quota value
+
 ## [0.6.3] - 2025-12-18
 
 ### Fixed
@@ -361,7 +374,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/authify/authify/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/authify/authify/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/authify/authify/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/authify/authify/compare/v0.6.0...v0.6.1

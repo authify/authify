@@ -259,6 +259,7 @@ defmodule Authify.Configurations.Schemas.Organization do
   Validates a rate limit setting with organization context.
 
   Ensures that the value does not exceed the corresponding quota setting.
+  Empty strings are treated as nil (not set), meaning the quota value will be used as the default.
   """
   def validate_rate_limit_with_quota(org, setting_name, value) do
     # Map setting name to quota name
@@ -272,24 +273,31 @@ defmodule Authify.Configurations.Schemas.Organization do
       end
 
     if quota_name do
-      # Get the quota value for this organization
-      quota = Authify.Configurations.get_organization_setting(org, quota_name)
+      # Treat empty string as nil (not set - will use quota as default)
+      normalized_value = if value == "", do: nil, else: value
 
-      cond do
-        value == nil ->
-          {:ok, nil}
+      # Cast value to integer first (it may be a string from form submission)
+      with {:ok, casted_value} <-
+             Authify.Configurations.Schema.cast_value(:integer, normalized_value) do
+        # Get the quota value for this organization
+        quota = Authify.Configurations.get_organization_setting(org, quota_name)
 
-        quota == nil ->
-          {:error, "Quota not set for this organization"}
+        cond do
+          casted_value == nil ->
+            {:ok, nil}
 
-        value > quota ->
-          {:error, "Must be less than or equal to quota (#{quota})"}
+          quota == nil ->
+            {:error, "Quota not set for this organization"}
 
-        value > 0 ->
-          {:ok, value}
+          casted_value > quota ->
+            {:error, "Must be less than or equal to quota (#{quota})"}
 
-        true ->
-          {:error, "Must be a positive integer"}
+          casted_value > 0 ->
+            {:ok, casted_value}
+
+          true ->
+            {:error, "Must be a positive integer"}
+        end
       end
     else
       # Not a rate limit setting, just validate it's positive
