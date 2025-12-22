@@ -1,0 +1,73 @@
+<.form for={@changeset} action={@action} id="application-group-form">
+  <%= if @changeset.action do %>
+    <div class="alert alert-danger">
+      <p>Oops, something went wrong! Please check the errors below.</p>
+    </div>
+  <% end %>
+
+  <div class="mb-3">
+    <label for="group_name" class="form-label">Group Name</label>
+    <input
+      type="text"
+      name="group[name]"
+      id="group_name"
+      class="form-control"
+      placeholder="Engineering Team"
+      value={
+        Map.get(@changeset.changes, :name) ||
+          Map.get(@changeset.data, :name) || ""
+      }
+      required
+    />
+    <div class="form-text">A descriptive name for this group</div>
+    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :name) || []) do %>
+      <div class="invalid-feedback d-block">{msg}</div>
+    <% end %>
+  </div>
+
+  <div class="mb-3">
+    <label for="group_description" class="form-label">Description</label>
+    <textarea
+      name="group[description]"
+      id="group_description"
+      class="form-control"
+      rows="3"
+      placeholder="Describe what this group is for..."
+    ><%= Map.get(@changeset.changes, :description) || Map.get(@changeset.data, :description) || "" %></textarea>
+    <div class="form-text">Optional description of the group's purpose</div>
+    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :description) || []) do %>
+      <div class="invalid-feedback d-block">{msg}</div>
+    <% end %>
+  </div>
+
+  <div class="mb-3">
+    <div class="form-check form-switch">
+      <input
+        type="checkbox"
+        name="group[is_active]"
+        id="group_is_active"
+        class="form-check-input"
+        value="true"
+        checked={
+          Map.get(@changeset.changes, :is_active) ||
+            Map.get(@changeset.data, :is_active) || true
+        }
+      />
+      <label class="form-check-label" for="group_is_active">
+        Active
+      </label>
+      <div class="form-text">
+        Whether this group is active and users can access its applications
+      </div>
+    </div>
+    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :is_active) || []) do %>
+      <div class="invalid-feedback d-block">{msg}</div>
+    <% end %>
+  </div>
+
+  <div class="d-grid gap-2 mt-4">
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-save"></i> Save Group
+    </button>
+  </div>
+</.form>

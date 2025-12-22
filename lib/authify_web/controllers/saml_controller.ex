@@ -225,6 +225,8 @@ defmodule AuthifyWeb.SAMLController do
 
   defp generate_and_send_response(_conn, saml_session, user) do
     service_provider = saml_session.service_provider
+    # Preload groups for SAML attribute generation
+    user = Authify.Repo.preload(user, :groups)
 
     case SAML.generate_saml_response(saml_session, service_provider, user) do
       {:ok, saml_response} ->

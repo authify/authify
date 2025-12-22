@@ -11,6 +11,9 @@ defmodule Authify.Accounts do
     ApplicationGroup,
     ApplicationGroupMember,
     Certificate,
+    Group,
+    GroupApplication,
+    GroupMembership,
     Invitation,
     Organization,
     PersonalAccessToken,
@@ -1804,13 +1807,26 @@ defmodule Authify.Accounts do
   end
 
   @doc """
-  Adds an application to an application group.
+  Adds an application to an application group or group.
+
+  Handles both legacy ApplicationGroup and new Group structs.
   """
-  def add_application_to_group(group, application_id, application_type) do
+  def add_application_to_group(%ApplicationGroup{} = group, application_id, application_type) do
     %ApplicationGroupMember{}
     |> ApplicationGroupMember.changeset(%{
       application_group_id: group.id,
       application_id: application_id,
+      application_type: application_type
+    })
+    |> Repo.insert()
+  end
+
+  def add_application_to_group(%Group{} = group, application_id, application_type)
+      when application_type in ["oauth2", "saml"] do
+    %GroupApplication{}
+    |> GroupApplication.changeset(%{
+      group_id: group.id,
+      application_id: String.to_integer(application_id),
       application_type: application_type
     })
     |> Repo.insert()
@@ -1956,5 +1972,186 @@ defmodule Authify.Accounts do
 
     query
     |> Repo.update_all(set: [is_active: false])
+  end
+
+  ## Groups
+
+  @doc """
+  Returns the list of groups for an organization.
+  """
+  def list_groups(%Organization{id: org_id}) do
+    Group
+    |> where([g], g.organization_id == ^org_id)
+    |> order_by([g], asc: g.name)
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns a filtered and sorted list of groups for an organization.
+
+  ## Options
+    * `:sort` - Field to sort by (atom, e.g., :name, :inserted_at)
+    * `:order` - Sort order (:asc or :desc, defaults to :asc)
+    * `:search` - Text search across name and description fields
+    * `:status` - Filter by is_active status (boolean or "all")
+
+  ## Examples
+
+      iex> list_groups_filtered(org, sort: :name, order: :desc, search: "admin")
+      [%Group{}, ...]
+  """
+  def list_groups_filtered(%Organization{id: org_id}, opts \\ []) do
+    query =
+      from(g in Group,
+        where: g.organization_id == ^org_id
+      )
+
+    query
+    |> apply_group_filters(opts)
+    |> apply_group_search(opts[:search])
+    |> apply_group_sorting(opts[:sort], opts[:order])
+    |> Repo.all()
+  end
+
+  defp apply_group_filters(query, opts) do
+    maybe_filter_group_by_status(query, opts[:status])
+  end
+
+  defp maybe_filter_group_by_status(query, nil),
+    do: query
+
+  defp maybe_filter_group_by_status(query, ""),
+    do: query
+
+  defp maybe_filter_group_by_status(query, "all"), do: query
+
+  defp maybe_filter_group_by_status(query, true),
+    do: where(query, [g], g.is_active == true)
+
+  defp maybe_filter_group_by_status(query, "true"),
+    do: where(query, [g], g.is_active == true)
+
+  defp maybe_filter_group_by_status(query, false),
+    do: where(query, [g], g.is_active == false)
+
+  defp maybe_filter_group_by_status(query, "false"),
+    do: where(query, [g], g.is_active == false)
+
+  defp maybe_filter_group_by_status(query, _),
+    do: query
+
+  defp apply_group_search(query, nil), do: query
+  defp apply_group_search(query, ""), do: query
+
+  defp apply_group_search(query, search_term) when is_binary(search_term) do
+    search_pattern = "%#{search_term}%"
+
+    where(
+      query,
+      [g],
+      like(g.name, ^search_pattern) or like(g.description, ^search_pattern)
+    )
+  end
+
+  defp apply_group_sorting(query, nil, _),
+    do: order_by(query, [g], asc: g.name)
+
+  defp apply_group_sorting(query, "", _), do: order_by(query, [g], asc: g.name)
+
+  defp apply_group_sorting(query, sort_field, order)
+       when sort_field in [:name, :description, :is_active, :inserted_at, :updated_at] do
+    order_atom = if order == :asc or order == "asc", do: :asc, else: :desc
+    order_by(query, [g], ^[{order_atom, sort_field}])
+  end
+
+  defp apply_group_sorting(query, _sort_field, _order),
+    do: order_by(query, [g], asc: g.name)
+
+  @doc """
+  Gets a single group by ID within an organization.
+  """
+  def get_group!(id, %Organization{id: org_id}) do
+    Group
+    |> where([g], g.id == ^id and g.organization_id == ^org_id)
+    |> Repo.one!()
+  end
+
+  @doc """
+  Creates a group.
+  """
+  def create_group(attrs \\ %{}) do
+    %Group{}
+    |> Group.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates a group.
+  """
+  def update_group(%Group{} = group, attrs) do
+    group
+    |> Group.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes a group.
+  """
+  def delete_group(%Group{} = group) do
+    Repo.delete(group)
+  end
+
+  @doc """
+  Returns an `%Ecto.Changeset{}` for tracking group changes.
+  """
+  def change_group(%Group{} = group, attrs \\ %{}) do
+    Group.changeset(group, attrs)
+  end
+
+  @doc """
+  Adds a user to a group.
+  """
+  def add_user_to_group(%User{} = user, %Group{} = group) do
+    %GroupMembership{}
+    |> GroupMembership.changeset(%{user_id: user.id, group_id: group.id})
+    |> Repo.insert()
+  end
+
+  @doc """
+  Removes a user from a group.
+  """
+  def remove_user_from_group(%User{id: user_id}, %Group{id: group_id}) do
+    from(gm in GroupMembership,
+      where: gm.user_id == ^user_id and gm.group_id == ^group_id
+    )
+    |> Repo.delete_all()
+  end
+
+  @doc """
+  Lists all users in a group.
+  """
+  def list_group_members(%Group{} = group) do
+    group
+    |> Repo.preload(:users)
+    |> Map.get(:users)
+  end
+
+  @doc """
+  Lists all groups for a user.
+  """
+  def list_user_groups(%User{} = user) do
+    user
+    |> Repo.preload(:groups)
+    |> Map.get(:groups)
+  end
+
+  @doc """
+  Removes an application from a group by member ID.
+  """
+  def remove_application_from_group(%Group{id: group_id}, member_id) do
+    from(ga in GroupApplication,
+      where: ga.id == ^member_id and ga.group_id == ^group_id
+    )
+    |> Repo.delete_all()
   end
 end

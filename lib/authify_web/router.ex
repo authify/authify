@@ -220,6 +220,14 @@ defmodule AuthifyWeb.Router do
     delete "/application_groups/:id/applications/:member_id",
            ApplicationGroupsController,
            :remove_application
+
+    # Groups management (replaces ApplicationGroups)
+    resources "/groups", GroupController
+    get "/groups/:id/members", GroupController, :manage_members
+    post "/groups/:id/users", GroupController, :add_user
+    delete "/groups/:id/users/:user_id", GroupController, :remove_user
+    post "/groups/:id/applications", GroupController, :add_application
+    delete "/groups/:id/applications/:member_id", GroupController, :remove_application
   end
 
   # Super admin only routes - require global admin privileges

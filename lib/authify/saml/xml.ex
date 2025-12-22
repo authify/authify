@@ -7,6 +7,8 @@ defmodule Authify.SAML.XML do
   alias Authify.Accounts.User
   alias Authify.SAML.{ServiceProvider, Session}
 
+  defguardp is_empty_list(list) when list == []
+
   @doc """
   Parse a SAML AuthnRequest from XML or Base64-encoded XML.
   """
@@ -344,16 +346,33 @@ defmodule Authify.SAML.XML do
     else
       attribute_elements =
         Enum.map(attribute_mapping, fn {saml_attr, user_field} ->
-          value = get_user_attribute(user, user_field)
+          values = get_user_attribute(user, user_field)
 
-          if value do
-            """
-            <saml2:Attribute Name="#{saml_attr}">
-              <saml2:AttributeValue>#{Phoenix.HTML.html_escape(value) |> Phoenix.HTML.safe_to_string()}</saml2:AttributeValue>
-            </saml2:Attribute>
-            """
-          else
-            nil
+          case values do
+            # Multi-valued attribute (list of values)
+            values when is_list(values) and not is_empty_list(values) ->
+              attribute_values =
+                Enum.map_join(values, "\n              ", fn value ->
+                  "<saml2:AttributeValue>#{Phoenix.HTML.html_escape(to_string(value)) |> Phoenix.HTML.safe_to_string()}</saml2:AttributeValue>"
+                end)
+
+              """
+              <saml2:Attribute Name="#{saml_attr}">
+                #{attribute_values}
+              </saml2:Attribute>
+              """
+
+            # Single-valued attribute
+            value when is_binary(value) ->
+              """
+              <saml2:Attribute Name="#{saml_attr}">
+                <saml2:AttributeValue>#{Phoenix.HTML.html_escape(value) |> Phoenix.HTML.safe_to_string()}</saml2:AttributeValue>
+              </saml2:Attribute>
+              """
+
+            # No value
+            _ ->
+              nil
           end
         end)
         |> Enum.filter(&(&1 != nil))
@@ -372,9 +391,22 @@ defmodule Authify.SAML.XML do
       "email" -> user.email
       "first_name" -> user.first_name
       "last_name" -> user.last_name
+      "username" -> user.username
       "{{first_name}} {{last_name}}" -> "#{user.first_name} #{user.last_name}"
+      "groups" -> get_user_groups(user)
       _ -> nil
     end
+  end
+
+  defp get_user_groups(%User{groups: groups}) when is_list(groups) do
+    # Groups are already preloaded, extract names
+    Enum.map(groups, & &1.name)
+  end
+
+  defp get_user_groups(%User{} = user) do
+    # Groups not preloaded, fetch them
+    user = Authify.Repo.preload(user, :groups)
+    Enum.map(user.groups, & &1.name)
   end
 
   defp generate_id do

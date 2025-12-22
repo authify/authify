@@ -8,13 +8,21 @@ defmodule Authify.Accounts.User do
   import Ecto.Changeset
   import Ecto.Query
 
-  alias Authify.Accounts.{ApplicationGroup, Organization, UserApplicationGroup}
+  alias Authify.Accounts.{
+    ApplicationGroup,
+    Group,
+    GroupMembership,
+    Organization,
+    UserApplicationGroup
+  }
 
   @derive {Jason.Encoder,
            except: [
              :organization,
              :user_application_groups,
              :application_groups,
+             :group_memberships,
+             :groups,
              :hashed_password,
              :password_reset_token,
              :password_reset_expires_at,
@@ -64,6 +72,9 @@ defmodule Authify.Accounts.User do
 
     has_many :user_application_groups, UserApplicationGroup, on_delete: :delete_all
     many_to_many :application_groups, ApplicationGroup, join_through: UserApplicationGroup
+
+    has_many :group_memberships, GroupMembership, on_delete: :delete_all
+    many_to_many :groups, Group, join_through: GroupMembership
 
     timestamps(type: :utc_datetime)
   end
