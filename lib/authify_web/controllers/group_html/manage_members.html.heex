@@ -3,15 +3,15 @@
     <.organization_sidebar
       user={@current_user}
       organization={@organization}
-      current_page="application_groups"
+      current_page="groups"
     />
   </:sidebar>
   <:main>
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-      <h1 class="h2">Manage Members: {@application_group.name}</h1>
+      <h1 class="h2">Manage Members: {@group.name}</h1>
       <div class="btn-toolbar mb-2 mb-md-0">
         <a
-          href={~p"/#{@current_organization.slug}/application_groups/#{@application_group}"}
+          href={~p"/#{@current_organization.slug}/groups/#{@group}"}
           class="btn btn-outline-secondary btn-sm"
         >
           <i class="bi bi-arrow-left"></i> Back to Group
@@ -36,9 +36,7 @@
 <!-- Add User Form -->
             <form
               method="post"
-              action={
-                ~p"/#{@organization.slug}/application_groups/#{@application_group.id}/users"
-              }
+              action={~p"/#{@organization.slug}/groups/#{@group.id}/users"}
               class="mb-4"
             >
               <input
@@ -62,30 +60,28 @@
             </form>
             
 <!-- Current Users List -->
-            <%= if Enum.empty?(@application_group.user_application_groups) do %>
+            <%= if Enum.empty?(@group.users) do %>
               <div class="text-center py-4">
                 <i class="bi bi-person-x display-6 text-muted"></i>
                 <p class="text-muted mt-2">No users in this group yet</p>
               </div>
             <% else %>
               <div class="list-group">
-                <%= for user_group <- @application_group.user_application_groups do %>
+                <%= for user <- @group.users do %>
                   <div class="list-group-item d-flex justify-content-between align-items-center">
                     <div>
                       <i class="bi bi-person-circle me-2 text-primary"></i>
-                      <span class="fw-medium">{user_group.user.email}</span>
-                      <%= if user_group.user.first_name || user_group.user.last_name do %>
+                      <span class="fw-medium">{user.email}</span>
+                      <%= if user.first_name || user.last_name do %>
                         <br />
                         <small class="text-muted ms-4">
-                          {user_group.user.first_name} {user_group.user.last_name}
+                          {user.first_name} {user.last_name}
                         </small>
                       <% end %>
                     </div>
                     <form
                       method="post"
-                      action={
-                        ~p"/#{@organization.slug}/application_groups/#{@application_group.id}/users/#{user_group.user.id}"
-                      }
+                      action={~p"/#{@organization.slug}/groups/#{@group.id}/users/#{user.id}"}
                     >
                       <input
                         type="hidden"
@@ -125,9 +121,7 @@
 <!-- Add Application Form -->
             <form
               method="post"
-              action={
-                ~p"/#{@organization.slug}/application_groups/#{@application_group.id}/applications"
-              }
+              action={~p"/#{@organization.slug}/groups/#{@group.id}/applications"}
               class="mb-4"
             >
               <input
@@ -154,9 +148,7 @@
 
             <form
               method="post"
-              action={
-                ~p"/#{@organization.slug}/application_groups/#{@application_group.id}/applications"
-              }
+              action={~p"/#{@organization.slug}/groups/#{@group.id}/applications"}
               class="mb-4"
             >
               <input
@@ -182,14 +174,14 @@
             </form>
             
 <!-- Current Applications List -->
-            <%= if Enum.empty?(@application_group.application_group_members) do %>
+            <%= if Enum.empty?(@group.group_applications) do %>
               <div class="text-center py-4">
                 <i class="bi bi-app-indicator display-6 text-muted"></i>
                 <p class="text-muted mt-2">No applications in this group yet</p>
               </div>
             <% else %>
               <div class="list-group">
-                <%= for member <- @application_group.application_group_members do %>
+                <%= for member <- @group.group_applications do %>
                   <div class="list-group-item d-flex justify-content-between align-items-center">
                     <div>
                       <%= if member.application_type == "oauth2" do %>
@@ -204,7 +196,7 @@
                     <form
                       method="post"
                       action={
-                        ~p"/#{@organization.slug}/application_groups/#{@application_group.id}/applications/#{member.id}"
+                        ~p"/#{@organization.slug}/groups/#{@group.id}/applications/#{member.id}"
                       }
                     >
                       <input

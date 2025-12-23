@@ -6,11 +6,11 @@
   <% end %>
 
   <div class="mb-3">
-    <label for="application_group_name" class="form-label">Group Name</label>
+    <label for="group_name" class="form-label">Group Name</label>
     <input
       type="text"
-      name="application_group[name]"
-      id="application_group_name"
+      name="group[name]"
+      id="group_name"
       class="form-control"
       placeholder="Engineering Team"
       value={
@@ -26,10 +26,10 @@
   </div>
 
   <div class="mb-3">
-    <label for="application_group_description" class="form-label">Description</label>
+    <label for="group_description" class="form-label">Description</label>
     <textarea
-      name="application_group[description]"
-      id="application_group_description"
+      name="group[description]"
+      id="group_description"
       class="form-control"
       rows="3"
       placeholder="Describe what this group is for..."
@@ -44,8 +44,8 @@
     <div class="form-check form-switch">
       <input
         type="checkbox"
-        name="application_group[is_active]"
-        id="application_group_is_active"
+        name="group[is_active]"
+        id="group_is_active"
         class="form-check-input"
         value="true"
         checked={
@@ -53,7 +53,7 @@
             Map.get(@changeset.data, :is_active) || true
         }
       />
-      <label class="form-check-label" for="application_group_is_active">
+      <label class="form-check-label" for="group_is_active">
         Active
       </label>
       <div class="form-text">

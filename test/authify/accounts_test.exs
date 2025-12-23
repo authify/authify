@@ -176,6 +176,79 @@ defmodule Authify.AccountsTest do
       assert {:error, :user_not_found} =
                Accounts.authenticate_user("nonexistent@example.com", "SecureP@ssw0rd!", org.id)
     end
+
+    test "update_user/2 clears email verification when email changes", %{organization: org} do
+      # Create a user with verified email
+      {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
+      verified_time = DateTime.utc_now() |> DateTime.truncate(:second)
+      {:ok, verified_user} = Accounts.update_user(user, %{"email_confirmed_at" => verified_time})
+
+      assert verified_user.email_confirmed_at != nil
+
+      # Update email address
+      {:ok, updated_user} =
+        Accounts.update_user(verified_user, %{"email" => "newemail@example.com"})
+
+      # Email verification should be cleared
+      assert updated_user.email == "newemail@example.com"
+      assert updated_user.email_confirmed_at == nil
+    end
+
+    test "update_user/2 preserves email verification when email doesn't change", %{
+      organization: org
+    } do
+      # Create a user with verified email
+      {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
+      verified_time = DateTime.utc_now() |> DateTime.truncate(:second)
+      {:ok, verified_user} = Accounts.update_user(user, %{"email_confirmed_at" => verified_time})
+
+      assert verified_user.email_confirmed_at != nil
+
+      # Update other fields but not email
+      {:ok, updated_user} = Accounts.update_user(verified_user, %{"first_name" => "Jane"})
+
+      # Email verification should be preserved
+      assert updated_user.first_name == "Jane"
+      assert updated_user.email_confirmed_at != nil
+    end
+
+    test "update_user_profile/2 clears email verification when email changes", %{
+      organization: org
+    } do
+      # Create a user with verified email
+      {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
+      verified_time = DateTime.utc_now() |> DateTime.truncate(:second)
+      {:ok, verified_user} = Accounts.update_user(user, %{"email_confirmed_at" => verified_time})
+
+      assert verified_user.email_confirmed_at != nil
+
+      # Update email via profile update
+      {:ok, updated_user} =
+        Accounts.update_user_profile(verified_user, %{"email" => "profilechange@example.com"})
+
+      # Email verification should be cleared
+      assert updated_user.email == "profilechange@example.com"
+      assert updated_user.email_confirmed_at == nil
+    end
+
+    test "update_user_profile/2 preserves email verification when email doesn't change", %{
+      organization: org
+    } do
+      # Create a user with verified email
+      {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
+      verified_time = DateTime.utc_now() |> DateTime.truncate(:second)
+      {:ok, verified_user} = Accounts.update_user(user, %{"email_confirmed_at" => verified_time})
+
+      assert verified_user.email_confirmed_at != nil
+
+      # Update username but not email
+      {:ok, updated_user} =
+        Accounts.update_user_profile(verified_user, %{"username" => "newusername"})
+
+      # Email verification should be preserved
+      assert updated_user.username == "newusername"
+      assert updated_user.email_confirmed_at != nil
+    end
   end
 
   describe "user utilities" do

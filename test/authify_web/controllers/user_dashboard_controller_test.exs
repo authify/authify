@@ -61,11 +61,12 @@ defmodule AuthifyWeb.UserDashboardControllerTest do
       user: user,
       organization: org
     } do
-      # Create an application group
+      # Create a group
       {:ok, group} =
-        Accounts.create_application_group(org, %{
+        Accounts.create_group(%{
           "name" => "Test Apps",
-          "description" => "Test application group"
+          "description" => "Test group",
+          "organization_id" => org.id
         })
 
       # Create a test OAuth application
@@ -92,7 +93,7 @@ defmodule AuthifyWeb.UserDashboardControllerTest do
       {:ok, _} = Accounts.add_application_to_group(group, saml_sp.id, "saml")
 
       # Add user to group
-      {:ok, _} = Accounts.add_user_to_application_group(user, group)
+      {:ok, _} = Accounts.add_user_to_group(user, group)
 
       conn = get(conn, ~p"/#{org.slug}/user/dashboard")
 

@@ -3,15 +3,15 @@
     <.organization_sidebar
       user={@current_user}
       organization={@organization}
-      current_page="application_groups"
+      current_page="groups"
     />
   </:sidebar>
   <:main>
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-      <h1 class="h2">New Application Group</h1>
+      <h1 class="h2">New Group</h1>
       <div class="btn-toolbar mb-2 mb-md-0">
         <a
-          href={~p"/#{@current_organization.slug}/application_groups"}
+          href={~p"/#{@current_organization.slug}/groups"}
           class="btn btn-outline-secondary btn-sm"
         >
           <i class="bi bi-arrow-left"></i> Back to Groups
@@ -28,9 +28,9 @@
             </h5>
           </div>
           <div class="card-body">
-            <.application_group_form
+            <.group_form
               changeset={@changeset}
-              action={~p"/#{@organization.slug}/application_groups"}
+              action={~p"/#{@organization.slug}/groups"}
             />
           </div>
         </div>
@@ -40,7 +40,7 @@
         <div class="card bg-body-secondary">
           <div class="card-body">
             <h6 class="card-title">
-              <i class="bi bi-info-circle"></i> About Application Groups
+              <i class="bi bi-info-circle"></i> About Groups
             </h6>
             <p class="card-text small">
               Application groups allow you to manage user access to multiple applications at once. Users assigned to a group automatically gain access to all applications in that group.

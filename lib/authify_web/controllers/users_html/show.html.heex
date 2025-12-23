@@ -8,6 +8,14 @@
       <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
           <a
+            href={~p"/#{@current_organization.slug}/users/#{@target_user}/edit"}
+            class="btn btn-primary btn-sm"
+          >
+            <i class="bi bi-pencil"></i> Edit User
+          </a>
+        </div>
+        <div class="btn-group me-2">
+          <a
             href={~p"/#{@current_organization.slug}/users"}
             class="btn btn-outline-secondary btn-sm"
           >
@@ -42,6 +50,18 @@
                     <span class="badge bg-warning ms-2" title="Email not verified">
                       <i class="bi bi-exclamation-circle"></i> Unverified
                     </span>
+                  <% end %>
+                </p>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6">
+                <h6 class="text-muted">Username</h6>
+                <p>
+                  <%= if @target_user.username do %>
+                    <code>{@target_user.username}</code>
+                  <% else %>
+                    <span class="text-muted fst-italic">Not set</span>
                   <% end %>
                 </p>
               </div>

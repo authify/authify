@@ -1,0 +1,176 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar user={@current_user} organization={@organization} current_page="users" />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Edit User</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@current_organization.slug}/users/#{@user}"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left"></i> Back to User
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-person-lines-fill"></i> User Information
+            </h5>
+          </div>
+          <div class="card-body">
+            <.form
+              for={@changeset}
+              action={~p"/#{@current_organization.slug}/users/#{@user}"}
+              method="put"
+              id="user-form"
+            >
+              <%= if @changeset.action do %>
+                <div class="alert alert-danger">
+                  <p>Oops, something went wrong! Please check the errors below.</p>
+                </div>
+              <% end %>
+
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="user_first_name" class="form-label">First Name</label>
+                    <input
+                      type="text"
+                      name="user[first_name]"
+                      id="user_first_name"
+                      class="form-control"
+                      placeholder="John"
+                      value={
+                        Map.get(@changeset.changes, :first_name) ||
+                          Map.get(@changeset.data, :first_name) || ""
+                      }
+                    />
+                    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :first_name) || []) do %>
+                      <div class="invalid-feedback d-block">{msg}</div>
+                    <% end %>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="user_last_name" class="form-label">Last Name</label>
+                    <input
+                      type="text"
+                      name="user[last_name]"
+                      id="user_last_name"
+                      class="form-control"
+                      placeholder="Doe"
+                      value={
+                        Map.get(@changeset.changes, :last_name) ||
+                          Map.get(@changeset.data, :last_name) || ""
+                      }
+                    />
+                    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :last_name) || []) do %>
+                      <div class="invalid-feedback d-block">{msg}</div>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_username" class="form-label">Username</label>
+                <input
+                  type="text"
+                  name="user[username]"
+                  id="user_username"
+                  class="form-control"
+                  placeholder="johndoe"
+                  value={
+                    Map.get(@changeset.changes, :username) ||
+                      Map.get(@changeset.data, :username) || ""
+                  }
+                />
+                <div class="form-text">
+                  <small>Username must be unique within this organization. Optional field.</small>
+                </div>
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :username) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_email" class="form-label">Email Address</label>
+                <input
+                  type="email"
+                  name="user[email]"
+                  id="user_email"
+                  class="form-control"
+                  placeholder="john@example.com"
+                  value={
+                    Map.get(@changeset.changes, :email) || Map.get(@changeset.data, :email) || ""
+                  }
+                  required
+                />
+                <div class="form-text">
+                  <small>Changing email address will require verification.</small>
+                </div>
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :email) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="d-grid gap-2 mt-4">
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-check-circle"></i> Update User
+                </button>
+              </div>
+            </.form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> About User Editing
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-2">Editing user information:</p>
+            <ul class="small mb-0">
+              <li>Update user's name and username</li>
+              <li>Email changes require verification</li>
+              <li>Use other actions to change role or password</li>
+              <li>User will see updated information immediately</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-shield-check"></i> Other Actions
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-2">To manage this user:</p>
+            <ul class="small mb-0">
+              <li>Change role from user detail page</li>
+              <li>Force password reset from user detail page</li>
+              <li>Enable/disable account from user detail page</li>
+            </ul>
+            <a
+              href={~p"/#{@current_organization.slug}/users/#{@user}"}
+              class="btn btn-outline-primary btn-sm mt-2"
+            >
+              View User Details
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

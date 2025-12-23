@@ -8,14 +8,14 @@ defmodule Authify.Accounts do
   alias Authify.Repo
 
   alias Authify.Accounts.{
-    ApplicationGroup,
-    ApplicationGroupMember,
     Certificate,
+    Group,
+    GroupApplication,
+    GroupMembership,
     Invitation,
     Organization,
     PersonalAccessToken,
-    User,
-    UserApplicationGroup
+    User
   }
 
   ## Organizations
@@ -316,9 +316,17 @@ defmodule Authify.Accounts do
   Updates a user.
   """
   def update_user(%User{} = user, attrs) do
-    user
-    |> User.changeset(attrs)
-    |> Repo.update()
+    changeset = User.changeset(user, attrs)
+
+    # If email is being changed, clear email verification
+    changeset =
+      if Ecto.Changeset.get_change(changeset, :email) do
+        Ecto.Changeset.put_change(changeset, :email_confirmed_at, nil)
+      else
+        changeset
+      end
+
+    Repo.update(changeset)
   end
 
   @doc """
@@ -363,9 +371,17 @@ defmodule Authify.Accounts do
   Updates a user's profile information (name, email, username).
   """
   def update_user_profile(%User{} = user, attrs) do
-    user
-    |> User.changeset(attrs)
-    |> Repo.update()
+    changeset = User.changeset(user, attrs)
+
+    # If email is being changed, clear email verification
+    changeset =
+      if Ecto.Changeset.get_change(changeset, :email) do
+        Ecto.Changeset.put_change(changeset, :email_confirmed_at, nil)
+      else
+        changeset
+      end
+
+    Repo.update(changeset)
   end
 
   @doc """
@@ -1120,18 +1136,18 @@ defmodule Authify.Accounts do
   end
 
   @doc """
-  Gets user accessible applications through their application groups.
+  Gets user accessible applications through their groups.
   """
   def get_user_accessible_applications(%User{} = user, %Organization{} = organization) do
-    # Get all application groups that the user belongs to
-    user_application_group_ids =
-      from(uag in UserApplicationGroup,
-        where: uag.user_id == ^user.id,
-        select: uag.application_group_id
+    # Get all groups that the user belongs to
+    user_group_ids =
+      from(gm in GroupMembership,
+        where: gm.user_id == ^user.id,
+        select: gm.group_id
       )
       |> Repo.all()
 
-    if Enum.empty?(user_application_group_ids) do
+    if Enum.empty?(user_group_ids) do
       %{
         oauth2_applications: [],
         saml_service_providers: []
@@ -1139,9 +1155,9 @@ defmodule Authify.Accounts do
     else
       # Get all application members for those groups
       application_members =
-        from(agm in ApplicationGroupMember,
-          where: agm.application_group_id in ^user_application_group_ids,
-          select: {agm.application_id, agm.application_type}
+        from(ga in GroupApplication,
+          where: ga.group_id in ^user_group_ids,
+          select: {ga.application_id, ga.application_type}
         )
         |> Repo.all()
 
@@ -1792,151 +1808,22 @@ defmodule Authify.Accounts do
     |> Repo.aggregate(:count, :id)
   end
 
-  ## Application Groups
-
   @doc """
-  Creates an application group for an organization.
+  Adds an application to a group.
   """
-  def create_application_group(organization, attrs) do
-    %ApplicationGroup{}
-    |> ApplicationGroup.changeset(attrs |> Map.put("organization_id", organization.id))
-    |> Repo.insert()
-  end
+  def add_application_to_group(%Group{} = group, application_id, application_type)
+      when application_type in ["oauth2", "saml"] do
+    # Handle both string and integer application IDs
+    app_id =
+      if is_binary(application_id), do: String.to_integer(application_id), else: application_id
 
-  @doc """
-  Adds an application to an application group.
-  """
-  def add_application_to_group(group, application_id, application_type) do
-    %ApplicationGroupMember{}
-    |> ApplicationGroupMember.changeset(%{
-      application_group_id: group.id,
-      application_id: application_id,
+    %GroupApplication{}
+    |> GroupApplication.changeset(%{
+      group_id: group.id,
+      application_id: app_id,
       application_type: application_type
     })
     |> Repo.insert()
-  end
-
-  @doc """
-  Adds a user to an application group.
-  """
-  def add_user_to_application_group(user, group) do
-    %UserApplicationGroup{}
-    |> UserApplicationGroup.changeset(%{
-      user_id: user.id,
-      application_group_id: group.id
-    })
-    |> Repo.insert()
-  end
-
-  @doc """
-  Removes a user from an application group.
-  """
-  def remove_user_from_application_group(user, group) do
-    case Repo.get_by(UserApplicationGroup, user_id: user.id, application_group_id: group.id) do
-      nil -> {:error, :not_found}
-      user_app_group -> Repo.delete(user_app_group)
-    end
-  end
-
-  @doc """
-  Lists application groups for an organization.
-  """
-  def list_application_groups(organization) do
-    from(ag in ApplicationGroup,
-      where: ag.organization_id == ^organization.id,
-      order_by: [asc: ag.name]
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns a filtered and sorted list of application groups for an organization.
-
-  ## Options
-    * `:sort` - Field to sort by (atom, e.g., :name, :inserted_at)
-    * `:order` - Sort order (:asc or :desc, defaults to :asc)
-    * `:search` - Text search across name and description fields
-
-  ## Examples
-
-      iex> list_application_groups_filtered(org, sort: :name, order: :desc, search: "admin")
-      [%ApplicationGroup{}, ...]
-  """
-  def list_application_groups_filtered(organization, opts \\ []) do
-    query =
-      from(ag in ApplicationGroup,
-        where: ag.organization_id == ^organization.id
-      )
-
-    query
-    |> apply_application_group_search(opts[:search])
-    |> apply_application_group_sorting(opts[:sort], opts[:order])
-    |> Repo.all()
-  end
-
-  defp apply_application_group_search(query, nil), do: query
-  defp apply_application_group_search(query, ""), do: query
-
-  defp apply_application_group_search(query, search_term) when is_binary(search_term) do
-    search_pattern = "%#{search_term}%"
-
-    where(
-      query,
-      [ag],
-      like(ag.name, ^search_pattern) or like(ag.description, ^search_pattern)
-    )
-  end
-
-  defp apply_application_group_sorting(query, nil, _), do: order_by(query, [ag], asc: ag.name)
-  defp apply_application_group_sorting(query, "", _), do: order_by(query, [ag], asc: ag.name)
-
-  defp apply_application_group_sorting(query, sort_field, order)
-       when sort_field in [:name, :description, :inserted_at, :updated_at] do
-    order_atom = if order == :desc or order == "desc", do: :desc, else: :asc
-    order_by(query, [ag], ^[{order_atom, sort_field}])
-  end
-
-  defp apply_application_group_sorting(query, _sort_field, _order),
-    do: order_by(query, [ag], asc: ag.name)
-
-  @doc """
-  Gets an application group.
-  """
-  def get_application_group!(id) do
-    Repo.get!(ApplicationGroup, id)
-  end
-
-  @doc """
-  Updates an application group.
-  """
-  def update_application_group(group, attrs) do
-    group
-    |> ApplicationGroup.changeset(attrs)
-    |> Repo.update()
-  end
-
-  @doc """
-  Deletes an application group.
-  """
-  def delete_application_group(group) do
-    Repo.delete(group)
-  end
-
-  @doc """
-  Returns an `%Ecto.Changeset{}` for tracking application group changes.
-  """
-  def change_application_group(%ApplicationGroup{} = application_group, attrs \\ %{}) do
-    ApplicationGroup.changeset(application_group, attrs)
-  end
-
-  @doc """
-  Returns an `%Ecto.Changeset{}` for application group forms without validations.
-  This is used for initial form rendering to avoid showing validation errors
-  before the user has attempted to submit the form.
-  """
-  def change_application_group_form(%ApplicationGroup{} = application_group, attrs \\ %{}) do
-    application_group
-    |> Ecto.Changeset.cast(attrs, [:name, :description, :is_active])
   end
 
   # Private helper functions for certificate management
@@ -1956,5 +1843,186 @@ defmodule Authify.Accounts do
 
     query
     |> Repo.update_all(set: [is_active: false])
+  end
+
+  ## Groups
+
+  @doc """
+  Returns the list of groups for an organization.
+  """
+  def list_groups(%Organization{id: org_id}) do
+    Group
+    |> where([g], g.organization_id == ^org_id)
+    |> order_by([g], asc: g.name)
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns a filtered and sorted list of groups for an organization.
+
+  ## Options
+    * `:sort` - Field to sort by (atom, e.g., :name, :inserted_at)
+    * `:order` - Sort order (:asc or :desc, defaults to :asc)
+    * `:search` - Text search across name and description fields
+    * `:status` - Filter by is_active status (boolean or "all")
+
+  ## Examples
+
+      iex> list_groups_filtered(org, sort: :name, order: :desc, search: "admin")
+      [%Group{}, ...]
+  """
+  def list_groups_filtered(%Organization{id: org_id}, opts \\ []) do
+    query =
+      from(g in Group,
+        where: g.organization_id == ^org_id
+      )
+
+    query
+    |> apply_group_filters(opts)
+    |> apply_group_search(opts[:search])
+    |> apply_group_sorting(opts[:sort], opts[:order])
+    |> Repo.all()
+  end
+
+  defp apply_group_filters(query, opts) do
+    maybe_filter_group_by_status(query, opts[:status])
+  end
+
+  defp maybe_filter_group_by_status(query, nil),
+    do: query
+
+  defp maybe_filter_group_by_status(query, ""),
+    do: query
+
+  defp maybe_filter_group_by_status(query, "all"), do: query
+
+  defp maybe_filter_group_by_status(query, true),
+    do: where(query, [g], g.is_active == true)
+
+  defp maybe_filter_group_by_status(query, "true"),
+    do: where(query, [g], g.is_active == true)
+
+  defp maybe_filter_group_by_status(query, false),
+    do: where(query, [g], g.is_active == false)
+
+  defp maybe_filter_group_by_status(query, "false"),
+    do: where(query, [g], g.is_active == false)
+
+  defp maybe_filter_group_by_status(query, _),
+    do: query
+
+  defp apply_group_search(query, nil), do: query
+  defp apply_group_search(query, ""), do: query
+
+  defp apply_group_search(query, search_term) when is_binary(search_term) do
+    search_pattern = "%#{search_term}%"
+
+    where(
+      query,
+      [g],
+      like(g.name, ^search_pattern) or like(g.description, ^search_pattern)
+    )
+  end
+
+  defp apply_group_sorting(query, nil, _),
+    do: order_by(query, [g], asc: g.name)
+
+  defp apply_group_sorting(query, "", _), do: order_by(query, [g], asc: g.name)
+
+  defp apply_group_sorting(query, sort_field, order)
+       when sort_field in [:name, :description, :is_active, :inserted_at, :updated_at] do
+    order_atom = if order == :asc or order == "asc", do: :asc, else: :desc
+    order_by(query, [g], ^[{order_atom, sort_field}])
+  end
+
+  defp apply_group_sorting(query, _sort_field, _order),
+    do: order_by(query, [g], asc: g.name)
+
+  @doc """
+  Gets a single group by ID within an organization.
+  """
+  def get_group!(id, %Organization{id: org_id}) do
+    Group
+    |> where([g], g.id == ^id and g.organization_id == ^org_id)
+    |> Repo.one!()
+  end
+
+  @doc """
+  Creates a group.
+  """
+  def create_group(attrs \\ %{}) do
+    %Group{}
+    |> Group.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates a group.
+  """
+  def update_group(%Group{} = group, attrs) do
+    group
+    |> Group.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes a group.
+  """
+  def delete_group(%Group{} = group) do
+    Repo.delete(group)
+  end
+
+  @doc """
+  Returns an `%Ecto.Changeset{}` for tracking group changes.
+  """
+  def change_group(%Group{} = group, attrs \\ %{}) do
+    Group.changeset(group, attrs)
+  end
+
+  @doc """
+  Adds a user to a group.
+  """
+  def add_user_to_group(%User{} = user, %Group{} = group) do
+    %GroupMembership{}
+    |> GroupMembership.changeset(%{user_id: user.id, group_id: group.id})
+    |> Repo.insert()
+  end
+
+  @doc """
+  Removes a user from a group.
+  """
+  def remove_user_from_group(%User{id: user_id}, %Group{id: group_id}) do
+    from(gm in GroupMembership,
+      where: gm.user_id == ^user_id and gm.group_id == ^group_id
+    )
+    |> Repo.delete_all()
+  end
+
+  @doc """
+  Lists all users in a group.
+  """
+  def list_group_members(%Group{} = group) do
+    group
+    |> Repo.preload(:users)
+    |> Map.get(:users)
+  end
+
+  @doc """
+  Lists all groups for a user.
+  """
+  def list_user_groups(%User{} = user) do
+    user
+    |> Repo.preload(:groups)
+    |> Map.get(:groups)
+  end
+
+  @doc """
+  Removes an application from a group by member ID.
+  """
+  def remove_application_from_group(%Group{id: group_id}, member_id) do
+    from(ga in GroupApplication,
+      where: ga.id == ^member_id and ga.group_id == ^group_id
+    )
+    |> Repo.delete_all()
   end
 end

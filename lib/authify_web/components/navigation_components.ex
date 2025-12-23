@@ -184,12 +184,12 @@ defmodule AuthifyWeb.NavigationComponents do
                 <a
                   class={[
                     "nav-link",
-                    if(@current_page == "application_groups", do: "active", else: "")
+                    if(@current_page == "groups", do: "active", else: "")
                   ]}
-                  aria-current={if @current_page == "application_groups", do: "page", else: false}
-                  href={"/#{@organization.slug}/application_groups"}
+                  aria-current={if @current_page == "groups", do: "page", else: false}
+                  href={"/#{@organization.slug}/groups"}
                 >
-                  <i class="bi bi-people-fill"></i> Application Groups
+                  <i class="bi bi-people-fill"></i> Groups
                 </a>
               </li>
             <% end %>

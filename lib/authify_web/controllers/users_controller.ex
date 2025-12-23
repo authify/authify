@@ -383,6 +383,96 @@ defmodule AuthifyWeb.UsersController do
     end
   end
 
+  def edit(conn, %{"id" => id}) do
+    organization = conn.assigns.current_organization
+    current_user = conn.assigns.current_user
+
+    # Check if user is admin
+    if Accounts.User.admin?(current_user, organization.id) ||
+         Accounts.User.super_admin?(current_user) do
+      target_user =
+        if organization.slug == "authify-global" do
+          Accounts.get_user_globally!(id)
+        else
+          user = Accounts.get_user!(id)
+          # Verify user belongs to current organization
+          if Accounts.User.member_of?(user, organization.id) do
+            user
+          else
+            conn
+            |> put_status(:not_found)
+            |> put_view(AuthifyWeb.ErrorHTML)
+            |> render(:"404")
+            |> halt()
+          end
+        end
+
+      changeset = Accounts.change_user_form(target_user)
+
+      render(conn, :edit,
+        changeset: changeset,
+        user: target_user,
+        organization: organization
+      )
+    else
+      conn
+      |> put_flash(:error, "You must be an administrator to edit users.")
+      |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users")
+      |> halt()
+    end
+  end
+
+  def update(conn, %{"id" => id, "user" => user_params}) do
+    organization = conn.assigns.current_organization
+    current_user = conn.assigns.current_user
+
+    # Check if user is admin
+    if Accounts.User.admin?(current_user, organization.id) ||
+         Accounts.User.super_admin?(current_user) do
+      target_user =
+        if organization.slug == "authify-global" do
+          Accounts.get_user_globally!(id)
+        else
+          user = Accounts.get_user!(id)
+          # Verify user belongs to current organization
+          if Accounts.User.member_of?(user, organization.id) do
+            user
+          else
+            conn
+            |> put_status(:not_found)
+            |> put_view(AuthifyWeb.ErrorHTML)
+            |> render(:"404")
+            |> halt()
+          end
+        end
+
+      case Accounts.update_user(target_user, user_params) do
+        {:ok, user} ->
+          # Log user update
+          log_audit_event(conn, :user_updated, user, %{
+            updated_user_email: user.email,
+            updated_fields: Map.keys(user_params)
+          })
+
+          conn
+          |> put_flash(:info, "#{Accounts.User.full_name(user)} has been updated successfully.")
+          |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users/#{user.id}")
+
+        {:error, changeset} ->
+          render(conn, :edit,
+            changeset: changeset,
+            user: target_user,
+            organization: organization
+          )
+      end
+    else
+      conn
+      |> put_flash(:error, "You must be an administrator to edit users.")
+      |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users")
+      |> halt()
+    end
+  end
+
   # Private helper for audit logging to reduce repetition
   defp log_audit_event(conn, event_type, target_user, metadata) do
     organization = conn.assigns.current_organization
