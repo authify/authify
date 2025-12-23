@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2025-12-22
+
+### Added
+
+- Username support in user creation and editing forms
+  - Optional field, unique per organization
+  - Displayed in user profile and user lists
+  - Can be set during user creation or updated later
+- Admin user editing capabilities
+  - Admins can now edit other users' names, usernames, and emails
+  - Full edit form with validation and error handling
+  - Proper permission checks (admin or global admin required)
+  - Edit buttons added to user detail and index pages
+  - Audit logging for all user updates
+- Email verification security enhancement
+  - Email verification is automatically cleared when email address changes
+  - Applies to both admin-initiated and self-service profile updates
+  - Prevents security bypass via email change
+  - Comprehensive test coverage for verification reset behavior
+- Groups system for application access management
+  - Replaces legacy ApplicationGroups with new Groups model
+  - Many-to-many relationships with users via GroupMembership join table
+  - Polymorphic ApplicationAssignment for both OAuth2 and SAML applications
+  - Complete CRUD interface for group management
+  - Member management UI for adding/removing users and applications
+  - SAML group membership attributes in SAML assertions
+
+### Changed
+
+- Consolidated Groups system architecture
+  - Removed legacy ApplicationGroups (2,522 lines of code removed)
+  - Navigation updated to remove ApplicationGroups references
+  - Groups now support both OAuth and SAML applications in a unified model
+  - Simplified data model with clearer relationships
+
+### Fixed
+
+- Fixed template bugs in group views accessing nested user fields
+  - Group show and manage_members templates now correctly access User objects
+  - Resolved "key :user_groups not found" errors
+
 ## [0.6.4] - 2025-12-20
 
 ### Fixed
@@ -374,7 +415,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.6.4...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/authify/authify/compare/v0.6.4...v0.7.0
 [0.6.4]: https://github.com/authify/authify/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/authify/authify/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/authify/authify/compare/v0.6.1...v0.6.2
