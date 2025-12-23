@@ -154,40 +154,4 @@ defmodule Authify.AccountsFixtures do
 
     invitation
   end
-
-  @doc """
-  Generate a unique application group name.
-  """
-  def unique_application_group_name, do: "Test Group #{System.unique_integer()}"
-
-  @doc """
-  Generate an application group.
-  """
-  def application_group_fixture(attrs \\ %{}) do
-    # Convert to map if it's a keyword list
-    attrs = if is_list(attrs), do: Enum.into(attrs, %{}), else: attrs
-
-    # Extract organization from attrs or use default
-    organization = Map.get(attrs, :organization) || organization_fixture()
-
-    # Remove organization from attrs and convert remaining attrs to string keys
-    group_attrs =
-      attrs
-      |> Map.drop([:organization])
-      |> Enum.map(fn {k, v} -> {to_string(k), v} end)
-      |> Enum.into(%{})
-
-    # Merge with defaults (string keys only)
-    group_attrs =
-      %{
-        "name" => unique_application_group_name(),
-        "description" => "A test application group",
-        "is_active" => true
-      }
-      |> Map.merge(group_attrs)
-
-    {:ok, group} = Accounts.create_application_group(organization, group_attrs)
-
-    group
-  end
 end

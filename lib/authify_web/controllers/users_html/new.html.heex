@@ -92,6 +92,27 @@
                 <% end %>
               </div>
 
+              <div class="mb-3">
+                <label for="user_username" class="form-label">Username</label>
+                <input
+                  type="text"
+                  name="user[username]"
+                  id="user_username"
+                  class="form-control"
+                  placeholder="johndoe"
+                  value={
+                    Map.get(@changeset.changes, :username) ||
+                      Map.get(@changeset.data, :username) || ""
+                  }
+                />
+                <div class="form-text">
+                  <small>Username must be unique within this organization. Optional field.</small>
+                </div>
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :username) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
               <div class="row">
                 <div class="col-md-6">
                   <div class="mb-3">

@@ -235,13 +235,22 @@
                   {Calendar.strftime(user_item.inserted_at, "%b %d, %Y")}
                 </td>
                 <td class="text-end">
-                  <a
-                    href={~p"/#{@current_organization.slug}/users/#{user_item.id}"}
-                    class="btn btn-outline-primary btn-sm"
-                    title="View Details"
-                  >
-                    <i class="bi bi-eye"></i>
-                  </a>
+                  <div class="btn-group btn-group-sm">
+                    <a
+                      href={~p"/#{@current_organization.slug}/users/#{user_item.id}"}
+                      class="btn btn-outline-primary"
+                      title="View Details"
+                    >
+                      <i class="bi bi-eye"></i>
+                    </a>
+                    <a
+                      href={~p"/#{@current_organization.slug}/users/#{user_item.id}/edit"}
+                      class="btn btn-outline-secondary"
+                      title="Edit"
+                    >
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                  </div>
                 </td>
               </tr>
             </tbody>

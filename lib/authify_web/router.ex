@@ -181,7 +181,7 @@ defmodule AuthifyWeb.Router do
     patch "/settings/configuration", ConfigurationController, :update
 
     # User management (works for both regular and global organizations)
-    resources "/users", UsersController, only: [:index, :show, :new, :create]
+    resources "/users", UsersController, only: [:index, :show, :new, :create, :edit, :update]
     patch "/users/:id/promote_global", UsersController, :promote_to_global_admin
     patch "/users/:id/demote_global", UsersController, :demote_from_global_admin
     patch "/users/:id/role/:role", UsersController, :update_role
@@ -207,21 +207,7 @@ defmodule AuthifyWeb.Router do
     patch "/certificates/:id/activate", CertificatesController, :activate
     patch "/certificates/:id/deactivate", CertificatesController, :deactivate
 
-    # Application Groups management
-    resources "/application_groups", ApplicationGroupsController
-    get "/application_groups/:id/members", ApplicationGroupsController, :manage_members
-    post "/application_groups/:id/users", ApplicationGroupsController, :add_user
-    delete "/application_groups/:id/users/:user_id", ApplicationGroupsController, :remove_user
-
-    post "/application_groups/:id/applications",
-         ApplicationGroupsController,
-         :add_application
-
-    delete "/application_groups/:id/applications/:member_id",
-           ApplicationGroupsController,
-           :remove_application
-
-    # Groups management (replaces ApplicationGroups)
+    # Groups management
     resources "/groups", GroupController
     get "/groups/:id/members", GroupController, :manage_members
     post "/groups/:id/users", GroupController, :add_user
@@ -296,13 +282,6 @@ defmodule AuthifyWeb.Router do
     get "/invitations/:id", InvitationsController, :show
     put "/invitations/:id", InvitationsController, :update
     delete "/invitations/:id", InvitationsController, :delete
-
-    # Application Groups Management
-    get "/application-groups", ApplicationGroupsController, :index
-    post "/application-groups", ApplicationGroupsController, :create
-    get "/application-groups/:id", ApplicationGroupsController, :show
-    put "/application-groups/:id", ApplicationGroupsController, :update
-    delete "/application-groups/:id", ApplicationGroupsController, :delete
 
     # OAuth Application Management
     get "/applications", ApplicationsController, :index

@@ -28,11 +28,12 @@ defmodule AuthifyWeb.AppLinkControllerTest do
         "user"
       )
 
-    # Create an application group
+    # Create a group
     {:ok, group} =
-      Accounts.create_application_group(organization, %{
+      Accounts.create_group(%{
         "name" => "Test Apps",
-        "description" => "Test application group"
+        "description" => "Test group",
+        "organization_id" => organization.id
       })
 
     # Create a test OAuth application
@@ -86,7 +87,7 @@ defmodule AuthifyWeb.AppLinkControllerTest do
       organization: org
     } do
       # Add user to group
-      {:ok, _} = Accounts.add_user_to_application_group(user, group)
+      {:ok, _} = Accounts.add_user_to_group(user, group)
 
       conn = get(conn, ~p"/#{org.slug}/user/apps/oauth2/#{oauth_app.id}")
 
@@ -127,7 +128,7 @@ defmodule AuthifyWeb.AppLinkControllerTest do
       organization: org
     } do
       # Add user to group
-      {:ok, _} = Accounts.add_user_to_application_group(user, group)
+      {:ok, _} = Accounts.add_user_to_group(user, group)
 
       conn = get(conn, ~p"/#{org.slug}/user/apps/saml/#{saml_sp.id}")
 
