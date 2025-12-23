@@ -426,6 +426,124 @@ defmodule AuthifyWeb.OAuthControllerTest do
       response = json_response(conn, 401)
       assert response["error"] == "invalid_token"
     end
+
+    test "returns groups claim when groups scope is requested", %{
+      conn: conn,
+      user: user,
+      organization: organization
+    } do
+      # Create groups
+      {:ok, group1} =
+        Authify.Accounts.create_group(%{
+          "name" => "Developers",
+          "description" => "Development team",
+          "organization_id" => organization.id
+        })
+
+      {:ok, group2} =
+        Authify.Accounts.create_group(%{
+          "name" => "Admins",
+          "description" => "Admin team",
+          "organization_id" => organization.id
+        })
+
+      # Add user to groups
+      {:ok, _} = Authify.Accounts.add_user_to_group(user, group1)
+      {:ok, _} = Authify.Accounts.add_user_to_group(user, group2)
+
+      # Create application and access token with groups scope
+      application = application_fixture(organization: organization)
+
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "profile", "email", "groups"]
+        )
+
+      {:ok, result} = Authify.OAuth.exchange_authorization_code(auth_code, application)
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{result.access_token.token}")
+        |> get(~p"/#{organization.slug}/oauth/userinfo")
+
+      response = json_response(conn, 200)
+      assert response["sub"] == to_string(user.id)
+      assert response["email"] == user.email
+      assert is_list(response["groups"])
+      assert "Developers" in response["groups"]
+      assert "Admins" in response["groups"]
+      assert length(response["groups"]) == 2
+    end
+
+    test "does not return groups claim when groups scope is not requested", %{
+      conn: conn,
+      user: user,
+      organization: organization
+    } do
+      # Create a group and add user to it
+      {:ok, group} =
+        Authify.Accounts.create_group(%{
+          "name" => "Test Group",
+          "description" => "Test",
+          "organization_id" => organization.id
+        })
+
+      {:ok, _} = Authify.Accounts.add_user_to_group(user, group)
+
+      # Create application and access token WITHOUT groups scope
+      application = application_fixture(organization: organization)
+
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "profile", "email"]
+        )
+
+      {:ok, result} = Authify.OAuth.exchange_authorization_code(auth_code, application)
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{result.access_token.token}")
+        |> get(~p"/#{organization.slug}/oauth/userinfo")
+
+      response = json_response(conn, 200)
+      assert response["sub"] == to_string(user.id)
+      assert response["email"] == user.email
+      refute Map.has_key?(response, "groups")
+    end
+
+    test "returns empty groups array when user has no groups", %{
+      conn: conn,
+      user: user,
+      organization: organization
+    } do
+      # Create application and access token with groups scope
+      application = application_fixture(organization: organization)
+
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "groups"]
+        )
+
+      {:ok, result} = Authify.OAuth.exchange_authorization_code(auth_code, application)
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{result.access_token.token}")
+        |> get(~p"/#{organization.slug}/oauth/userinfo")
+
+      response = json_response(conn, 200)
+      assert response["sub"] == to_string(user.id)
+      assert response["groups"] == []
+    end
   end
 
   describe "OAuth security and edge cases" do

@@ -172,7 +172,16 @@ defmodule AuthifyWeb.OAuthController do
         case OAuth.validate_access_token(token, organization) do
           {:ok, access_token} ->
             scopes = OAuth.AccessToken.scopes_list(access_token)
-            claims = OAuth.generate_userinfo_claims(access_token.user, scopes)
+
+            # Preload groups if groups scope is requested
+            user =
+              if "groups" in scopes do
+                Authify.Repo.preload(access_token.user, :groups)
+              else
+                access_token.user
+              end
+
+            claims = OAuth.generate_userinfo_claims(user, scopes)
             json(conn, claims)
 
           {:error, _} ->

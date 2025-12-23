@@ -569,7 +569,23 @@ defmodule Authify.OAuth do
     })
   end
 
+  defp add_scope_claims("groups", claims, user) do
+    groups = get_user_groups(user)
+    Map.put(claims, "groups", groups)
+  end
+
   defp add_scope_claims(_, claims, _user), do: claims
+
+  defp get_user_groups(%User{groups: groups}) when is_list(groups) do
+    # Groups are already preloaded, extract names
+    Enum.map(groups, & &1.name)
+  end
+
+  defp get_user_groups(%User{} = user) do
+    # Groups not preloaded, fetch them
+    user = Repo.preload(user, :groups)
+    Enum.map(user.groups, & &1.name)
+  end
 
   @doc """
   Cleanup expired authorization codes and access tokens.
