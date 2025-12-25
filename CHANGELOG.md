@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2025-12-24
+
+### Added
+
+- **SAML Provider Management API Documentation**
+  - Comprehensive OpenAPI documentation for SAML provider endpoints (GET, POST, PUT, DELETE)
+  - Detailed examples showing mustache-style attribute mapping templates
+  - Request/response schemas with full field descriptions
+  - Security scopes and authentication requirements documented
+
 ## [0.8.0] - 2025-12-24
 
 ### Added
@@ -439,7 +449,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/authify/authify/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/authify/authify/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/authify/authify/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/authify/authify/compare/v0.6.4...v0.7.0
