@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2025-12-24
+
+### Added
+
+- **Mustache-style template interpolation for SAML attribute mapping**
+  - True regex-based `{{field_name}}` placeholder parsing for SAML attributes
+  - Support for complex multi-field templates like `"{{first_name}} {{last_name}}"`
+  - Smart handling of multi-valued attributes (e.g., groups) - returns list directly when `{{groups}}` is the sole template
+  - Graceful handling of nil values and whitespace in placeholders
+  - Updated default SAML attribute mapping to use new mustache format
+  - Comprehensive test coverage with 8 new test cases for template interpolation
+  - All 730 tests passing
+
 ## [0.7.1] - 2025-12-22
 
 ### Added
@@ -426,7 +439,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/authify/authify/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/authify/authify/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/authify/authify/compare/v0.6.4...v0.7.0
 [0.6.4]: https://github.com/authify/authify/compare/v0.6.3...v0.6.4
