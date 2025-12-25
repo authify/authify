@@ -151,11 +151,13 @@ defmodule AuthifyWeb.SAMLProvidersHTML do
           id="service_provider_attribute_mapping"
           class="form-control font-monospace"
           rows="6"
-          placeholder='{"email": "email", "first_name": "first_name", "last_name": "last_name", "name": "{{first_name}} {{last_name}}"}'
+          placeholder='{"email": "{{email}}", "displayName": "{{first_name}} {{last_name}}", "groups": "{{groups}}"}'
         ><%= Map.get(@changeset.changes, :attribute_mapping) || Map.get(@changeset.data, :attribute_mapping) || Authify.SAML.ServiceProvider.default_attribute_mapping() %></textarea>
         <div class="form-text">
-          Maps user fields to SAML assertion attributes. Use <code>{"{{ }}"}</code>
-          syntax for templates (e.g., <code>{"{{first_name}} {{last_name}}"}</code>). Default mapping is usually sufficient.
+          Maps SAML attribute names to user field templates using mustache-style
+          <code>{{"{{ }}"}}</code>
+          syntax.
+          Available fields: <code>email</code>, <code>username</code>, <code>first_name</code>, <code>last_name</code>, <code>groups</code>.
         </div>
         <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :attribute_mapping) || []) do %>
           <div class="invalid-feedback d-block">{msg}</div>

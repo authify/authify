@@ -111,12 +111,7 @@ defmodule Authify.SAML.ServiceProvider do
   end
 
   def default_attribute_mapping do
-    %{
-      "email" => "email",
-      "first_name" => "first_name",
-      "last_name" => "last_name",
-      "name" => "{{first_name}} {{last_name}}"
-    }
+    get_default_mapping()
     |> Jason.encode!()
   end
 
@@ -134,10 +129,12 @@ defmodule Authify.SAML.ServiceProvider do
 
   defp get_default_mapping do
     %{
-      "email" => "email",
-      "first_name" => "first_name",
-      "last_name" => "last_name",
-      "name" => "{{first_name}} {{last_name}}"
+      "email" => "{{email}}",
+      "firstName" => "{{first_name}}",
+      "lastName" => "{{last_name}}",
+      "displayName" => "{{first_name}} {{last_name}}",
+      "username" => "{{username}}",
+      "groups" => "{{groups}}"
     }
   end
 end

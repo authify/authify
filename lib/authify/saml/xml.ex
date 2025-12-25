@@ -387,14 +387,69 @@ defmodule Authify.SAML.XML do
   end
 
   defp get_user_attribute(%User{} = user, field) do
+    # Always use template interpolation for consistency
+    interpolate_template(field, user)
+  end
+
+  defp get_simple_user_field(%User{} = user, field) do
     case field do
       "email" -> user.email
       "first_name" -> user.first_name
       "last_name" -> user.last_name
       "username" -> user.username
-      "{{first_name}} {{last_name}}" -> "#{user.first_name} #{user.last_name}"
       "groups" -> get_user_groups(user)
       _ -> nil
+    end
+  end
+
+  defp interpolate_template(template, %User{} = user) do
+    # Find all {{field_name}} patterns
+    placeholders = Regex.scan(~r/\{\{([^}]+)\}\}/, template)
+
+    # If template has only one placeholder and it's the entire template,
+    # return the raw value (which could be a list) so build_attribute_statements
+    # can create multiple AttributeValue elements
+    case placeholders do
+      [[full_match, field_name]] ->
+        trimmed_field = String.trim(field_name)
+        # Check if the placeholder is the entire template
+        if String.trim(template) == String.trim(full_match) do
+          # Single placeholder that is the entire template - return raw value
+          get_simple_user_field(user, trimmed_field)
+        else
+          # Template has other text - interpolate as string
+          interpolate_as_string(template, placeholders, user)
+        end
+
+      _ ->
+        # Multiple placeholders or empty - interpolate as string
+        interpolate_as_string(template, placeholders, user)
+    end
+  end
+
+  defp interpolate_as_string(template, placeholders, user) do
+    placeholders
+    |> Enum.reduce(template, fn [full_match, field_name], acc ->
+      # Trim whitespace from field name
+      field_name = String.trim(field_name)
+      # Get the value for this field
+      value = get_simple_user_field(user, field_name)
+
+      # Replace the placeholder with the value (or empty string if nil)
+      replacement =
+        case value do
+          nil -> ""
+          val when is_binary(val) -> val
+          val when is_list(val) -> Enum.join(val, ", ")
+          val -> to_string(val)
+        end
+
+      String.replace(acc, full_match, replacement)
+    end)
+    |> String.trim()
+    |> case do
+      "" -> nil
+      result -> result
     end
   end
 

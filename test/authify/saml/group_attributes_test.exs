@@ -54,10 +54,10 @@ defmodule Authify.SAML.GroupAttributesTest do
           organization_id: org.id,
           attribute_mapping:
             Jason.encode!(%{
-              "username" => "username",
-              "email" => "email",
+              "username" => "{{username}}",
+              "email" => "{{email}}",
               "displayName" => "{{first_name}} {{last_name}}",
-              "memberOf" => "groups"
+              "memberOf" => "{{groups}}"
             })
         })
 

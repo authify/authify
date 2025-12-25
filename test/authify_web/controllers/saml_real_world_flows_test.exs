@@ -29,9 +29,9 @@ defmodule AuthifyWeb.SAMLRealWorldFlowsTest do
           "organization_id" => org.id,
           "attribute_mapping" =>
             Jason.encode!(%{
-              "email" => "email",
-              "first_name" => "firstName",
-              "last_name" => "lastName"
+              "email" => "{{email}}",
+              "firstName" => "{{first_name}}",
+              "lastName" => "{{last_name}}"
             }),
           "is_active" => true
         })
@@ -43,7 +43,7 @@ defmodule AuthifyWeb.SAMLRealWorldFlowsTest do
           "acs_url" => "https://workday.enterprise.com/saml/acs",
           "sls_url" => "https://workday.enterprise.com/saml/sls",
           "organization_id" => org.id,
-          "attribute_mapping" => Jason.encode!(%{"email" => "mail"}),
+          "attribute_mapping" => Jason.encode!(%{"mail" => "{{email}}"}),
           "is_active" => true
         })
 
@@ -188,9 +188,9 @@ defmodule AuthifyWeb.SAMLRealWorldFlowsTest do
           "organization_id" => org.id,
           "attribute_mapping" =>
             Jason.encode!(%{
-              "email" => "emailAddress",
-              "first_name" => "givenName",
-              "last_name" => "familyName"
+              "emailAddress" => "{{email}}",
+              "givenName" => "{{first_name}}",
+              "familyName" => "{{last_name}}"
             }),
           "is_active" => true
         })

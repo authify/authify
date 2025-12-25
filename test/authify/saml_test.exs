@@ -432,4 +432,257 @@ defmodule Authify.SAMLTest do
       assert length(remaining_sessions) == 1
     end
   end
+
+  describe "attribute mapping with mustache interpolation" do
+    test "interpolates simple field placeholders" do
+      organization = organization_fixture()
+
+      user =
+        user_for_organization_fixture(organization, %{
+          "email" => "test@example.com",
+          "first_name" => "John",
+          "last_name" => "Doe",
+          "username" => "johndoe"
+        })
+
+      sp =
+        service_provider_fixture(%{
+          organization: organization,
+          attribute_mapping:
+            Jason.encode!(%{
+              "email" => "{{email}}",
+              "username" => "{{username}}",
+              "firstName" => "{{first_name}}",
+              "lastName" => "{{last_name}}"
+            })
+        })
+
+      session = saml_session_fixture(%{user: user, service_provider: sp})
+      assert {:ok, response} = SAML.generate_saml_response(session, sp, user)
+
+      assert String.contains?(response, ~s(<saml2:Attribute Name="email">))
+
+      assert String.contains?(
+               response,
+               ~s(<saml2:AttributeValue>test@example.com</saml2:AttributeValue>)
+             )
+
+      assert String.contains?(response, ~s(<saml2:Attribute Name="firstName">))
+      assert String.contains?(response, ~s(<saml2:AttributeValue>John</saml2:AttributeValue>))
+      assert String.contains?(response, ~s(<saml2:Attribute Name="lastName">))
+      assert String.contains?(response, ~s(<saml2:AttributeValue>Doe</saml2:AttributeValue>))
+      assert String.contains?(response, ~s(<saml2:Attribute Name="username">))
+      assert String.contains?(response, ~s(<saml2:AttributeValue>johndoe</saml2:AttributeValue>))
+    end
+
+    test "interpolates multiple fields in a single template" do
+      organization = organization_fixture()
+
+      user =
+        user_for_organization_fixture(organization, %{
+          "email" => "jane@example.com",
+          "first_name" => "Jane",
+          "last_name" => "Smith"
+        })
+
+      sp =
+        service_provider_fixture(%{
+          organization: organization,
+          attribute_mapping:
+            Jason.encode!(%{
+              "displayName" => "{{first_name}} {{last_name}}",
+              "fullName" => "{{last_name}}, {{first_name}}",
+              "emailWithName" => "{{first_name}} {{last_name}} <{{email}}>"
+            })
+        })
+
+      session = saml_session_fixture(%{user: user, service_provider: sp})
+      assert {:ok, response} = SAML.generate_saml_response(session, sp, user)
+
+      assert String.contains?(response, ~s(<saml2:Attribute Name="displayName">))
+
+      assert String.contains?(
+               response,
+               ~s(<saml2:AttributeValue>Jane Smith</saml2:AttributeValue>)
+             )
+
+      assert String.contains?(response, ~s(<saml2:Attribute Name="fullName">))
+
+      assert String.contains?(
+               response,
+               ~s(<saml2:AttributeValue>Smith, Jane</saml2:AttributeValue>)
+             )
+
+      assert String.contains?(response, ~s(<saml2:Attribute Name="emailWithName">))
+
+      assert String.contains?(
+               response,
+               ~s(<saml2:AttributeValue>Jane Smith &lt;jane@example.com&gt;</saml2:AttributeValue>)
+             )
+    end
+
+    test "handles whitespace in template placeholders" do
+      organization = organization_fixture()
+
+      user =
+        user_for_organization_fixture(organization, %{
+          "first_name" => "Bob",
+          "last_name" => "Johnson"
+        })
+
+      sp =
+        service_provider_fixture(%{
+          organization: organization,
+          attribute_mapping:
+            Jason.encode!(%{
+              "name" => "{{ first_name }} {{ last_name }}"
+            })
+        })
+
+      session = saml_session_fixture(%{user: user, service_provider: sp})
+      assert {:ok, response} = SAML.generate_saml_response(session, sp, user)
+
+      assert String.contains?(
+               response,
+               ~s(<saml2:AttributeValue>Bob Johnson</saml2:AttributeValue>)
+             )
+    end
+
+    test "handles missing field values gracefully" do
+      organization = organization_fixture()
+
+      user =
+        user_for_organization_fixture(organization, %{
+          "first_name" => "Alice",
+          "last_name" => nil
+        })
+
+      sp =
+        service_provider_fixture(%{
+          organization: organization,
+          attribute_mapping:
+            Jason.encode!(%{
+              "displayName" => "{{first_name}} {{last_name}}"
+            })
+        })
+
+      session = saml_session_fixture(%{user: user, service_provider: sp})
+      assert {:ok, response} = SAML.generate_saml_response(session, sp, user)
+
+      # Should contain "Alice" but handle nil last_name gracefully
+      assert String.contains?(response, ~s(<saml2:AttributeValue>Alice</saml2:AttributeValue>))
+    end
+
+    test "handles multi-valued attributes like groups" do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+
+      # Create groups and assign to user
+      {:ok, group1} =
+        Authify.Accounts.create_group(%{
+          name: "Developers",
+          organization_id: organization.id
+        })
+
+      {:ok, group2} =
+        Authify.Accounts.create_group(%{
+          name: "Admins",
+          organization_id: organization.id
+        })
+
+      Authify.Accounts.add_user_to_group(user, group1)
+      Authify.Accounts.add_user_to_group(user, group2)
+
+      sp =
+        service_provider_fixture(%{
+          organization: organization,
+          attribute_mapping:
+            Jason.encode!(%{
+              "groups" => "{{groups}}"
+            })
+        })
+
+      # Reload user with groups preloaded
+      user = Authify.Repo.preload(user, :groups, force: true)
+      session = saml_session_fixture(%{user: user, service_provider: sp})
+      assert {:ok, response} = SAML.generate_saml_response(session, sp, user)
+
+      assert String.contains?(response, ~s(<saml2:Attribute Name="groups">))
+
+      assert String.contains?(
+               response,
+               ~s(<saml2:AttributeValue>Developers</saml2:AttributeValue>)
+             )
+
+      assert String.contains?(response, ~s(<saml2:AttributeValue>Admins</saml2:AttributeValue>))
+    end
+
+    test "uses default attribute mapping when none specified" do
+      organization = organization_fixture()
+
+      user =
+        user_for_organization_fixture(organization, %{
+          "email" => "default@example.com",
+          "first_name" => "Default",
+          "last_name" => "User",
+          "username" => "defaultuser"
+        })
+
+      sp =
+        service_provider_fixture(%{
+          organization: organization,
+          attribute_mapping: nil
+        })
+
+      session = saml_session_fixture(%{user: user, service_provider: sp})
+      assert {:ok, response} = SAML.generate_saml_response(session, sp, user)
+
+      # Should use default mapping
+      assert String.contains?(
+               response,
+               ~s(<saml2:AttributeValue>default@example.com</saml2:AttributeValue>)
+             )
+
+      assert String.contains?(response, ~s(<saml2:AttributeValue>Default</saml2:AttributeValue>))
+      assert String.contains?(response, ~s(<saml2:AttributeValue>User</saml2:AttributeValue>))
+
+      assert String.contains?(
+               response,
+               ~s(<saml2:AttributeValue>Default User</saml2:AttributeValue>)
+             )
+
+      assert String.contains?(
+               response,
+               ~s(<saml2:AttributeValue>defaultuser</saml2:AttributeValue>)
+             )
+    end
+
+    test "properly escapes HTML special characters in attribute values" do
+      organization = organization_fixture()
+
+      user =
+        user_for_organization_fixture(organization, %{
+          "email" => "test@example.com",
+          "first_name" => "John<script>",
+          "last_name" => "Doe&Co"
+        })
+
+      sp =
+        service_provider_fixture(%{
+          organization: organization,
+          attribute_mapping:
+            Jason.encode!(%{
+              "displayName" => "{{first_name}} {{last_name}}"
+            })
+        })
+
+      session = saml_session_fixture(%{user: user, service_provider: sp})
+      assert {:ok, response} = SAML.generate_saml_response(session, sp, user)
+
+      # Should escape HTML entities
+      assert String.contains?(response, "John&lt;script&gt; Doe&amp;Co")
+      refute String.contains?(response, "<script>")
+      refute String.contains?(response, "&Co")
+    end
+  end
 end
