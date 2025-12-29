@@ -311,6 +311,18 @@ defmodule AuthifyWeb.Router do
     patch "/certificates/:id/deactivate", CertificatesController, :deactivate
     get "/certificates/:id/download/:type", CertificatesController, :download
 
+    # Group Management
+    get "/groups", GroupsController, :index
+    post "/groups", GroupsController, :create
+    get "/groups/:id", GroupsController, :show
+    put "/groups/:id", GroupsController, :update
+    delete "/groups/:id", GroupsController, :delete
+    get "/groups/:id/members", GroupsController, :members
+    post "/groups/:id/users", GroupsController, :add_user
+    delete "/groups/:id/users/:user_id", GroupsController, :remove_user
+    post "/groups/:id/applications", GroupsController, :add_application
+    delete "/groups/:id/applications/:member_id", GroupsController, :remove_application
+
     # Profile Management (user's own profile)
     get "/profile", ProfileController, :show
     put "/profile", ProfileController, :update
