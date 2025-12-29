@@ -55,6 +55,8 @@ defmodule AuthifyWeb.API.OpenAPI.Components.Security do
       "management_app:write" => "Manage Management API applications",
       "organizations:read" => "Read organization configuration",
       "organizations:write" => "Manage organization configuration",
+      "profile:read" => "Read current user's profile",
+      "profile:write" => "Update current user's profile",
       "saml:read" => "Read SAML service providers",
       "saml:write" => "Manage SAML service providers",
       "users:read" => "Read users",

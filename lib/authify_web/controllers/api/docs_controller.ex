@@ -32,6 +32,7 @@ defmodule AuthifyWeb.API.DocsController do
     |> Map.merge(Paths.Certificates.build())
     |> Map.merge(Paths.SamlProviders.build())
     |> Map.merge(Paths.AuditLogs.build())
+    |> Map.merge(Paths.Profile.build())
   end
 
   defp build_components(base_url) do
@@ -51,5 +52,6 @@ defmodule AuthifyWeb.API.DocsController do
     |> Map.merge(Schemas.Applications.build())
     |> Map.merge(Schemas.Groups.build())
     |> Map.merge(Schemas.Certificates.build())
+    |> Map.merge(Schemas.Profile.build())
   end
 end

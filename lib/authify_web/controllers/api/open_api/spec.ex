@@ -76,6 +76,10 @@ defmodule AuthifyWeb.API.OpenAPI.Spec do
         description: "User management and role administration"
       },
       %{
+        name: "Profile",
+        description: "Current user's profile management and preferences"
+      },
+      %{
         name: "Invitations",
         description: "User invitation management"
       },
