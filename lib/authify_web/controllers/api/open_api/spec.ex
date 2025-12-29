@@ -8,11 +8,15 @@ defmodule AuthifyWeb.API.OpenAPI.Spec do
   @doc """
   Returns the OpenAPI info section.
   """
-  def info(base_url) do
+  def info(_base_url) do
+    app_version = Application.spec(:authify, :vsn) |> to_string()
+
     %{
       title: "Authify Management API",
       description: """
       Comprehensive REST API for managing Authify organizations, users, and OAuth applications.
+
+      **Application Version**: #{app_version}
 
       ## Features
       - **HATEOAS Compliance**: All responses include hypermedia links for navigation
@@ -29,8 +33,8 @@ defmodule AuthifyWeb.API.OpenAPI.Spec do
       """,
       version: "1.0.0",
       contact: %{
-        name: "Authify API Support",
-        url: "#{base_url}/developers/api"
+        name: "Authify Support",
+        url: "https://github.com/authify/authify"
       },
       license: %{
         name: "MIT",
