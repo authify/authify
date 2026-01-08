@@ -27,8 +27,10 @@ defmodule Authify.AuditLog.Event do
     saml_sp_created saml_sp_updated saml_sp_deleted
     application_group_created application_group_updated application_group_deleted
     organization_created organization_updated organization_deleted
-  certificate_created certificate_activated certificate_deactivated certificate_deleted
-  personal_access_token_created personal_access_token_deleted
+    certificate_created certificate_activated certificate_deactivated certificate_deleted
+    personal_access_token_created personal_access_token_deleted
+    mfa_enabled mfa_disabled mfa_verified mfa_failed
+    mfa_backup_codes_regenerated mfa_device_revoked mfa_all_devices_revoked
     settings_updated
     rate_limit_exceeded
     permission_denied scope_denied

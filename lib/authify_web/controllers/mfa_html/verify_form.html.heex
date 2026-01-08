@@ -1,0 +1,128 @@
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+      <div class="card shadow mt-5">
+        <div class="card-header text-center bg-primary text-white">
+          <h4 class="mb-0">
+            <i class="bi bi-shield-lock"></i> Multi-Factor Authentication
+          </h4>
+        </div>
+        <div class="card-body p-4">
+          <p class="text-center mb-4">
+            Enter the 6-digit code from your authenticator app to continue.
+          </p>
+
+          <.form
+            for={%{}}
+            action={~p"/mfa/verify"}
+            method="post"
+            id="mfa-verify-form"
+          >
+            <div class="mb-3">
+              <label for="totp_code" class="form-label">Authentication Code</label>
+              <input
+                type="text"
+                name="totp_code"
+                id="totp_code"
+                class="form-control form-control-lg text-center"
+                placeholder="000000"
+                pattern="[0-9]{6}"
+                maxlength="6"
+                required
+                autofocus
+                autocomplete="off"
+                inputmode="numeric"
+              />
+              <%= if @error do %>
+                <div class="invalid-feedback d-block">{@error}</div>
+              <% end %>
+            </div>
+
+            <div class="form-check mb-3">
+              <input
+                type="checkbox"
+                name="remember_device"
+                id="remember_device"
+                class="form-check-input"
+                value="true"
+              />
+              <label class="form-check-label" for="remember_device">
+                Remember this device for 30 days
+              </label>
+            </div>
+
+            <div class="d-grid gap-2 mb-3">
+              <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-check-circle"></i> Verify
+              </button>
+            </div>
+
+            <hr />
+
+            <div class="text-center">
+              <p class="text-muted small mb-2">Lost access to your authenticator app?</p>
+              <a
+                href="#"
+                onclick="document.getElementById('backup-form').style.display='block'; document.getElementById('mfa-verify-form').style.display='none'; return false;"
+                class="btn btn-sm btn-outline-secondary"
+              >
+                <i class="bi bi-key"></i> Use Backup Code
+              </a>
+            </div>
+          </.form>
+
+          <.form
+            for={%{}}
+            action={~p"/mfa/verify"}
+            method="post"
+            id="backup-form"
+            style="display:none;"
+          >
+            <input type="hidden" name="use_backup" value="true" />
+
+            <div class="mb-3">
+              <label for="backup_code" class="form-label">Backup Code</label>
+              <input
+                type="text"
+                name="totp_code"
+                id="backup_code"
+                class="form-control form-control-lg text-center"
+                placeholder="XXXX-XXXX"
+                maxlength="9"
+                required
+                autocomplete="off"
+              />
+              <div class="form-text">
+                Enter one of your backup codes (format: XXXX-XXXX)
+              </div>
+              <%= if @error do %>
+                <div class="invalid-feedback d-block">{@error}</div>
+              <% end %>
+            </div>
+
+            <div class="d-grid gap-2 mb-3">
+              <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-check-circle"></i> Verify with Backup Code
+              </button>
+            </div>
+
+            <div class="text-center">
+              <a
+                href="#"
+                onclick="document.getElementById('backup-form').style.display='none'; document.getElementById('mfa-verify-form').style.display='block'; return false;"
+                class="btn btn-sm btn-link"
+              >
+                <i class="bi bi-arrow-left"></i> Back to Authenticator Code
+              </a>
+            </div>
+          </.form>
+        </div>
+        <div class="card-footer text-center">
+          <a href={~p"/login"} class="text-muted small">
+            <i class="bi bi-arrow-left"></i> Back to Login
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

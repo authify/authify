@@ -1,0 +1,158 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@user}
+      organization={@organization}
+      current_page="mfa"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Setup Multi-Factor Authentication</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@organization.slug}/profile"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left"></i> Back to Profile
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-qr-code"></i> Scan QR Code
+            </h5>
+          </div>
+          <div class="card-body">
+            <p class="mb-4">
+              Scan this QR code with your authenticator app to set up multi-factor authentication.
+            </p>
+
+            <div class="text-center mb-4">
+              <img
+                src={"data:image/png;base64,#{@qr_code_data_uri}"}
+                alt="QR Code for TOTP Setup"
+                class="img-fluid"
+                style="max-width: 300px;"
+              />
+            </div>
+
+            <div class="alert alert-info">
+              <h6><i class="bi bi-info-circle"></i> Can't scan the QR code?</h6>
+              <p class="mb-2">
+                <strong>Option 1:</strong>
+                Copy and paste this URL (supported by most modern authenticator apps):
+              </p>
+              <div class="mb-3">
+                <code
+                  class="d-block user-select-all small p-2 bg-white border rounded"
+                  style="word-break: break-all;"
+                >
+                  {@totp_uri}
+                </code>
+              </div>
+              <p class="mb-2">
+                <strong>Option 2:</strong> Enter this secret key manually:
+              </p>
+              <code class="user-select-all">{@manual_entry_key}</code>
+              <p class="small text-muted mt-2 mb-0">
+                You'll also need to enter your account name: <strong>{@user.email}</strong>
+              </p>
+            </div>
+
+            <.form
+              for={%{}}
+              action={~p"/#{@organization.slug}/profile/mfa/setup"}
+              method="post"
+              id="mfa-setup-form"
+            >
+              <div class="mb-3">
+                <label for="verification_code" class="form-label">
+                  Verification Code
+                </label>
+                <input
+                  type="text"
+                  name="verification_code"
+                  id="verification_code"
+                  class="form-control"
+                  placeholder="000000"
+                  pattern="[0-9]{6}"
+                  maxlength="6"
+                  required
+                  autofocus
+                  autocomplete="off"
+                />
+                <div class="form-text">
+                  Enter the 6-digit code from your authenticator app.
+                </div>
+                <%= if @error do %>
+                  <div class="invalid-feedback d-block">{@error}</div>
+                <% end %>
+              </div>
+
+              <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary btn-lg">
+                  <i class="bi bi-shield-check"></i> Enable Multi-Factor Authentication
+                </button>
+              </div>
+            </.form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> What is TOTP?
+            </h6>
+          </div>
+          <div class="card-body">
+            <p>
+              Time-based One-Time Password (TOTP) adds an extra layer of security to your account
+              by requiring a unique code from your phone along with your password when logging in.
+            </p>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-phone"></i> Recommended Authenticator Apps
+            </h6>
+          </div>
+          <div class="card-body">
+            <ul class="mb-0">
+              <li>Google Authenticator</li>
+              <li>Microsoft Authenticator</li>
+              <li>Authy</li>
+              <li>1Password</li>
+              <li>Bitwarden</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-shield-lock"></i> Security Tips
+            </h6>
+          </div>
+          <div class="card-body">
+            <ul class="mb-0">
+              <li>Keep your phone secure with a PIN or biometric lock</li>
+              <li>Save the backup codes that will be provided after setup</li>
+              <li>Don't share your verification codes with anyone</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

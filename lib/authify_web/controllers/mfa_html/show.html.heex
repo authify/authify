@@ -1,0 +1,312 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@user}
+      organization={@organization}
+      current_page="mfa"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Multi-Factor Authentication</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+          <a
+            href={~p"/#{@organization.slug}/profile"}
+            class="btn btn-outline-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left"></i> Back to Profile
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <!-- MFA Status Card -->
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-shield-lock"></i> TOTP Status
+            </h5>
+          </div>
+          <div class="card-body">
+            <%= if Authify.Accounts.User.totp_enabled?(@user) do %>
+              <p>
+                <span class="badge bg-success fs-6">
+                  <i class="bi bi-check-circle"></i> Enabled
+                </span>
+              </p>
+              <p class="text-muted mb-3">
+                Multi-factor authentication is protecting your account. <br />
+                <small>
+                  Enabled on: {Calendar.strftime(
+                    @user.totp_enabled_at,
+                    "%B %d, %Y at %I:%M %p"
+                  )}
+                </small>
+              </p>
+
+              <div class="alert alert-warning">
+                <h6><i class="bi bi-exclamation-triangle"></i> Disable MFA</h6>
+                <p class="mb-3">
+                  Disabling multi-factor authentication will make your account less secure.
+                  All trusted devices will be revoked.
+                </p>
+
+                <button
+                  type="button"
+                  class="btn btn-outline-danger btn-sm"
+                  data-bs-toggle="modal"
+                  data-bs-target="#disableMfaModal"
+                >
+                  <i class="bi bi-shield-x"></i> Disable MFA
+                </button>
+              </div>
+            <% else %>
+              <p>
+                <span class="badge bg-secondary fs-6">Not Enabled</span>
+              </p>
+              <p class="text-muted mb-3">
+                Add an extra layer of security to your account with multi-factor authentication.
+              </p>
+              <a
+                href={~p"/#{@organization.slug}/profile/mfa/setup"}
+                class="btn btn-primary"
+              >
+                <i class="bi bi-shield-plus"></i> Setup Multi-Factor Authentication
+              </a>
+            <% end %>
+          </div>
+        </div>
+
+        <%= if Authify.Accounts.User.totp_enabled?(@user) do %>
+          <!-- Backup Codes Card -->
+          <div class="card mt-3">
+            <div class="card-header">
+              <h5 class="card-title mb-0">
+                <i class="bi bi-key"></i> Backup Codes
+              </h5>
+            </div>
+            <div class="card-body">
+              <p class="mb-2">
+                Backup codes allow you to access your account if you lose access to your
+                authenticator app. Each code can only be used once.
+              </p>
+              <div class="d-flex align-items-center mb-3">
+                <div>
+                  <strong>{@backup_codes_count}</strong> backup codes remaining
+                </div>
+                <div class="ms-auto">
+                  <a
+                    href={~p"/#{@organization.slug}/profile/mfa/regenerate-codes"}
+                    data-method="post"
+                    class="btn btn-sm btn-outline-primary"
+                  >
+                    <i class="bi bi-arrow-clockwise"></i> Regenerate Codes
+                  </a>
+                </div>
+              </div>
+              <%= if @backup_codes_count < 3 do %>
+                <div class="alert alert-warning mb-0">
+                  <small>
+                    <i class="bi bi-exclamation-triangle"></i>
+                    You're running low on backup codes. Consider regenerating them.
+                  </small>
+                </div>
+              <% end %>
+            </div>
+          </div>
+          
+<!-- Trusted Devices Card -->
+          <div class="card mt-3">
+            <div class="card-header d-flex align-items-center">
+              <h5 class="card-title mb-0">
+                <i class="bi bi-phone"></i> Trusted Devices
+              </h5>
+              <%= if length(@trusted_devices) > 0 do %>
+                <div class="ms-auto">
+                  <a
+                    href={~p"/#{@organization.slug}/profile/mfa/devices"}
+                    data-method="delete"
+                    data-confirm="Are you sure you want to revoke all trusted devices? You will need to verify MFA on all devices again."
+                    class="btn btn-sm btn-outline-danger"
+                  >
+                    <i class="bi bi-x-circle"></i> Revoke All
+                  </a>
+                </div>
+              <% end %>
+            </div>
+            <div class="card-body">
+              <%= if length(@trusted_devices) > 0 do %>
+                <p class="mb-3">
+                  These devices won't require MFA verification for 30 days.
+                </p>
+                <div class="list-group">
+                  <%= for device <- Enum.take(@trusted_devices, 5) do %>
+                    <div class="list-group-item">
+                      <div class="d-flex w-100 justify-content-between align-items-start">
+                        <div>
+                          <h6 class="mb-1">
+                            <i class="bi bi-phone"></i> {device.device_name}
+                          </h6>
+                          <p class="mb-1 small text-muted">
+                            IP: {device.ip_address}<br />
+                            Last used: {Calendar.strftime(
+                              device.last_used_at,
+                              "%B %d, %Y at %I:%M %p"
+                            )}
+                            <br />
+                            Expires: {Calendar.strftime(
+                              device.expires_at,
+                              "%B %d, %Y"
+                            )}
+                          </p>
+                        </div>
+                        <a
+                          href={~p"/#{@organization.slug}/profile/mfa/devices/#{device.id}"}
+                          data-method="delete"
+                          data-confirm="Revoke this device?"
+                          class="btn btn-sm btn-outline-danger"
+                        >
+                          <i class="bi bi-x"></i> Revoke
+                        </a>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+                <%= if length(@trusted_devices) > 5 do %>
+                  <div class="mt-3 text-center">
+                    <a
+                      href={~p"/#{@organization.slug}/profile/mfa/devices"}
+                      class="btn btn-sm btn-outline-secondary"
+                    >
+                      View All Devices ({length(@trusted_devices)})
+                    </a>
+                  </div>
+                <% end %>
+              <% else %>
+                <p class="text-muted mb-0">
+                  <i class="bi bi-info-circle"></i>
+                  No trusted devices. Check "Remember this device" during login to skip MFA
+                  verification for 30 days.
+                </p>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-shield-check"></i> Security Tips
+            </h6>
+          </div>
+          <div class="card-body">
+            <ul class="mb-0">
+              <li>Keep your authenticator app secure</li>
+              <li>Save backup codes in a safe place</li>
+              <li>Regularly review trusted devices</li>
+              <li>Don't share verification codes</li>
+            </ul>
+          </div>
+        </div>
+
+        <%= if Authify.Accounts.User.totp_enabled?(@user) do %>
+          <div class="card mt-3">
+            <div class="card-header">
+              <h6 class="card-title mb-0">
+                <i class="bi bi-question-circle"></i> About Backup Codes
+              </h6>
+            </div>
+            <div class="card-body">
+              <p class="mb-0 small">
+                Backup codes are single-use codes that allow you to access your account if you
+                lose your phone or authenticator app. Store them in a secure location like a
+                password manager or safe.
+              </p>
+            </div>
+          </div>
+
+          <div class="card mt-3">
+            <div class="card-header">
+              <h6 class="card-title mb-0">
+                <i class="bi bi-info-circle"></i> Managing Devices
+              </h6>
+            </div>
+            <div class="card-body">
+              <p class="mb-0 small">
+                Trusted devices allow you to skip MFA verification for 30 days. Revoke devices
+                if you no longer use them or suspect unauthorized access.
+              </p>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+    
+<!-- Disable MFA Modal -->
+    <%= if Authify.Accounts.User.totp_enabled?(@user) do %>
+      <div
+        class="modal fade"
+        id="disableMfaModal"
+        tabindex="-1"
+        aria-labelledby="disableMfaModalLabel"
+        aria-hidden="true"
+      >
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="disableMfaModalLabel">
+                <i class="bi bi-shield-x"></i> Disable Multi-Factor Authentication
+              </h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              >
+              </button>
+            </div>
+            <.form
+              for={%{}}
+              action={~p"/#{@organization.slug}/profile/mfa"}
+              method="delete"
+            >
+              <div class="modal-body">
+                <div class="alert alert-warning">
+                  <i class="bi bi-exclamation-triangle"></i>
+                  This will make your account less secure and revoke all trusted devices.
+                </div>
+
+                <div class="mb-3">
+                  <label for="password_confirm" class="form-label">
+                    Enter your password to confirm
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    id="password_confirm"
+                    class="form-control"
+                    required
+                    autocomplete="current-password"
+                  />
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                  Cancel
+                </button>
+                <button type="submit" class="btn btn-danger">
+                  <i class="bi bi-shield-x"></i> Disable MFA
+                </button>
+              </div>
+            </.form>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </:main>
+</.two_column_layout>

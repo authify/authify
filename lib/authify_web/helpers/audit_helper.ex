@@ -629,6 +629,153 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   end
 
   @doc """
+  Logs successful MFA enablement events.
+  """
+  def log_mfa_enabled(conn, user, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :mfa_enabled,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs successful MFA disablement events.
+  """
+  def log_mfa_disabled(conn, user, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :mfa_disabled,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs successful MFA verification events during login.
+  """
+  def log_mfa_verified(conn, user, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "organization_slug" => user.organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :mfa_verified,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs failed MFA verification attempts during login.
+  """
+  def log_mfa_failed(conn, user, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "organization_slug" => user.organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :mfa_failed,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "failure",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs backup code regeneration events.
+  """
+  def log_mfa_backup_codes_regenerated(conn, user, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :mfa_backup_codes_regenerated,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs trusted device revocation events.
+  """
+  def log_mfa_device_revoked(conn, user, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :mfa_device_revoked,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs events where all trusted devices are revoked.
+  """
+  def log_mfa_all_devices_revoked(conn, user, opts \\ []) do
+    metadata =
+      %{
+        "user_id" => user.id,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :mfa_all_devices_revoked,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
   Converts changeset errors into a flat list of human-readable strings.
   """
   def changeset_errors(%Changeset{} = changeset) do

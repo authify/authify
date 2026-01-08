@@ -10,5 +10,6 @@ Config.CSRF: Missing CSRF Protections,lib/authify_web/router.ex:14,88CB4F
 
 XSS.SendResp: XSS in `send_resp`,lib/authify_web/controllers/saml_controller.ex:467,1D3AE37
 XSS.SendResp: XSS in `send_resp`,lib/authify_web/controllers/saml_controller.ex:426,483F23D
-Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:351,1F74DFA
-Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:348,67C7B97
+
+Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:368,60D9013
+Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:371,B8A16F

@@ -119,6 +119,15 @@ defmodule AuthifyWeb.Router do
     post "/invite/:token/accept", InvitationController, :accept_invitation
   end
 
+  # MFA verification during login (requires pending MFA session, not full auth)
+  scope "/mfa", AuthifyWeb do
+    pipe_through [:browser, :auth_endpoints]
+
+    get "/verify", MfaController, :verify_form
+    post "/verify", MfaController, :verify_code
+    get "/locked", MfaController, :locked
+  end
+
   # Logout doesn't need rate limiting (it's a DELETE and terminates sessions)
   scope "/", AuthifyWeb do
     pipe_through [:browser, :auth]
@@ -150,6 +159,17 @@ defmodule AuthifyWeb.Router do
     get "/profile/personal-access-tokens", ProfileController, :personal_access_tokens
     post "/profile/personal-access-tokens", ProfileController, :create_personal_access_token
     delete "/profile/personal-access-tokens/:id", ProfileController, :delete_personal_access_token
+
+    # MFA setup and management
+    get "/profile/mfa", MfaController, :show
+    get "/profile/mfa/setup", MfaController, :setup
+    post "/profile/mfa/setup", MfaController, :complete_setup
+    delete "/profile/mfa", MfaController, :disable
+    get "/profile/mfa/backup-codes", MfaController, :backup_codes
+    post "/profile/mfa/regenerate-codes", MfaController, :regenerate_codes
+    get "/profile/mfa/devices", MfaController, :list_devices
+    delete "/profile/mfa/devices/:id", MfaController, :revoke_device
+    delete "/profile/mfa/devices", MfaController, :revoke_all_devices
   end
 
   # Admin-only routes - require organization admin privileges
