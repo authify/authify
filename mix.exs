@@ -4,7 +4,7 @@ defmodule Authify.MixProject do
   def project do
     [
       app: :authify,
-      version: "0.9.2",
+      version: "0.10.0",
       elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -50,6 +50,7 @@ defmodule Authify.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:libcluster, "~> 3.4"},
       {:ecto_sql, "~> 3.13"},
+      {:eqrcode, "~> 0.2"},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:gettext, "~> 0.26"},
       {:guardian, "~> 2.3"},
@@ -57,6 +58,7 @@ defmodule Authify.MixProject do
       {:jason, "~> 1.2"},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:myxql, ">= 0.0.0"},
+      {:nimble_totp, "~> 1.0"},
       {:phoenix, "~> 1.8.1"},
       {:phoenix_ecto, "~> 4.5"},
       {:phoenix_html, "~> 4.1"},

@@ -26,6 +26,8 @@ defmodule Authify.Accounts.User do
              :email_verification_expires_at,
              :password,
              :password_confirmation,
+             :totp_secret,
+             :totp_backup_codes,
              :__meta__
            ]}
 
@@ -63,6 +65,12 @@ defmodule Authify.Accounts.User do
     field :theme_preference, :string, default: "auto"
     field :password, :string, virtual: true
     field :password_confirmation, :string, virtual: true
+
+    # TOTP MFA fields
+    field :totp_secret, :string
+    field :totp_enabled_at, :utc_datetime
+    field :totp_backup_codes, :string
+    field :totp_backup_codes_generated_at, :utc_datetime
 
     belongs_to :organization, Organization
 
@@ -535,4 +543,21 @@ defmodule Authify.Accounts.User do
   end
 
   def verify_email_verification_token(_, _), do: false
+
+  # TOTP MFA Helper Functions
+
+  @doc """
+  Checks if TOTP is enabled for the user.
+  """
+  def totp_enabled?(%__MODULE__{totp_enabled_at: nil}), do: false
+  def totp_enabled?(%__MODULE__{}), do: true
+
+  @doc """
+  Checks if TOTP is required for the user based on organization settings.
+  Returns true if the organization requires MFA but the user hasn't enabled it.
+  """
+  def totp_required?(%__MODULE__{} = user, organization) do
+    org_requires_mfa = Authify.Configurations.get_organization_setting(organization, :require_mfa)
+    org_requires_mfa && !totp_enabled?(user)
+  end
 end

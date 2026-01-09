@@ -24,8 +24,10 @@ end
 #
 # Enable or disable Prometheus metrics collection. Metrics are exposed on port 9568 at /metrics.
 # Set ENABLE_METRICS=false to disable metrics collection and save memory/CPU resources.
-# Defaults to true (enabled).
-config :authify, :metrics_enabled, System.get_env("ENABLE_METRICS", "true") == "true"
+# Defaults to true (enabled) unless already configured (e.g., in test environment).
+if is_nil(Application.get_env(:authify, :metrics_enabled)) do
+  config :authify, :metrics_enabled, System.get_env("ENABLE_METRICS", "true") == "true"
+end
 
 # ## Encryption Configuration
 #

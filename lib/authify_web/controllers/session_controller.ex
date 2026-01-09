@@ -5,6 +5,7 @@ defmodule AuthifyWeb.SessionController do
   alias Authify.AuditLog
   alias Authify.Configurations
   alias Authify.Guardian
+  alias Authify.MFA
 
   def new(conn, params) do
     # Clear any existing session when showing login form
@@ -42,7 +43,7 @@ defmodule AuthifyWeb.SessionController do
       organization ->
         case Accounts.authenticate_user(email, password, organization.id) do
           {:ok, user} ->
-            # Log successful login
+            # Log successful password authentication
             AuditLog.log_event_async(:login_success, %{
               organization_id: organization.id,
               actor_type: "user",
@@ -53,13 +54,8 @@ defmodule AuthifyWeb.SessionController do
               user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first()
             })
 
-            # Clear any existing session before signing in, then set the selected organization
-            conn
-            |> Guardian.Plug.sign_out()
-            |> Guardian.Plug.sign_in(user)
-            |> put_session(:current_organization_id, organization.id)
-            |> put_flash(:info, "Welcome back!")
-            |> redirect(to: get_dashboard_path_for_user(user, organization))
+            # Route based on MFA status
+            route_after_authentication(conn, user, organization)
 
           {:error, :invalid_password} ->
             # Log failed login attempt
@@ -122,8 +118,11 @@ defmodule AuthifyWeb.SessionController do
       })
     end
 
-    # Sign out the user from Guardian
-    conn = Guardian.Plug.sign_out(conn)
+    # Sign out the user from Guardian and clear MFA session
+    conn =
+      conn
+      |> Guardian.Plug.sign_out()
+      |> clear_mfa_session()
 
     # Check if this is part of SAML Single Logout completion
     if slo_complete == "true" do
@@ -173,5 +172,87 @@ defmodule AuthifyWeb.SessionController do
     # Check if user is admin in current organization or global admin
     Authify.Accounts.User.admin?(user, organization.id) or
       Authify.Accounts.User.global_admin?(user)
+  end
+
+  # Routes user after successful password authentication based on MFA status
+  defp route_after_authentication(conn, user, organization) do
+    if Accounts.User.totp_enabled?(user) do
+      handle_mfa_enabled_user(conn, user, organization)
+    else
+      handle_mfa_disabled_user(conn, user, organization)
+    end
+  end
+
+  # Handles login for users with MFA enabled
+  defp handle_mfa_enabled_user(conn, user, organization) do
+    case check_trusted_device(conn, user) do
+      {:ok, _device} ->
+        # Device is trusted, skip MFA verification
+        complete_login(conn, user, organization)
+
+      {:error, _reason} ->
+        # Require MFA verification
+        conn
+        |> Guardian.Plug.sign_out()
+        |> put_session(:mfa_pending_user_id, user.id)
+        |> put_session(:mfa_pending_organization_id, organization.id)
+        |> put_session(:mfa_pending_timestamp, DateTime.utc_now() |> DateTime.to_unix())
+        |> put_flash(:info, "Please enter your authentication code.")
+        |> redirect(to: ~p"/mfa/verify")
+    end
+  end
+
+  # Handles login for users without MFA - checks if organization requires it
+  defp handle_mfa_disabled_user(conn, user, organization) do
+    mfa_required =
+      Authify.Configurations.get_organization_setting(organization, :require_mfa) || false
+
+    if mfa_required do
+      # MFA is required but not enabled - force setup
+      conn
+      |> Guardian.Plug.sign_out()
+      |> put_session(:mfa_setup_required, true)
+      |> put_session(:mfa_pending_user_id, user.id)
+      |> put_session(:mfa_pending_organization_id, organization.id)
+      |> put_flash(
+        :warning,
+        "Your organization requires multi-factor authentication. Please set it up to continue."
+      )
+      |> redirect(to: ~p"/#{organization.slug}/profile/mfa/setup")
+    else
+      # MFA not required, normal login
+      complete_login(conn, user, organization)
+    end
+  end
+
+  # Check if user has a valid trusted device token
+  defp check_trusted_device(conn, user) do
+    case get_session(conn, :mfa_trusted_device_token) do
+      nil ->
+        {:error, :no_device_token}
+
+      token ->
+        MFA.verify_trusted_device(user, token)
+    end
+  end
+
+  # Complete the login process (extracted for reuse)
+  defp complete_login(conn, user, organization) do
+    conn
+    |> Guardian.Plug.sign_out()
+    |> Guardian.Plug.sign_in(user)
+    |> put_session(:current_organization_id, organization.id)
+    |> clear_mfa_session()
+    |> put_flash(:info, "Welcome back!")
+    |> redirect(to: get_dashboard_path_for_user(user, organization))
+  end
+
+  # Clear MFA-related session keys
+  defp clear_mfa_session(conn) do
+    conn
+    |> delete_session(:mfa_pending_user_id)
+    |> delete_session(:mfa_pending_organization_id)
+    |> delete_session(:mfa_pending_timestamp)
+    |> delete_session(:mfa_setup_secret)
   end
 end

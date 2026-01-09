@@ -1,0 +1,152 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@user}
+      organization={@organization}
+      current_page="mfa"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Backup Codes</h1>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header bg-success text-white">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-check-circle"></i> Multi-Factor Authentication Enabled
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="alert alert-warning">
+              <h6><i class="bi bi-exclamation-triangle"></i> Save These Backup Codes</h6>
+              <p class="mb-0">
+                Each code can only be used once. Store them in a secure location like a password
+                manager. You won't be able to see these codes again.
+              </p>
+            </div>
+
+            <%= if @show_download do %>
+              <div class="mb-4 p-4 bg-light border rounded">
+                <h6 class="mb-3">Your Backup Codes:</h6>
+                <div class="row">
+                  <%= for code <- @backup_codes do %>
+                    <div class="col-md-6 mb-2">
+                      <code class="fs-5 user-select-all">{code}</code>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+
+              <div class="d-grid gap-2 d-md-flex justify-content-md-start mb-3">
+                <button
+                  type="button"
+                  class="btn btn-outline-primary"
+                  onclick="copyBackupCodes()"
+                >
+                  <i class="bi bi-clipboard"></i> Copy All Codes
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary"
+                  onclick="downloadBackupCodes()"
+                >
+                  <i class="bi bi-download"></i> Download as Text
+                </button>
+              </div>
+
+              <script>
+                function copyBackupCodes() {
+                  const codes = <%= Phoenix.HTML.raw(Jason.encode!(@backup_codes)) %>;
+                  const text = codes.join('\n');
+                  navigator.clipboard.writeText(text).then(() => {
+                    alert('Backup codes copied to clipboard!');
+                  });
+                }
+
+                function downloadBackupCodes() {
+                  const codes = <%= Phoenix.HTML.raw(Jason.encode!(@backup_codes)) %>;
+                  const text = 'Authify Backup Codes\n\n' + codes.join('\n') + '\n\nKeep these codes safe. Each code can only be used once.';
+                  const blob = new Blob([text], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'authify-backup-codes.txt';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }
+              </script>
+            <% end %>
+
+            <div class="d-grid gap-2">
+              <%= if assigns[:mandatory_setup] do %>
+                <a
+                  href={
+                    if assigns[:user].is_global_admin do
+                      ~p"/#{@organization.slug}/dashboard"
+                    else
+                      ~p"/#{@organization.slug}/user/dashboard"
+                    end
+                  }
+                  class="btn btn-primary btn-lg"
+                >
+                  <i class="bi bi-arrow-right"></i> Continue to Dashboard
+                </a>
+              <% else %>
+                <a
+                  href={~p"/#{@organization.slug}/profile/mfa"}
+                  class="btn btn-primary btn-lg"
+                >
+                  <i class="bi bi-arrow-right"></i> Continue to MFA Settings
+                </a>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> How to Use Backup Codes
+            </h6>
+          </div>
+          <div class="card-body">
+            <ol class="mb-0 small">
+              <li class="mb-2">
+                During login, if you can't access your authenticator app, click "Use Backup
+                Code"
+              </li>
+              <li class="mb-2">Enter one of your backup codes</li>
+              <li class="mb-2">
+                The code will be consumed and can't be used again
+              </li>
+              <li class="mb-0">
+                Regenerate new codes if you're running low
+              </li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-shield-check"></i> Storage Recommendations
+            </h6>
+          </div>
+          <div class="card-body">
+            <ul class="mb-0 small">
+              <li>Store in a password manager (1Password, Bitwarden, etc.)</li>
+              <li>Keep a printed copy in a secure location</li>
+              <li>Never share your backup codes with anyone</li>
+              <li>Don't store them in plain text on your computer</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

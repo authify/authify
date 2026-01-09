@@ -1,0 +1,48 @@
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+      <div class="card shadow mt-5">
+        <div class="card-header text-center bg-danger text-white">
+          <h4 class="mb-0">
+            <i class="bi bi-lock"></i> Account Temporarily Locked
+          </h4>
+        </div>
+        <div class="card-body p-4 text-center">
+          <div class="mb-4">
+            <i class="bi bi-exclamation-triangle text-warning" style="font-size: 4rem;"></i>
+          </div>
+
+          <h5 class="mb-3">Too Many Failed Attempts</h5>
+
+          <p class="mb-4">
+            Your account has been temporarily locked due to multiple failed authentication
+            attempts.
+          </p>
+
+          <div class="alert alert-info">
+            <p class="mb-1">
+              <strong>Locked until:</strong>
+            </p>
+            <p class="mb-0">
+              {Calendar.strftime(@locked_until, "%B %d, %Y at %I:%M %p")}
+            </p>
+          </div>
+
+          <div class="mt-4">
+            <h6>What can I do?</h6>
+            <ul class="text-start">
+              <li>Wait for the lockout period to expire</li>
+              <li>Try using a backup code if you have one</li>
+              <li>Contact your administrator for assistance</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card-footer text-center">
+          <a href={~p"/login"} class="text-muted small">
+            <i class="bi bi-arrow-left"></i> Back to Login
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
