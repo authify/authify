@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-01-09
+
+### Added
+
+- **TOTP Multi-Factor Authentication (MFA) System**
+  - Complete TOTP (Time-based One-Time Password) implementation for enhanced account security
+  - QR code generation for easy authenticator app enrollment (Google Authenticator, Authy, etc.)
+  - Manual entry option with formatted secret key display
+  - Real-time verification during login with rate limiting
+  - Comprehensive web UI for MFA setup, verification, and management
+
+- **MFA Backup Codes**
+  - 10 single-use backup codes generated during TOTP setup
+  - Secure recovery mechanism when authenticator app is unavailable
+  - Code regeneration capability with audit logging
+  - Encrypted storage with automatic consumption tracking
+
+- **Trusted Device Management**
+  - "Remember this device for 30 days" option during MFA verification
+  - Secure device token storage and validation
+  - Per-device management UI with revocation capability
+  - Bulk device revocation for security incidents
+  - Device metadata tracking (name, IP, user agent, last used)
+
+- **MFA Rate Limiting and Lockout Protection**
+  - Configurable failed attempt thresholds (default: 5 attempts)
+  - Automatic lockout after threshold exceeded (default: 5 minutes)
+  - Per-organization lockout settings (attempts, duration, enable/disable)
+  - Lockout status display with expiry countdown
+  - Admin unlock capability for locked-out users
+  - Complete lockout history tracking with audit trail
+
+- **Organization-Level MFA Enforcement**
+  - Optional organization-wide MFA requirement setting
+  - Automatic enforcement during login for non-compliant users
+  - Graceful redirect to MFA setup when required but not enabled
+  - Configuration UI for admins to toggle MFA requirements
+  - Proper handling of trusted devices when MFA is required
+
+- **Admin MFA Management Interface**
+  - View MFA status for any user (TOTP enabled, backup codes count, trusted devices)
+  - Unlock locked-out users via web UI
+  - Complete MFA reset (disables TOTP, revokes devices, clears codes)
+  - Integrated into user detail pages with clear status indicators
+  - Protection against self-targeting for dangerous operations
+
+- **MFA Management API Endpoints**
+  - `GET /{org_slug}/api/users/:id/mfa` - Get detailed MFA status
+  - `POST /{org_slug}/api/users/:id/mfa/unlock` - Unlock MFA lockout
+  - `POST /{org_slug}/api/users/:id/mfa/reset` - Reset user's MFA completely
+  - Full JSON:API response format with HATEOAS links
+  - Uses existing `users:read` and `users:write` OAuth scopes
+  - Comprehensive OpenAPI 3.1.0 documentation with examples
+
+- **MFA Audit Logging**
+  - All MFA events logged: enabled, disabled, verified, failed attempts
+  - Backup code regeneration and usage tracking
+  - Trusted device creation and revocation events
+  - Lockout and unlock events with admin actor tracking
+  - MFA reset operations with metadata
+
+### Changed
+
+- Login flow now checks for TOTP enrollment and trusted devices
+- Session handling extended to support MFA pending state
+- Profile page enhanced with MFA status section and setup links
+- User detail pages show comprehensive MFA information
+- Navigation includes MFA management section under profile
+
+### Security
+
+- TOTP secrets encrypted at rest using Cloak encryption
+- Backup codes stored as bcrypt hashes (single-use enforcement)
+- Trusted device tokens are cryptographically secure random values
+- Rate limiting prevents brute force attacks on TOTP verification
+- Automatic lockout mechanism protects against repeated failed attempts
+- Comprehensive audit trail for all MFA-related security events
+
+### Technical
+
+- Database migrations for TOTP fields, trusted_devices, and totp_lockouts tables
+- New `Authify.MFA` context module with 25+ functions
+- MFA controller with 10+ actions for setup, verification, and management
+- Complete test coverage (80+ new tests, all passing)
+- Integration with existing Guardian authentication
+- Telemetry configuration improved to prevent test environment pollution
+
 ## [0.8.1] - 2025-12-24
 
 ### Added

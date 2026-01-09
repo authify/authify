@@ -44,9 +44,10 @@ Authify is a self-hosted, open-source identity provider built with Elixir and Ph
 - **Professional Templates** - HTML and plain text email templates for all notifications
 
 ### **Security & Compliance**
+- **Multi-Factor Authentication (MFA)** - TOTP-based MFA with backup codes and trusted devices
 - **Secure by Default** - Strong password policies and validation
 - **Token Security** - Proper JWT handling with secure defaults
-- **Rate Limiting** - Per-organization rate limits with hierarchical quotas
+- **Rate Limiting** - Per-organization rate limits with hierarchical quotas and MFA lockout protection
 - **Session Management** - Secure session handling with proper cleanup
 
 ## 🚀 Quick Start
