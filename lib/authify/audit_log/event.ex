@@ -31,6 +31,7 @@ defmodule Authify.AuditLog.Event do
     personal_access_token_created personal_access_token_deleted
     mfa_enabled mfa_disabled mfa_verified mfa_failed
     mfa_backup_codes_regenerated mfa_device_revoked mfa_all_devices_revoked
+    mfa_unlocked mfa_reset
     settings_updated
     rate_limit_exceeded
     permission_denied scope_denied

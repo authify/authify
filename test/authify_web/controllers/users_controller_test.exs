@@ -451,4 +451,183 @@ defmodule AuthifyWeb.UsersControllerTest do
                "Access denied. Admin privileges required."
     end
   end
+
+  describe "unlock_mfa" do
+    test "admin can unlock a locked out user", %{conn: conn} do
+      organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+      regular_user = user_for_organization_fixture(organization)
+
+      # Enable TOTP and create a lockout for the user
+      {:ok, secret} = Authify.MFA.setup_totp(regular_user)
+      code = NimbleTOTP.verification_code(secret)
+      {:ok, regular_user, _codes} = Authify.MFA.complete_totp_setup(regular_user, code, secret)
+
+      # Create a lockout
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, _lockout} =
+        Authify.Repo.insert(%Authify.MFA.TotpLockout{
+          user_id: regular_user.id,
+          failed_attempts: 5,
+          locked_at: now,
+          locked_until: DateTime.add(now, 3600, :second)
+        })
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      conn = post(conn, ~p"/#{organization.slug}/users/#{regular_user.id}/mfa/unlock")
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/users/#{regular_user.id}"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "has been unlocked"
+
+      # Verify lockout was removed
+      assert {:ok, _user} = Authify.MFA.check_lockout(Authify.Accounts.get_user!(regular_user.id))
+    end
+
+    test "admin cannot unlock user from different organization", %{conn: conn} do
+      organization1 = organization_fixture()
+      organization2 = organization_fixture()
+      admin_user = admin_user_fixture(organization1)
+      other_org_user = user_for_organization_fixture(organization2)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization1.id)
+        |> assign(:current_organization, organization1)
+        |> assign(:current_user, admin_user)
+
+      conn = post(conn, ~p"/#{organization1.slug}/users/#{other_org_user.id}/mfa/unlock")
+
+      assert conn.status == 404
+    end
+  end
+
+  describe "reset_mfa" do
+    test "admin can reset MFA for a user with TOTP enabled", %{conn: conn} do
+      organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+      regular_user = user_for_organization_fixture(organization)
+
+      # Enable TOTP for the user
+      {:ok, secret} = Authify.MFA.setup_totp(regular_user)
+      code = NimbleTOTP.verification_code(secret)
+      {:ok, regular_user, _codes} = Authify.MFA.complete_totp_setup(regular_user, code, secret)
+
+      # Verify TOTP is enabled before reset
+      assert Authify.Accounts.User.totp_enabled?(regular_user)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      conn = post(conn, ~p"/#{organization.slug}/users/#{regular_user.id}/mfa/reset")
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/users/#{regular_user.id}"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "MFA has been reset"
+
+      # Verify TOTP is disabled after reset
+      updated_user = Authify.Accounts.get_user!(regular_user.id)
+      refute Authify.Accounts.User.totp_enabled?(updated_user)
+    end
+
+    test "admin can reset MFA even when user doesn't have it enabled (no-op)", %{conn: conn} do
+      organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+      regular_user = user_for_organization_fixture(organization)
+
+      # User doesn't have TOTP enabled
+      refute Authify.Accounts.User.totp_enabled?(regular_user)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      conn = post(conn, ~p"/#{organization.slug}/users/#{regular_user.id}/mfa/reset")
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/users/#{regular_user.id}"
+      # Admin reset succeeds even if MFA not enabled (it's a no-op)
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "MFA has been reset"
+    end
+
+    test "admin cannot reset MFA for user from different organization", %{conn: conn} do
+      organization1 = organization_fixture()
+      organization2 = organization_fixture()
+      admin_user = admin_user_fixture(organization1)
+      other_org_user = user_for_organization_fixture(organization2)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization1.id)
+        |> assign(:current_organization, organization1)
+        |> assign(:current_user, admin_user)
+
+      conn = post(conn, ~p"/#{organization1.slug}/users/#{other_org_user.id}/mfa/reset")
+
+      assert conn.status == 404
+    end
+
+    test "global admin can reset MFA for any user", %{conn: conn} do
+      # Create regular organization and user with MFA
+      organization = organization_fixture()
+      regular_user = user_for_organization_fixture(organization)
+
+      # Enable TOTP for the user
+      {:ok, secret} = Authify.MFA.setup_totp(regular_user)
+      code = NimbleTOTP.verification_code(secret)
+      {:ok, regular_user, _codes} = Authify.MFA.complete_totp_setup(regular_user, code, secret)
+
+      # Create global organization and admin
+      global_org =
+        Accounts.get_organization_by_slug("authify-global") ||
+          elem(Accounts.create_organization(%{name: "Global", slug: "authify-global"}), 1)
+
+      global_admin_attrs = %{
+        "first_name" => "Global",
+        "last_name" => "Admin",
+        "username" => "globaladmin",
+        "email" => "globaladmin@test.com",
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      {:ok, global_admin} =
+        Accounts.create_user_with_role(global_admin_attrs, global_org.id, "admin")
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(global_admin)
+        |> put_session(:current_organization_id, global_org.id)
+        |> assign(:current_organization, global_org)
+        |> assign(:current_user, global_admin)
+
+      conn = post(conn, ~p"/#{global_org.slug}/users/#{regular_user.id}/mfa/reset")
+
+      assert redirected_to(conn) == ~p"/#{global_org.slug}/users/#{regular_user.id}"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "MFA has been reset"
+
+      # Verify TOTP is disabled after reset
+      updated_user = Authify.Accounts.get_user!(regular_user.id)
+      refute Authify.Accounts.User.totp_enabled?(updated_user)
+    end
+  end
 end

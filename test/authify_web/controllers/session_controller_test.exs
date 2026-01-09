@@ -277,7 +277,7 @@ defmodule AuthifyWeb.SessionControllerTest do
         "password_confirmation" => "SecureP@ssw0rd!"
       }
 
-      {:ok, user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
+      {:ok, _user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
 
       # Attempt to log in
       login_params = %{

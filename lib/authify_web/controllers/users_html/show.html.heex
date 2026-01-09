@@ -124,9 +124,73 @@
             </div>
           </div>
         </div>
+        <!-- MFA Status -->
+        <div class="card mt-3">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-shield-lock"></i> Multi-Factor Authentication
+            </h5>
+          </div>
+          <div class="card-body">
+            <%= if Authify.Accounts.User.totp_enabled?(@target_user) do %>
+              <div class="d-flex align-items-center mb-3">
+                <span class="badge bg-success me-2">
+                  <i class="bi bi-shield-check"></i> Enabled
+                </span>
+                <small class="text-muted">
+                  Since {Calendar.strftime(@target_user.totp_enabled_at, "%B %d, %Y")}
+                </small>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6">
+                  <h6 class="text-muted small">Backup Codes</h6>
+                  <p>
+                    <%= if assigns[:backup_codes_count] do %>
+                      <span class="badge bg-info">{@backup_codes_count} remaining</span>
+                    <% else %>
+                      <span class="badge bg-secondary">Unknown</span>
+                    <% end %>
+                  </p>
+                </div>
+                <div class="col-md-6">
+                  <h6 class="text-muted small">Trusted Devices</h6>
+                  <p>
+                    <%= if assigns[:trusted_devices_count] do %>
+                      <span class="badge bg-info">{@trusted_devices_count} active</span>
+                    <% else %>
+                      <span class="badge bg-secondary">Unknown</span>
+                    <% end %>
+                  </p>
+                </div>
+              </div>
+
+              <%= if assigns[:lockout] do %>
+                <div class="alert alert-warning mb-0 mt-2">
+                  <h6 class="alert-heading">
+                    <i class="bi bi-lock"></i> User is Locked Out
+                  </h6>
+                  <p class="mb-1 small">
+                    <strong>Locked until:</strong>
+                    {Calendar.strftime(@lockout.locked_until, "%B %d, %Y at %I:%M %p")}
+                  </p>
+                  <p class="mb-0 small">
+                    <strong>Failed attempts:</strong> {@lockout.failed_attempts}
+                  </p>
+                </div>
+              <% end %>
+            <% else %>
+              <div class="d-flex align-items-center">
+                <span class="badge bg-secondary me-2">
+                  <i class="bi bi-shield-slash"></i> Not Enabled
+                </span>
+                <small class="text-muted">User has not set up MFA</small>
+              </div>
+            <% end %>
+          </div>
+        </div>
       </div>
-      
-<!-- Actions -->
+      <!-- Actions -->
       <div class="col-md-4">
         <div class="card">
           <div class="card-header">
@@ -136,7 +200,7 @@
             <%= if @is_global_view do %>
               <!-- Global Admin Actions -->
               <h6 class="text-muted">Global Administration</h6>
-              <div class="btn-group d-grid gap-2 mb-3">
+              <div class="d-grid gap-2 mb-3">
                 <% # Check if user is in global organization
                 is_global_admin =
                   @target_user.organization && @target_user.organization.slug == "authify-global" %>
@@ -147,6 +211,7 @@
                       ~p"/#{@current_organization.slug}/users/#{@target_user.id}/demote_global"
                     }
                     method="patch"
+                    class="d-grid"
                   >
                     <button
                       type="submit"
@@ -164,6 +229,7 @@
                         ~p"/#{@current_organization.slug}/users/#{@target_user.id}/promote_global"
                       }
                       method="patch"
+                      class="d-grid"
                     >
                       <button
                         type="submit"
@@ -180,7 +246,7 @@
             
 <!-- Role Management -->
             <h6 class="text-muted">Role Management</h6>
-            <div class="btn-group gap-2 mb-3">
+            <div class="d-grid gap-2 mb-3">
               <%= if @target_user.organization_id == @organization.id do %>
                 <%= if @target_user.role == "user" do %>
                   <.form
@@ -189,6 +255,7 @@
                       ~p"/#{@current_organization.slug}/users/#{@target_user.id}/role/admin"
                     }
                     method="patch"
+                    class="d-grid"
                   >
                     <button type="submit" class="btn btn-outline-primary btn-sm">
                       Promote to Admin
@@ -202,6 +269,7 @@
                         ~p"/#{@current_organization.slug}/users/#{@target_user.id}/role/user"
                       }
                       method="patch"
+                      class="d-grid"
                     >
                       <button
                         type="submit"
@@ -214,7 +282,7 @@
                   <% else %>
                     <button
                       type="button"
-                      class="btn btn-outline-secondary btn-sm"
+                      class="btn btn-outline-secondary btn-sm w-100"
                       disabled
                       title="You cannot demote yourself"
                     >
@@ -227,13 +295,14 @@
             
 <!-- Security Actions -->
             <h6 class="text-muted">Security</h6>
-            <div class="btn-group d-grid gap-2">
+            <div class="d-grid gap-2">
               <%= if @target_user.id != @user.id do %>
                 <%= if @target_user.active do %>
                   <.form
                     for={%{}}
                     action={~p"/#{@current_organization.slug}/users/#{@target_user.id}/disable"}
                     method="patch"
+                    class="d-grid"
                   >
                     <button
                       type="submit"
@@ -248,6 +317,7 @@
                     for={%{}}
                     action={~p"/#{@current_organization.slug}/users/#{@target_user.id}/enable"}
                     method="patch"
+                    class="d-grid"
                   >
                     <button type="submit" class="btn btn-outline-success btn-sm">
                       <i class="bi bi-person-check"></i> Enable User
@@ -257,7 +327,7 @@
               <% else %>
                 <button
                   type="button"
-                  class="btn btn-outline-warning btn-sm"
+                  class="btn btn-outline-warning btn-sm w-100"
                   disabled
                   title="You cannot disable your own account"
                 >
@@ -265,21 +335,58 @@
                 </button>
               <% end %>
 
-              <.form
-                for={%{}}
-                action={
-                  ~p"/#{@current_organization.slug}/users/#{@target_user.id}/reset_password"
-                }
-                method="post"
-              >
-                <button
-                  type="submit"
-                  class="btn btn-outline-danger btn-sm"
-                  onclick="return confirm('Are you sure you want to force a password reset for this user?')"
+              <%= if @target_user.id != @user.id do %>
+                <.form
+                  for={%{}}
+                  action={
+                    ~p"/#{@current_organization.slug}/users/#{@target_user.id}/reset_password"
+                  }
+                  method="post"
+                  class="d-grid"
                 >
-                  <i class="bi bi-key"></i> Force Password Reset
-                </button>
-              </.form>
+                  <button
+                    type="submit"
+                    class="btn btn-outline-danger btn-sm"
+                    onclick="return confirm('Are you sure you want to force a password reset for this user?')"
+                  >
+                    <i class="bi bi-key"></i> Force Password Reset
+                  </button>
+                </.form>
+              <% end %>
+
+              <%= if assigns[:lockout] do %>
+                <.form
+                  for={%{}}
+                  action={~p"/#{@current_organization.slug}/users/#{@target_user.id}/mfa/unlock"}
+                  method="post"
+                  class="d-grid"
+                >
+                  <button
+                    type="submit"
+                    class="btn btn-outline-success btn-sm"
+                    onclick="return confirm('Are you sure you want to unlock this user? This will remove the MFA lockout.')"
+                  >
+                    <i class="bi bi-unlock"></i> Unlock MFA
+                  </button>
+                </.form>
+              <% end %>
+
+              <%= if Authify.Accounts.User.totp_enabled?(@target_user) && @target_user.id != @user.id do %>
+                <.form
+                  for={%{}}
+                  action={~p"/#{@current_organization.slug}/users/#{@target_user.id}/mfa/reset"}
+                  method="post"
+                  class="d-grid"
+                >
+                  <button
+                    type="submit"
+                    class="btn btn-outline-danger btn-sm"
+                    onclick="return confirm('Are you sure you want to reset MFA for this user? This will disable their TOTP, revoke all trusted devices, and clear backup codes. The user will need to set up MFA again.')"
+                  >
+                    <i class="bi bi-shield-slash"></i> Reset MFA
+                  </button>
+                </.form>
+              <% end %>
             </div>
           </div>
         </div>

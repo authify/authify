@@ -1,6 +1,8 @@
 defmodule AuthifyWeb.UsersController do
   use AuthifyWeb, :controller
 
+  import Ecto.Query
+
   alias Authify.Accounts
   alias Authify.AuditLog
 
@@ -97,13 +99,58 @@ defmodule AuthifyWeb.UsersController do
   end
 
   defp render_user_show(conn, target_user, invitations, user, organization, is_global_view) do
+    # Load MFA data for admin view
+    mfa_assigns = load_mfa_data(target_user)
+
     render(conn, :show,
       user: user,
       organization: organization,
       target_user: target_user,
       invitations: invitations,
-      is_global_view: is_global_view
+      is_global_view: is_global_view,
+      backup_codes_count: mfa_assigns.backup_codes_count,
+      trusted_devices_count: mfa_assigns.trusted_devices_count,
+      lockout: mfa_assigns.lockout
     )
+  end
+
+  # Load MFA-related data for a user
+  defp load_mfa_data(user) do
+    if Authify.Accounts.User.totp_enabled?(user) do
+      # Count backup codes
+      backup_codes_count = Authify.MFA.backup_codes_count(user)
+
+      # Count trusted devices
+      trusted_devices_count =
+        user
+        |> Authify.MFA.list_trusted_devices()
+        |> length()
+
+      # Get active lockout record directly
+      lockout =
+        Authify.Repo.one(
+          from l in Authify.MFA.TotpLockout,
+            where:
+              l.user_id == ^user.id and
+                is_nil(l.unlocked_at) and
+                l.locked_until > ^DateTime.utc_now(),
+            order_by: [desc: l.locked_at],
+            limit: 1
+        )
+
+      %{
+        backup_codes_count: backup_codes_count,
+        trusted_devices_count: trusted_devices_count,
+        lockout: lockout
+      }
+    else
+      # MFA not enabled, return nil values
+      %{
+        backup_codes_count: nil,
+        trusted_devices_count: nil,
+        lockout: nil
+      }
+    end
   end
 
   # Global admin actions (only available when viewing global organization)
@@ -527,6 +574,76 @@ defmodule AuthifyWeb.UsersController do
       |> put_flash(:error, "You must be an administrator to create users.")
       |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users")
       |> halt()
+    end
+  end
+
+  # MFA Management Actions
+  def unlock_mfa(conn, %{"id" => id}) do
+    organization = conn.assigns.current_organization
+    current_user = conn.assigns.current_user
+
+    case get_target_user_for_mfa_action(conn, id, organization) do
+      {:ok, target_user} ->
+        {:ok, _user} = Authify.MFA.unlock_user(target_user, current_user)
+
+        # Log MFA unlock
+        log_audit_event(conn, :mfa_unlocked, target_user, %{
+          target_user_email: target_user.email
+        })
+
+        conn
+        |> put_flash(:info, "#{Accounts.User.full_name(target_user)} has been unlocked.")
+        |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users/#{target_user.id}")
+
+      {:error, conn} ->
+        conn
+    end
+  end
+
+  def reset_mfa(conn, %{"id" => id}) do
+    organization = conn.assigns.current_organization
+    current_user = conn.assigns.current_user
+
+    case get_target_user_for_mfa_action(conn, id, organization) do
+      {:ok, target_user} ->
+        {:ok, _user} = Authify.MFA.admin_reset_totp(target_user, current_user)
+
+        # Log MFA reset
+        log_audit_event(conn, :mfa_reset, target_user, %{
+          target_user_email: target_user.email
+        })
+
+        conn
+        |> put_flash(
+          :info,
+          "MFA has been reset for #{Accounts.User.full_name(target_user)}. They will need to set it up again."
+        )
+        |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users/#{target_user.id}")
+
+      {:error, conn} ->
+        conn
+    end
+  end
+
+  # Helper to get target user for MFA actions with proper organization checks
+  defp get_target_user_for_mfa_action(conn, id, organization) do
+    if organization.slug == "authify-global" do
+      {:ok, Accounts.get_user_globally!(id)}
+    else
+      user = Accounts.get_user!(id)
+
+      if Accounts.User.member_of?(user, organization.id) do
+        {:ok, user}
+      else
+        halted_conn =
+          conn
+          |> put_status(:not_found)
+          |> put_view(AuthifyWeb.ErrorHTML)
+          |> render(:"404")
+          |> halt()
+
+        {:error, halted_conn}
+      end
     end
   end
 end

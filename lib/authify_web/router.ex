@@ -208,6 +208,8 @@ defmodule AuthifyWeb.Router do
     post "/users/:id/reset_password", UsersController, :force_password_reset
     patch "/users/:id/disable", UsersController, :disable_user
     patch "/users/:id/enable", UsersController, :enable_user
+    post "/users/:id/mfa/unlock", UsersController, :unlock_mfa
+    post "/users/:id/mfa/reset", UsersController, :reset_mfa
 
     # Invitations management
     resources "/invitations", InvitationController, only: [:index, :new, :create, :show, :delete]
