@@ -9,7 +9,6 @@ defmodule Authify.Application do
   def start(_type, _args) do
     children =
       [
-        AuthifyWeb.Telemetry,
         Authify.Repo,
         # Cluster formation - use libcluster for Kubernetes, DNSCluster for fallback
         {Cluster.Supervisor,
@@ -37,7 +36,7 @@ defmodule Authify.Application do
   # Always disabled in test environment
   defp prometheus_children do
     if Application.get_env(:authify, :metrics_enabled, true) do
-      [Authify.Telemetry]
+      [AuthifyWeb.Telemetry, Authify.Telemetry]
     else
       []
     end
