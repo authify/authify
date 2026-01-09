@@ -81,12 +81,27 @@
             <% end %>
 
             <div class="d-grid gap-2">
-              <a
-                href={~p"/#{@organization.slug}/profile/mfa"}
-                class="btn btn-primary btn-lg"
-              >
-                <i class="bi bi-arrow-right"></i> Continue to MFA Settings
-              </a>
+              <%= if assigns[:mandatory_setup] do %>
+                <a
+                  href={
+                    if assigns[:user].is_global_admin do
+                      ~p"/#{@organization.slug}/dashboard"
+                    else
+                      ~p"/#{@organization.slug}/user/dashboard"
+                    end
+                  }
+                  class="btn btn-primary btn-lg"
+                >
+                  <i class="bi bi-arrow-right"></i> Continue to Dashboard
+                </a>
+              <% else %>
+                <a
+                  href={~p"/#{@organization.slug}/profile/mfa"}
+                  class="btn btn-primary btn-lg"
+                >
+                  <i class="bi bi-arrow-right"></i> Continue to MFA Settings
+                </a>
+              <% end %>
             </div>
           </div>
         </div>

@@ -54,31 +54,8 @@ defmodule AuthifyWeb.SessionController do
               user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first()
             })
 
-            # Check if TOTP is enabled for user
-            if Accounts.User.totp_enabled?(user) do
-              # Check for trusted device
-              case check_trusted_device(conn, user) do
-                {:ok, _device} ->
-                  # Device is trusted, skip MFA verification
-                  complete_login(conn, user, organization)
-
-                {:error, _reason} ->
-                  # Require MFA verification
-                  conn
-                  |> Guardian.Plug.sign_out()
-                  |> put_session(:mfa_pending_user_id, user.id)
-                  |> put_session(:mfa_pending_organization_id, organization.id)
-                  |> put_session(
-                    :mfa_pending_timestamp,
-                    DateTime.utc_now() |> DateTime.to_unix()
-                  )
-                  |> put_flash(:info, "Please enter your authentication code.")
-                  |> redirect(to: ~p"/mfa/verify")
-              end
-            else
-              # TOTP not enabled, normal login
-              complete_login(conn, user, organization)
-            end
+            # Route based on MFA status
+            route_after_authentication(conn, user, organization)
 
           {:error, :invalid_password} ->
             # Log failed login attempt
@@ -195,6 +172,57 @@ defmodule AuthifyWeb.SessionController do
     # Check if user is admin in current organization or global admin
     Authify.Accounts.User.admin?(user, organization.id) or
       Authify.Accounts.User.global_admin?(user)
+  end
+
+  # Routes user after successful password authentication based on MFA status
+  defp route_after_authentication(conn, user, organization) do
+    if Accounts.User.totp_enabled?(user) do
+      handle_mfa_enabled_user(conn, user, organization)
+    else
+      handle_mfa_disabled_user(conn, user, organization)
+    end
+  end
+
+  # Handles login for users with MFA enabled
+  defp handle_mfa_enabled_user(conn, user, organization) do
+    case check_trusted_device(conn, user) do
+      {:ok, _device} ->
+        # Device is trusted, skip MFA verification
+        complete_login(conn, user, organization)
+
+      {:error, _reason} ->
+        # Require MFA verification
+        conn
+        |> Guardian.Plug.sign_out()
+        |> put_session(:mfa_pending_user_id, user.id)
+        |> put_session(:mfa_pending_organization_id, organization.id)
+        |> put_session(:mfa_pending_timestamp, DateTime.utc_now() |> DateTime.to_unix())
+        |> put_flash(:info, "Please enter your authentication code.")
+        |> redirect(to: ~p"/mfa/verify")
+    end
+  end
+
+  # Handles login for users without MFA - checks if organization requires it
+  defp handle_mfa_disabled_user(conn, user, organization) do
+    mfa_required =
+      Authify.Configurations.get_organization_setting(organization, :require_mfa) || false
+
+    if mfa_required do
+      # MFA is required but not enabled - force setup
+      conn
+      |> Guardian.Plug.sign_out()
+      |> put_session(:mfa_setup_required, true)
+      |> put_session(:mfa_pending_user_id, user.id)
+      |> put_session(:mfa_pending_organization_id, organization.id)
+      |> put_flash(
+        :warning,
+        "Your organization requires multi-factor authentication. Please set it up to continue."
+      )
+      |> redirect(to: ~p"/#{organization.slug}/profile/mfa/setup")
+    else
+      # MFA not required, normal login
+      complete_login(conn, user, organization)
+    end
   end
 
   # Check if user has a valid trusted device token

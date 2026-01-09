@@ -11,12 +11,19 @@ defmodule AuthifyWeb.MfaController do
 
   @doc """
   Display QR code and setup form for TOTP enrollment.
-  Requires authenticated user without TOTP already enabled.
+  Handles both voluntary setup (authenticated users) and mandatory setup (pending users).
   """
   def setup(conn, _params) do
-    current_user = conn.assigns.current_user
-    organization = conn.assigns.current_organization
+    case get_setup_context(conn) do
+      {:ok, user, organization} ->
+        render_setup_form(conn, user, organization)
 
+      {:error, conn} ->
+        conn
+    end
+  end
+
+  defp render_setup_form(conn, current_user, organization) do
     if User.totp_enabled?(current_user) do
       conn
       |> put_flash(:info, "Multi-factor authentication is already enabled.")
@@ -60,9 +67,16 @@ defmodule AuthifyWeb.MfaController do
   Returns backup codes on success.
   """
   def complete_setup(conn, %{"verification_code" => code}) do
-    current_user = conn.assigns.current_user
-    organization = conn.assigns.current_organization
+    case get_setup_context(conn) do
+      {:ok, user, organization} ->
+        verify_and_complete_setup(conn, user, organization, code)
 
+      {:error, conn} ->
+        conn
+    end
+  end
+
+  defp verify_and_complete_setup(conn, current_user, organization, code) do
     # Retrieve secret from session
     case get_session(conn, :mfa_setup_secret) do
       nil ->
@@ -74,60 +88,103 @@ defmodule AuthifyWeb.MfaController do
         # Verify and complete setup
         case MFA.complete_totp_setup(current_user, code, secret) do
           {:ok, updated_user, backup_codes} ->
-            # Audit log
-            AuditHelper.log_mfa_enabled(conn, current_user, extra_metadata: %{"source" => "web"})
-
-            # Clear setup secret from session
-            conn
-            |> delete_session(:mfa_setup_secret)
-            |> put_flash(
-              :info,
-              "Multi-factor authentication has been successfully enabled! Please save your backup codes."
-            )
-            |> render(:backup_codes,
-              user: updated_user,
-              organization: organization,
-              backup_codes: backup_codes,
-              show_download: true
-            )
+            handle_setup_success(conn, current_user, updated_user, organization, backup_codes)
 
           {:error, :invalid_verification_code} ->
-            # Re-render setup with error
-            totp_uri = generate_totp_uri(current_user, secret, organization)
-            qr_code_data_uri = generate_qr_code(totp_uri)
-            manual_entry_key = format_secret_for_manual_entry(secret)
-
-            conn
-            |> put_flash(:error, "Invalid verification code. Please try again.")
-            |> render(:setup,
-              user: current_user,
-              organization: organization,
-              secret: secret,
-              totp_uri: totp_uri,
-              qr_code_data_uri: qr_code_data_uri,
-              manual_entry_key: manual_entry_key,
-              error: "Invalid verification code"
-            )
+            handle_invalid_code(conn, current_user, organization, secret)
 
           {:error, _changeset} ->
-            # Database error or other issue
-            totp_uri = generate_totp_uri(current_user, secret, organization)
-            qr_code_data_uri = generate_qr_code(totp_uri)
-            manual_entry_key = format_secret_for_manual_entry(secret)
-
-            conn
-            |> put_flash(:error, "Failed to enable MFA. Please try again.")
-            |> render(:setup,
-              user: current_user,
-              organization: organization,
-              secret: secret,
-              totp_uri: totp_uri,
-              qr_code_data_uri: qr_code_data_uri,
-              manual_entry_key: manual_entry_key,
-              error: "Setup failed"
-            )
+            handle_setup_error(conn, current_user, organization, secret)
         end
     end
+  end
+
+  defp handle_setup_success(conn, current_user, updated_user, organization, backup_codes) do
+    # Audit log
+    AuditHelper.log_mfa_enabled(conn, current_user, extra_metadata: %{"source" => "web"})
+
+    # Check if this was a mandatory MFA setup
+    mfa_setup_required = get_session(conn, :mfa_setup_required)
+
+    # Clear MFA setup session flags
+    conn =
+      conn
+      |> delete_session(:mfa_setup_secret)
+      |> delete_session(:mfa_setup_required)
+      |> delete_session(:mfa_pending_user_id)
+      |> delete_session(:mfa_pending_organization_id)
+
+    if mfa_setup_required do
+      # Mandatory setup complete - sign user in and show backup codes
+      conn
+      |> Authify.Guardian.Plug.sign_in(updated_user)
+      |> put_session(:current_organization_id, organization.id)
+      |> put_flash(
+        :info,
+        "Multi-factor authentication has been successfully enabled! Please save your backup codes before continuing."
+      )
+      |> render(:backup_codes,
+        user: updated_user,
+        organization: organization,
+        backup_codes: backup_codes,
+        show_download: true,
+        mandatory_setup: true
+      )
+    else
+      # Voluntary setup - show backup codes
+      conn
+      |> put_flash(
+        :info,
+        "Multi-factor authentication has been successfully enabled! Please save your backup codes."
+      )
+      |> render(:backup_codes,
+        user: updated_user,
+        organization: organization,
+        backup_codes: backup_codes,
+        show_download: true,
+        mandatory_setup: false
+      )
+    end
+  end
+
+  defp handle_invalid_code(conn, current_user, organization, secret) do
+    render_setup_with_error(
+      conn,
+      current_user,
+      organization,
+      secret,
+      "Invalid verification code. Please try again.",
+      "Invalid verification code"
+    )
+  end
+
+  defp handle_setup_error(conn, current_user, organization, secret) do
+    render_setup_with_error(
+      conn,
+      current_user,
+      organization,
+      secret,
+      "Failed to enable MFA. Please try again.",
+      "Setup failed"
+    )
+  end
+
+  defp render_setup_with_error(conn, current_user, organization, secret, flash_message, error) do
+    totp_uri = generate_totp_uri(current_user, secret, organization)
+    qr_code_data_uri = generate_qr_code(totp_uri)
+    manual_entry_key = format_secret_for_manual_entry(secret)
+
+    conn
+    |> put_flash(:error, flash_message)
+    |> render(:setup,
+      user: current_user,
+      organization: organization,
+      secret: secret,
+      totp_uri: totp_uri,
+      qr_code_data_uri: qr_code_data_uri,
+      manual_entry_key: manual_entry_key,
+      error: error
+    )
   end
 
   # ============================================================================
@@ -635,6 +692,36 @@ defmodule AuthifyWeb.MfaController do
     |> delete_session(:mfa_pending_organization_id)
     |> delete_session(:mfa_pending_timestamp)
     |> delete_session(:mfa_setup_secret)
+  end
+
+  # Determines the context for MFA setup (mandatory vs voluntary)
+  # Returns {:ok, user, organization} or {:error, conn_with_redirect}
+  defp get_setup_context(conn) do
+    mfa_setup_required = get_session(conn, :mfa_setup_required)
+
+    if mfa_setup_required do
+      # Mandatory setup - load user from session
+      user_id = get_session(conn, :mfa_pending_user_id)
+      org_id = get_session(conn, :mfa_pending_organization_id)
+
+      if user_id && org_id do
+        user = Accounts.get_user!(user_id)
+        org = Accounts.get_organization!(org_id)
+        {:ok, user, org}
+      else
+        # Session expired, redirect to login
+        conn =
+          conn
+          |> put_flash(:error, "Session expired. Please log in again.")
+          |> redirect(to: ~p"/")
+          |> halt()
+
+        {:error, conn}
+      end
+    else
+      # Voluntary setup - use authenticated user
+      {:ok, conn.assigns.current_user, conn.assigns.current_organization}
+    end
   end
 
   defp get_dashboard_path_for_user(user, organization) do

@@ -201,4 +201,143 @@ defmodule AuthifyWeb.SessionControllerTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "logged out"
     end
   end
+
+  describe "POST /login with MFA requirements" do
+    test "redirects to MFA setup when organization requires MFA and user doesn't have it", %{
+      conn: conn
+    } do
+      # Create organization
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+
+      # Create configuration and set require_mfa to true
+      _config =
+        Authify.Configurations.get_or_create_configuration(
+          "organization",
+          organization.id,
+          "organization"
+        )
+
+      {:ok, _setting} =
+        Authify.Configurations.set_setting("organization", organization.id, :require_mfa, true)
+
+      # Create user without MFA
+      user_attrs = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "email" => "john@test.com",
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      {:ok, user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
+
+      # Verify user doesn't have TOTP enabled
+      refute Authify.Accounts.User.totp_enabled?(user)
+
+      # Attempt to log in
+      login_params = %{
+        "organization_slug" => "test-org",
+        "email" => "john@test.com",
+        "password" => "SecureP@ssw0rd!"
+      }
+
+      conn = post(conn, ~p"/login", login: login_params)
+
+      # Should redirect to MFA setup
+      assert redirected_to(conn) == ~p"/test-org/profile/mfa/setup"
+      assert Phoenix.Flash.get(conn.assigns.flash, :warning) =~ "organization requires"
+
+      # Session should have MFA setup flags
+      assert get_session(conn, :mfa_setup_required) == true
+      assert get_session(conn, :mfa_pending_user_id) == user.id
+      assert get_session(conn, :mfa_pending_organization_id) == organization.id
+    end
+
+    test "allows login when MFA is not required", %{conn: conn} do
+      # Create organization
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+
+      # Create configuration and ensure require_mfa is false (default)
+      _config =
+        Authify.Configurations.get_or_create_configuration(
+          "organization",
+          organization.id,
+          "organization"
+        )
+
+      {:ok, _setting} =
+        Authify.Configurations.set_setting("organization", organization.id, :require_mfa, false)
+
+      # Create user without MFA
+      user_attrs = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "email" => "john@test.com",
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      {:ok, user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
+
+      # Attempt to log in
+      login_params = %{
+        "organization_slug" => "test-org",
+        "email" => "john@test.com",
+        "password" => "SecureP@ssw0rd!"
+      }
+
+      conn = post(conn, ~p"/login", login: login_params)
+
+      # Should complete normal login
+      assert redirected_to(conn) == ~p"/test-org/user/dashboard"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Welcome back"
+    end
+
+    test "proceeds to MFA verification when MFA is required and user has it enabled", %{
+      conn: conn
+    } do
+      # Create organization with MFA required
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+
+      # Create configuration and set require_mfa
+      _config =
+        Authify.Configurations.get_or_create_configuration(
+          "organization",
+          organization.id,
+          "organization"
+        )
+
+      {:ok, _setting} =
+        Authify.Configurations.set_setting("organization", organization.id, :require_mfa, true)
+
+      # Create user
+      user_attrs = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "email" => "john@test.com",
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      {:ok, user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
+
+      # Enable TOTP for user
+      {:ok, secret} = Authify.MFA.setup_totp(user)
+      valid_code = NimbleTOTP.verification_code(secret)
+      {:ok, _user, _codes} = Authify.MFA.complete_totp_setup(user, valid_code, secret)
+
+      # Attempt to log in
+      login_params = %{
+        "organization_slug" => "test-org",
+        "email" => "john@test.com",
+        "password" => "SecureP@ssw0rd!"
+      }
+
+      conn = post(conn, ~p"/login", login: login_params)
+
+      # Should redirect to MFA verification (not setup)
+      assert redirected_to(conn) == ~p"/mfa/verify"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "authentication code"
+    end
+  end
 end
