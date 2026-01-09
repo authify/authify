@@ -116,6 +116,40 @@ defmodule Authify.Configurations.Schemas.Organization do
         required: false,
         validation_fn: nil
       },
+      # MFA (Multi-Factor Authentication) settings
+      %{
+        name: :require_mfa,
+        description:
+          "Require all users in this organization to enable multi-factor authentication",
+        value_type: :boolean,
+        default_value: false,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :mfa_lockout_enabled,
+        description: "Enable account lockout after failed MFA verification attempts",
+        value_type: :boolean,
+        default_value: true,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :mfa_lockout_attempts,
+        description: "Number of failed MFA attempts before account lockout (1-10)",
+        value_type: :integer,
+        default_value: 5,
+        required: false,
+        validation_fn: &validate_mfa_attempts/1
+      },
+      %{
+        name: :mfa_lockout_duration_minutes,
+        description: "Duration of MFA lockout in minutes (1-60)",
+        value_type: :integer,
+        default_value: 5,
+        required: false,
+        validation_fn: &validate_lockout_duration/1
+      },
       # Profile/branding fields
       %{
         name: :description,
@@ -390,4 +424,28 @@ defmodule Authify.Configurations.Schemas.Organization do
   end
 
   defp validate_positive_integer(_), do: {:error, "Must be an integer"}
+
+  defp validate_mfa_attempts(nil), do: {:ok, nil}
+
+  defp validate_mfa_attempts(value) when is_integer(value) and value >= 1 and value <= 10 do
+    {:ok, value}
+  end
+
+  defp validate_mfa_attempts(value) when is_integer(value) do
+    {:error, "Must be between 1 and 10"}
+  end
+
+  defp validate_mfa_attempts(_), do: {:error, "Must be an integer"}
+
+  defp validate_lockout_duration(nil), do: {:ok, nil}
+
+  defp validate_lockout_duration(value) when is_integer(value) and value >= 1 and value <= 60 do
+    {:ok, value}
+  end
+
+  defp validate_lockout_duration(value) when is_integer(value) do
+    {:error, "Must be between 1 and 60 minutes"}
+  end
+
+  defp validate_lockout_duration(_), do: {:error, "Must be an integer"}
 end

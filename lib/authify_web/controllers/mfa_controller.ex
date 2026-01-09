@@ -424,15 +424,36 @@ defmodule AuthifyWeb.MfaController do
       |> assign(:current_user, user)
       |> assign(:current_organization, organization)
 
-    # Verify code
-    result =
-      if use_backup do
-        MFA.verify_backup_code(user, code)
-      else
-        MFA.verify_totp(user, code)
-      end
+    # Check rate limit before verifying
+    case MFA.check_rate_limit(user, organization) do
+      {:deny, _locked_until} ->
+        # Rate limit exceeded, redirect to lockout page
+        conn
+        |> put_flash(
+          :error,
+          "Too many failed attempts. Your account has been temporarily locked."
+        )
+        |> redirect(to: ~p"/mfa/locked")
 
-    handle_verification_result(conn, result, user, organization, remember_device, use_backup)
+      {:allow, remaining_attempts} ->
+        # Rate limit OK, verify code
+        result =
+          if use_backup do
+            MFA.verify_backup_code(user, code)
+          else
+            MFA.verify_totp(user, code)
+          end
+
+        handle_verification_result(
+          conn,
+          result,
+          user,
+          organization,
+          remember_device,
+          use_backup,
+          remaining_attempts
+        )
+    end
   end
 
   defp handle_verification_result(
@@ -441,9 +462,12 @@ defmodule AuthifyWeb.MfaController do
          _user,
          organization,
          remember_device,
-         use_backup
+         use_backup,
+         _remaining_attempts
        ) do
-    # Successful verification - complete login
+    # Successful verification - clear rate limit and complete login
+    MFA.clear_rate_limit(updated_user)
+
     device_token =
       if remember_device do
         create_trusted_device_token(conn, updated_user)
@@ -482,23 +506,32 @@ defmodule AuthifyWeb.MfaController do
          user,
          organization,
          _remember_device,
-         use_backup
+         use_backup,
+         remaining_attempts
        ) do
     # Failed verification
     AuditHelper.log_mfa_failed(conn, user,
       extra_metadata: %{
         "source" => "web",
-        "method" => if(use_backup, do: "backup_code", else: "totp")
+        "method" => if(use_backup, do: "backup_code", else: "totp"),
+        "attempts_remaining" => remaining_attempts - 1
       }
     )
 
+    error_message =
+      if remaining_attempts > 1 do
+        "Invalid code. #{remaining_attempts - 1} attempts remaining."
+      else
+        "Invalid code. This is your last attempt before lockout."
+      end
+
     conn
-    |> put_flash(:error, "Invalid code. Please try again.")
+    |> put_flash(:error, error_message)
     |> render(:verify_form,
       user: user,
       organization: organization,
       error: "Invalid code",
-      attempts_remaining: nil
+      attempts_remaining: remaining_attempts - 1
     )
   end
 
@@ -508,7 +541,8 @@ defmodule AuthifyWeb.MfaController do
          _user,
          _organization,
          _remember_device,
-         _use_backup
+         _use_backup,
+         _remaining_attempts
        ) do
     conn
     |> put_flash(:error, "Multi-factor authentication is not enabled.")
@@ -521,7 +555,8 @@ defmodule AuthifyWeb.MfaController do
          user,
          organization,
          _remember_device,
-         _use_backup
+         _use_backup,
+         remaining_attempts
        ) do
     conn
     |> put_flash(:error, "No backup codes available.")
@@ -529,18 +564,26 @@ defmodule AuthifyWeb.MfaController do
       user: user,
       organization: organization,
       error: "No backup codes available",
-      attempts_remaining: nil
+      attempts_remaining: remaining_attempts
     )
   end
 
-  defp handle_verification_result(conn, _error, user, organization, _remember_device, _use_backup) do
+  defp handle_verification_result(
+         conn,
+         _error,
+         user,
+         organization,
+         _remember_device,
+         _use_backup,
+         remaining_attempts
+       ) do
     conn
     |> put_flash(:error, "Verification failed. Please try again.")
     |> render(:verify_form,
       user: user,
       organization: organization,
       error: "Verification failed",
-      attempts_remaining: nil
+      attempts_remaining: remaining_attempts
     )
   end
 

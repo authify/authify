@@ -336,6 +336,82 @@ defmodule Authify.MFA do
   end
 
   @doc """
+  Checks if an MFA attempt is allowed based on rate limiting.
+  Returns {:allow, remaining_attempts} or {:deny, locked_until}.
+
+  Organization configuration:
+  - mfa_lockout_enabled: Enable/disable lockout (default: true)
+  - mfa_lockout_attempts: Max attempts before lockout (default: 5)
+  - mfa_lockout_duration_minutes: Lockout duration (default: 5)
+  """
+  def check_rate_limit(%User{} = user, organization) do
+    # Check if lockout is enabled for this organization
+    lockout_enabled =
+      Authify.Configurations.get_organization_setting(organization, :mfa_lockout_enabled) || true
+
+    if lockout_enabled do
+      # Get org settings
+      max_attempts =
+        Authify.Configurations.get_organization_setting(organization, :mfa_lockout_attempts) || 5
+
+      lockout_minutes =
+        Authify.Configurations.get_organization_setting(
+          organization,
+          :mfa_lockout_duration_minutes
+        ) ||
+          5
+
+      # Check rate limit using Hammer
+      bucket_key = "mfa:totp:#{user.id}"
+      scale_ms = lockout_minutes * 60 * 1000
+      limit = max_attempts
+
+      case Authify.RateLimit.hit(bucket_key, scale_ms, limit) do
+        {:allow, count} ->
+          {:allow, limit - count}
+
+        {:deny, _retry_after_ms} ->
+          # Create lockout record
+          locked_until =
+            DateTime.utc_now()
+            |> DateTime.add(lockout_minutes * 60, :second)
+            |> DateTime.truncate(:second)
+
+          create_lockout_record(user, locked_until, max_attempts)
+
+          {:deny, locked_until}
+      end
+    else
+      # Lockout disabled, always allow
+      max_attempts =
+        Authify.Configurations.get_organization_setting(organization, :mfa_lockout_attempts) || 5
+
+      {:allow, max_attempts}
+    end
+  end
+
+  @doc """
+  Clears the rate limit bucket for a user (called after successful verification).
+  """
+  def clear_rate_limit(%User{} = user) do
+    bucket_key = "mfa:totp:#{user.id}"
+    # Reset the bucket to 0 attempts (scale doesn't matter since we're setting, not checking)
+    Authify.RateLimit.set(bucket_key, 60_000, 0)
+    :ok
+  end
+
+  defp create_lockout_record(user, locked_until, failed_attempts) do
+    %TotpLockout{}
+    |> TotpLockout.changeset(%{
+      user_id: user.id,
+      locked_at: DateTime.utc_now() |> DateTime.truncate(:second),
+      locked_until: locked_until,
+      failed_attempts: failed_attempts
+    })
+    |> Repo.insert()
+  end
+
+  @doc """
   Unlocks a user by marking all active lockouts as unlocked.
   """
   def unlock_user(%User{} = user, admin_user) do
@@ -350,8 +426,8 @@ defmodule Authify.MFA do
       ]
     )
 
-    # Also clear any rate limit buckets (TODO: implement when RateLimit module is ready)
-    # Authify.RateLimit.delete_buckets("mfa:totp:#{user.id}")
+    # Clear rate limit buckets
+    clear_rate_limit(user)
 
     {:ok, user}
   end
