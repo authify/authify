@@ -292,4 +292,193 @@ defmodule AuthifyWeb.API.UsersController do
         response
     end
   end
+
+  @doc """
+  GET /{org_slug}/api/users/:id/mfa
+
+  Get MFA status for a user.
+  Requires users:read scope.
+  """
+  def mfa_status(conn, %{"id" => id}) do
+    case ensure_scope(conn, "users:read") do
+      :ok ->
+        organization = conn.assigns.current_organization
+
+        case Accounts.get_user_in_organization(id, organization.id) do
+          nil ->
+            render_error_response(
+              conn,
+              :not_found,
+              "resource_not_found",
+              "User not found in organization"
+            )
+
+          user ->
+            mfa_data = build_mfa_status(user)
+
+            json(conn, %{
+              data: %{
+                id: user.id,
+                type: "mfa_status",
+                attributes: mfa_data
+              },
+              links: %{
+                self: url(~p"/#{organization.slug}/api/users/#{user.id}/mfa")
+              }
+            })
+        end
+
+      {:error, response} ->
+        response
+    end
+  end
+
+  @doc """
+  POST /{org_slug}/api/users/:id/mfa/unlock
+
+  Unlock a user who is locked out from MFA.
+  Requires users:write scope.
+  """
+  def mfa_unlock(conn, %{"id" => id}) do
+    case ensure_scope(conn, "users:write") do
+      :ok ->
+        organization = conn.assigns.current_organization
+        current_user = conn.assigns.current_user
+
+        case Accounts.get_user_in_organization(id, organization.id) do
+          nil ->
+            render_error_response(
+              conn,
+              :not_found,
+              "resource_not_found",
+              "User not found in organization"
+            )
+
+          user ->
+            {:ok, _unlocked_user} = Authify.MFA.unlock_user(user, current_user)
+
+            AuditHelper.log_event_async(
+              conn,
+              :mfa_unlocked,
+              "user",
+              user.id,
+              "success",
+              %{"source" => "api", "target_user_email" => user.email}
+            )
+
+            json(conn, %{
+              data: %{
+                id: user.id,
+                type: "mfa_unlock",
+                attributes: %{
+                  message: "User MFA lockout has been removed"
+                }
+              },
+              links: %{
+                self: url(~p"/#{organization.slug}/api/users/#{user.id}/mfa"),
+                user: url(~p"/#{organization.slug}/api/users/#{user.id}")
+              }
+            })
+        end
+
+      {:error, response} ->
+        response
+    end
+  end
+
+  @doc """
+  POST /{org_slug}/api/users/:id/mfa/reset
+
+  Reset a user's MFA completely (disable TOTP, revoke devices, clear codes).
+  Requires users:write scope.
+  """
+  def mfa_reset(conn, %{"id" => id}) do
+    case ensure_scope(conn, "users:write") do
+      :ok ->
+        organization = conn.assigns.current_organization
+        current_user = conn.assigns.current_user
+
+        case Accounts.get_user_in_organization(id, organization.id) do
+          nil ->
+            render_error_response(
+              conn,
+              :not_found,
+              "resource_not_found",
+              "User not found in organization"
+            )
+
+          user ->
+            {:ok, _reset_user} = Authify.MFA.admin_reset_totp(user, current_user)
+
+            AuditHelper.log_event_async(
+              conn,
+              :mfa_reset,
+              "user",
+              user.id,
+              "success",
+              %{"source" => "api", "target_user_email" => user.email}
+            )
+
+            json(conn, %{
+              data: %{
+                id: user.id,
+                type: "mfa_reset",
+                attributes: %{
+                  message: "User MFA has been reset. They will need to set it up again."
+                }
+              },
+              links: %{
+                self: url(~p"/#{organization.slug}/api/users/#{user.id}/mfa"),
+                user: url(~p"/#{organization.slug}/api/users/#{user.id}")
+              }
+            })
+        end
+
+      {:error, response} ->
+        response
+    end
+  end
+
+  # Private helper to build MFA status
+  defp build_mfa_status(user) do
+    if Accounts.User.totp_enabled?(user) do
+      # Count backup codes
+      backup_codes_count = Authify.MFA.backup_codes_count(user)
+
+      # Count trusted devices
+      trusted_devices_count =
+        user
+        |> Authify.MFA.list_trusted_devices()
+        |> length()
+
+      # Check for active lockout
+      lockout_info =
+        case Authify.MFA.check_lockout(user) do
+          {:ok, :no_lockout} ->
+            nil
+
+          {:error, {:locked, locked_until}} ->
+            %{
+              locked: true,
+              locked_until: DateTime.to_iso8601(locked_until)
+            }
+        end
+
+      %{
+        totp_enabled: true,
+        totp_enabled_at: DateTime.to_iso8601(user.totp_enabled_at),
+        backup_codes_count: backup_codes_count,
+        trusted_devices_count: trusted_devices_count,
+        lockout: lockout_info
+      }
+    else
+      %{
+        totp_enabled: false,
+        totp_enabled_at: nil,
+        backup_codes_count: 0,
+        trusted_devices_count: 0,
+        lockout: nil
+      }
+    end
+  end
 end

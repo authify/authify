@@ -469,4 +469,301 @@ defmodule AuthifyWeb.API.UsersControllerTest do
              } = json_response(conn, 400)
     end
   end
+
+  describe "GET /api/users/:id/mfa" do
+    test "returns MFA status for user without TOTP", %{
+      conn: conn,
+      regular_user: regular_user,
+      organization: organization
+    } do
+      conn = get(conn, "/#{organization.slug}/api/users/#{regular_user.id}/mfa")
+
+      assert %{
+               "data" => %{
+                 "id" => user_id,
+                 "type" => "mfa_status",
+                 "attributes" => %{
+                   "totp_enabled" => false,
+                   "totp_enabled_at" => nil,
+                   "backup_codes_count" => 0,
+                   "trusted_devices_count" => 0,
+                   "lockout" => nil
+                 }
+               },
+               "links" => %{"self" => _}
+             } = json_response(conn, 200)
+
+      assert user_id == regular_user.id
+    end
+
+    test "returns MFA status for user with TOTP enabled", %{
+      conn: conn,
+      regular_user: regular_user,
+      organization: organization
+    } do
+      # Enable TOTP for user
+      {:ok, secret} = Authify.MFA.setup_totp(regular_user)
+      code = NimbleTOTP.verification_code(secret)
+      {:ok, regular_user, _codes} = Authify.MFA.complete_totp_setup(regular_user, code, secret)
+
+      conn = get(conn, "/#{organization.slug}/api/users/#{regular_user.id}/mfa")
+
+      assert %{
+               "data" => %{
+                 "id" => user_id,
+                 "type" => "mfa_status",
+                 "attributes" => %{
+                   "totp_enabled" => true,
+                   "totp_enabled_at" => totp_enabled_at,
+                   "backup_codes_count" => backup_codes_count,
+                   "trusted_devices_count" => 0,
+                   "lockout" => nil
+                 }
+               },
+               "links" => %{"self" => _}
+             } = json_response(conn, 200)
+
+      assert user_id == regular_user.id
+      refute is_nil(totp_enabled_at)
+      assert backup_codes_count == 10
+    end
+
+    test "returns MFA status with lockout info when user is locked out", %{
+      conn: conn,
+      regular_user: regular_user,
+      organization: organization
+    } do
+      # Enable TOTP for user
+      {:ok, secret} = Authify.MFA.setup_totp(regular_user)
+      code = NimbleTOTP.verification_code(secret)
+      {:ok, regular_user, _codes} = Authify.MFA.complete_totp_setup(regular_user, code, secret)
+
+      # Create lockout record directly
+      locked_until =
+        DateTime.utc_now() |> DateTime.add(300, :second) |> DateTime.truncate(:second)
+
+      {:ok, _lockout} =
+        Authify.Repo.insert(%Authify.MFA.TotpLockout{
+          user_id: regular_user.id,
+          locked_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          locked_until: locked_until,
+          failed_attempts: 5
+        })
+
+      conn = get(conn, "/#{organization.slug}/api/users/#{regular_user.id}/mfa")
+
+      assert %{
+               "data" => %{
+                 "attributes" => %{
+                   "totp_enabled" => true,
+                   "lockout" => %{
+                     "locked" => true,
+                     "locked_until" => _locked_until_str
+                   }
+                 }
+               }
+             } = json_response(conn, 200)
+    end
+
+    test "returns 404 when user not found in organization", %{
+      conn: conn,
+      organization: organization
+    } do
+      conn = get(conn, "/#{organization.slug}/api/users/99999/mfa")
+
+      assert %{
+               "error" => %{
+                 "type" => "resource_not_found",
+                 "message" => "User not found in organization"
+               }
+             } = json_response(conn, 404)
+    end
+
+    test "requires users:read scope", %{
+      conn: conn,
+      regular_user: regular_user,
+      organization: organization
+    } do
+      conn =
+        conn
+        |> assign(:current_scopes, ["profile:read"])
+
+      conn = get(conn, "/#{organization.slug}/api/users/#{regular_user.id}/mfa")
+
+      assert %{
+               "error" => %{
+                 "type" => "insufficient_scope",
+                 "message" => "Insufficient scope to access this resource"
+               }
+             } = json_response(conn, 403)
+    end
+  end
+
+  describe "POST /api/users/:id/mfa/unlock" do
+    test "unlocks user who is locked out", %{
+      conn: conn,
+      regular_user: regular_user,
+      organization: organization
+    } do
+      # Enable TOTP for user
+      {:ok, secret} = Authify.MFA.setup_totp(regular_user)
+      code = NimbleTOTP.verification_code(secret)
+      {:ok, regular_user, _codes} = Authify.MFA.complete_totp_setup(regular_user, code, secret)
+
+      # Create lockout record directly
+      locked_until =
+        DateTime.utc_now() |> DateTime.add(300, :second) |> DateTime.truncate(:second)
+
+      {:ok, _lockout} =
+        Authify.Repo.insert(%Authify.MFA.TotpLockout{
+          user_id: regular_user.id,
+          locked_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          locked_until: locked_until,
+          failed_attempts: 5
+        })
+
+      # Verify lockout exists
+      assert {:error, {:locked, _}} = Authify.MFA.check_lockout(regular_user)
+
+      # Unlock via API
+      conn = post(conn, "/#{organization.slug}/api/users/#{regular_user.id}/mfa/unlock")
+
+      assert %{
+               "data" => %{
+                 "id" => user_id,
+                 "type" => "mfa_unlock",
+                 "attributes" => %{
+                   "message" => "User MFA lockout has been removed"
+                 }
+               },
+               "links" => %{
+                 "self" => _,
+                 "user" => _
+               }
+             } = json_response(conn, 200)
+
+      assert user_id == regular_user.id
+
+      # Verify lockout removed
+      regular_user = Authify.Repo.reload!(regular_user)
+      assert {:ok, :no_lockout} = Authify.MFA.check_lockout(regular_user)
+    end
+
+    test "returns 404 when user not found in organization", %{
+      conn: conn,
+      organization: organization
+    } do
+      conn = post(conn, "/#{organization.slug}/api/users/99999/mfa/unlock")
+
+      assert %{
+               "error" => %{
+                 "type" => "resource_not_found",
+                 "message" => "User not found in organization"
+               }
+             } = json_response(conn, 404)
+    end
+
+    test "requires users:write scope", %{
+      conn: conn,
+      regular_user: regular_user,
+      organization: organization
+    } do
+      conn =
+        conn
+        |> assign(:current_scopes, ["users:read"])
+
+      conn = post(conn, "/#{organization.slug}/api/users/#{regular_user.id}/mfa/unlock")
+
+      assert %{
+               "error" => %{
+                 "type" => "insufficient_scope",
+                 "message" => "Insufficient scope to access this resource"
+               }
+             } = json_response(conn, 403)
+    end
+  end
+
+  describe "POST /api/users/:id/mfa/reset" do
+    test "resets user MFA completely", %{
+      conn: conn,
+      regular_user: regular_user,
+      organization: organization
+    } do
+      # Enable TOTP for user
+      {:ok, secret} = Authify.MFA.setup_totp(regular_user)
+      code = NimbleTOTP.verification_code(secret)
+      {:ok, regular_user, _codes} = Authify.MFA.complete_totp_setup(regular_user, code, secret)
+
+      # Create trusted device
+      {:ok, _device, _token} =
+        Authify.MFA.create_trusted_device(regular_user, %{
+          device_name: "Test Device",
+          ip_address: "127.0.0.1",
+          user_agent: "Test"
+        })
+
+      # Verify TOTP is enabled
+      regular_user = Authify.Repo.reload!(regular_user)
+      assert Authify.Accounts.User.totp_enabled?(regular_user)
+      assert length(Authify.MFA.list_trusted_devices(regular_user)) == 1
+
+      # Reset MFA via API
+      conn = post(conn, "/#{organization.slug}/api/users/#{regular_user.id}/mfa/reset")
+
+      assert %{
+               "data" => %{
+                 "id" => user_id,
+                 "type" => "mfa_reset",
+                 "attributes" => %{
+                   "message" => "User MFA has been reset. They will need to set it up again."
+                 }
+               },
+               "links" => %{
+                 "self" => _,
+                 "user" => _
+               }
+             } = json_response(conn, 200)
+
+      assert user_id == regular_user.id
+
+      # Verify MFA disabled and devices revoked
+      regular_user = Authify.Repo.reload!(regular_user)
+      refute Authify.Accounts.User.totp_enabled?(regular_user)
+      assert Enum.empty?(Authify.MFA.list_trusted_devices(regular_user))
+      assert Authify.MFA.backup_codes_count(regular_user) == 0
+    end
+
+    test "returns 404 when user not found in organization", %{
+      conn: conn,
+      organization: organization
+    } do
+      conn = post(conn, "/#{organization.slug}/api/users/99999/mfa/reset")
+
+      assert %{
+               "error" => %{
+                 "type" => "resource_not_found",
+                 "message" => "User not found in organization"
+               }
+             } = json_response(conn, 404)
+    end
+
+    test "requires users:write scope", %{
+      conn: conn,
+      regular_user: regular_user,
+      organization: organization
+    } do
+      conn =
+        conn
+        |> assign(:current_scopes, ["users:read"])
+
+      conn = post(conn, "/#{organization.slug}/api/users/#{regular_user.id}/mfa/reset")
+
+      assert %{
+               "error" => %{
+                 "type" => "insufficient_scope",
+                 "message" => "Insufficient scope to access this resource"
+               }
+             } = json_response(conn, 403)
+    end
+  end
 end

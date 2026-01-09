@@ -297,6 +297,9 @@ defmodule AuthifyWeb.Router do
     put "/users/:id", UsersController, :update
     delete "/users/:id", UsersController, :delete
     put "/users/:id/role", UsersController, :update_role
+    get "/users/:id/mfa", UsersController, :mfa_status
+    post "/users/:id/mfa/unlock", UsersController, :mfa_unlock
+    post "/users/:id/mfa/reset", UsersController, :mfa_reset
 
     # Invitation Management
     get "/invitations", InvitationsController, :index

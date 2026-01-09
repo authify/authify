@@ -12,7 +12,10 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Users do
     %{
       "/{org_slug}/api/users" => users_collection(),
       "/{org_slug}/api/users/{id}" => user_resource(),
-      "/{org_slug}/api/users/{id}/role" => user_role()
+      "/{org_slug}/api/users/{id}/role" => user_role(),
+      "/{org_slug}/api/users/{id}/mfa" => user_mfa_status(),
+      "/{org_slug}/api/users/{id}/mfa/unlock" => user_mfa_unlock(),
+      "/{org_slug}/api/users/{id}/mfa/reset" => user_mfa_reset()
     }
   end
 
@@ -266,6 +269,271 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Users do
           "403" => %{"$ref" => "#/components/responses/Forbidden"},
           "404" => %{"$ref" => "#/components/responses/NotFound"},
           "422" => %{"$ref" => "#/components/responses/ValidationError"}
+        }
+      }
+    }
+  end
+
+  defp user_mfa_status do
+    %{
+      parameters: [
+        %{"$ref" => "#/components/parameters/OrgSlug"},
+        %{"$ref" => "#/components/parameters/AcceptHeader"}
+      ],
+      get: %{
+        tags: ["Users"],
+        summary: "Get user MFA status",
+        description:
+          "Retrieve the MFA (Multi-Factor Authentication) status for a specific user, including TOTP status, backup codes count, trusted devices count, and lockout information",
+        security: [
+          %{"OAuth2" => ["users:read"]},
+          %{"BearerAuth" => []},
+          %{"SessionAuth" => []}
+        ],
+        parameters: [
+          %{
+            name: "id",
+            in: "path",
+            required: true,
+            description: "User ID",
+            schema: %{type: "string"}
+          }
+        ],
+        responses: %{
+          "200" => %{
+            description: "MFA status retrieved successfully",
+            content: %{
+              "application/vnd.authify.v1+json" => %{
+                schema: %{
+                  type: "object",
+                  properties: %{
+                    data: %{
+                      type: "object",
+                      properties: %{
+                        id: %{type: "string", description: "User ID"},
+                        type: %{type: "string", enum: ["mfa_status"]},
+                        attributes: %{
+                          type: "object",
+                          properties: %{
+                            totp_enabled: %{
+                              type: "boolean",
+                              description: "Whether TOTP is enabled"
+                            },
+                            totp_enabled_at: %{
+                              type: "string",
+                              format: "date-time",
+                              nullable: true,
+                              description: "When TOTP was enabled (ISO 8601)"
+                            },
+                            backup_codes_count: %{
+                              type: "integer",
+                              description: "Number of unused backup codes"
+                            },
+                            trusted_devices_count: %{
+                              type: "integer",
+                              description: "Number of trusted devices"
+                            },
+                            lockout: %{
+                              type: "object",
+                              nullable: true,
+                              properties: %{
+                                locked: %{type: "boolean"},
+                                locked_until: %{type: "string", format: "date-time"}
+                              },
+                              description: "Lockout status (null if not locked out)"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    links: %{
+                      type: "object",
+                      properties: %{
+                        self: %{type: "string", format: "uri"}
+                      }
+                    }
+                  }
+                },
+                example: %{
+                  data: %{
+                    id: "12345",
+                    type: "mfa_status",
+                    attributes: %{
+                      totp_enabled: true,
+                      totp_enabled_at: "2026-01-01T12:00:00Z",
+                      backup_codes_count: 8,
+                      trusted_devices_count: 2,
+                      lockout: nil
+                    }
+                  },
+                  links: %{
+                    self: "https://authify.example.com/acme/api/users/12345/mfa"
+                  }
+                }
+              }
+            }
+          },
+          "401" => %{"$ref" => "#/components/responses/Unauthorized"},
+          "403" => %{"$ref" => "#/components/responses/Forbidden"},
+          "404" => %{"$ref" => "#/components/responses/NotFound"}
+        }
+      }
+    }
+  end
+
+  defp user_mfa_unlock do
+    %{
+      parameters: [
+        %{"$ref" => "#/components/parameters/OrgSlug"},
+        %{"$ref" => "#/components/parameters/AcceptHeader"}
+      ],
+      post: %{
+        tags: ["Users"],
+        summary: "Unlock user MFA",
+        description:
+          "Unlock a user who is locked out from MFA due to too many failed verification attempts. This clears the lockout and allows the user to attempt MFA verification again.",
+        security: [
+          %{"OAuth2" => ["users:write"]},
+          %{"BearerAuth" => []},
+          %{"SessionAuth" => []}
+        ],
+        parameters: [
+          %{
+            name: "id",
+            in: "path",
+            required: true,
+            description: "User ID",
+            schema: %{type: "string"}
+          }
+        ],
+        responses: %{
+          "200" => %{
+            description: "User MFA lockout removed successfully",
+            content: %{
+              "application/vnd.authify.v1+json" => %{
+                schema: %{
+                  type: "object",
+                  properties: %{
+                    data: %{
+                      type: "object",
+                      properties: %{
+                        id: %{type: "string", description: "User ID"},
+                        type: %{type: "string", enum: ["mfa_unlock"]},
+                        attributes: %{
+                          type: "object",
+                          properties: %{
+                            message: %{type: "string"}
+                          }
+                        }
+                      }
+                    },
+                    links: %{
+                      type: "object",
+                      properties: %{
+                        self: %{type: "string", format: "uri"},
+                        user: %{type: "string", format: "uri"}
+                      }
+                    }
+                  }
+                },
+                example: %{
+                  data: %{
+                    id: "12345",
+                    type: "mfa_unlock",
+                    attributes: %{
+                      message: "User MFA lockout has been removed"
+                    }
+                  },
+                  links: %{
+                    self: "https://authify.example.com/acme/api/users/12345/mfa",
+                    user: "https://authify.example.com/acme/api/users/12345"
+                  }
+                }
+              }
+            }
+          },
+          "401" => %{"$ref" => "#/components/responses/Unauthorized"},
+          "403" => %{"$ref" => "#/components/responses/Forbidden"},
+          "404" => %{"$ref" => "#/components/responses/NotFound"}
+        }
+      }
+    }
+  end
+
+  defp user_mfa_reset do
+    %{
+      parameters: [
+        %{"$ref" => "#/components/parameters/OrgSlug"},
+        %{"$ref" => "#/components/parameters/AcceptHeader"}
+      ],
+      post: %{
+        tags: ["Users"],
+        summary: "Reset user MFA",
+        description:
+          "Completely reset a user's MFA configuration. This disables TOTP, revokes all trusted devices, clears backup codes, and removes any lockouts. The user will need to set up MFA again from scratch.",
+        security: [
+          %{"OAuth2" => ["users:write"]},
+          %{"BearerAuth" => []},
+          %{"SessionAuth" => []}
+        ],
+        parameters: [
+          %{
+            name: "id",
+            in: "path",
+            required: true,
+            description: "User ID",
+            schema: %{type: "string"}
+          }
+        ],
+        responses: %{
+          "200" => %{
+            description: "User MFA reset successfully",
+            content: %{
+              "application/vnd.authify.v1+json" => %{
+                schema: %{
+                  type: "object",
+                  properties: %{
+                    data: %{
+                      type: "object",
+                      properties: %{
+                        id: %{type: "string", description: "User ID"},
+                        type: %{type: "string", enum: ["mfa_reset"]},
+                        attributes: %{
+                          type: "object",
+                          properties: %{
+                            message: %{type: "string"}
+                          }
+                        }
+                      }
+                    },
+                    links: %{
+                      type: "object",
+                      properties: %{
+                        self: %{type: "string", format: "uri"},
+                        user: %{type: "string", format: "uri"}
+                      }
+                    }
+                  }
+                },
+                example: %{
+                  data: %{
+                    id: "12345",
+                    type: "mfa_reset",
+                    attributes: %{
+                      message: "User MFA has been reset. They will need to set it up again."
+                    }
+                  },
+                  links: %{
+                    self: "https://authify.example.com/acme/api/users/12345/mfa",
+                    user: "https://authify.example.com/acme/api/users/12345"
+                  }
+                }
+              }
+            }
+          },
+          "401" => %{"$ref" => "#/components/responses/Unauthorized"},
+          "403" => %{"$ref" => "#/components/responses/Forbidden"},
+          "404" => %{"$ref" => "#/components/responses/NotFound"}
         }
       }
     }
