@@ -26,70 +26,56 @@ defmodule AuthifyWeb.CertificatesController do
 
   def create(conn, %{"certificate" => certificate_params}) do
     organization = conn.assigns.current_organization
+    is_generated = certificate_params["generate_new"] == "true"
 
-    case certificate_params["generate_new"] do
-      "true" ->
-        # Generate a new certificate
-        case Accounts.generate_certificate(organization, certificate_params) do
-          {:ok, certificate} ->
-            AuditHelper.log_certificate_event(conn, :certificate_created, certificate,
-              generated: true,
-              extra_metadata: %{source: "web"}
-            )
+    create_certificate_for_organization(conn, organization, certificate_params, is_generated)
+  end
 
-            conn
-            |> put_flash(:info, "Certificate generated successfully.")
-            |> redirect(
-              to: ~p"/#{conn.assigns.current_organization.slug}/certificates/#{certificate.id}"
-            )
+  defp create_certificate_for_organization(conn, organization, certificate_params, true) do
+    case Accounts.generate_certificate(organization, certificate_params) do
+      {:ok, certificate} ->
+        handle_web_certificate_success(conn, certificate, true, "generated")
 
-          {:error, %Ecto.Changeset{} = changeset} ->
-            AuditHelper.log_certificate_failure(
-              conn,
-              :certificate_created,
-              AuditHelper.changeset_errors(changeset),
-              extra_metadata: %{
-                source: "web",
-                attempted_name: certificate_params["name"],
-                usage: certificate_params["usage"],
-                generated: true
-              }
-            )
-
-            render(conn, :new, changeset: changeset)
-        end
-
-      _ ->
-        # Manual certificate creation
-        case Accounts.create_certificate(organization, certificate_params) do
-          {:ok, certificate} ->
-            AuditHelper.log_certificate_event(conn, :certificate_created, certificate,
-              generated: false,
-              extra_metadata: %{source: "web"}
-            )
-
-            conn
-            |> put_flash(:info, "Certificate created successfully.")
-            |> redirect(
-              to: ~p"/#{conn.assigns.current_organization.slug}/certificates/#{certificate.id}"
-            )
-
-          {:error, %Ecto.Changeset{} = changeset} ->
-            AuditHelper.log_certificate_failure(
-              conn,
-              :certificate_created,
-              AuditHelper.changeset_errors(changeset),
-              extra_metadata: %{
-                source: "web",
-                attempted_name: certificate_params["name"],
-                usage: certificate_params["usage"],
-                generated: false
-              }
-            )
-
-            render(conn, :new, changeset: changeset)
-        end
+      {:error, %Ecto.Changeset{} = changeset} ->
+        handle_web_certificate_failure(conn, changeset, certificate_params, true)
     end
+  end
+
+  defp create_certificate_for_organization(conn, organization, certificate_params, false) do
+    case Accounts.create_certificate(organization, certificate_params) do
+      {:ok, certificate} ->
+        handle_web_certificate_success(conn, certificate, false, "created")
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        handle_web_certificate_failure(conn, changeset, certificate_params, false)
+    end
+  end
+
+  defp handle_web_certificate_success(conn, certificate, generated, action_verb) do
+    AuditHelper.log_certificate_event(conn, :certificate_created, certificate,
+      generated: generated,
+      extra_metadata: %{source: "web"}
+    )
+
+    conn
+    |> put_flash(:info, "Certificate #{action_verb} successfully.")
+    |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/certificates/#{certificate.id}")
+  end
+
+  defp handle_web_certificate_failure(conn, changeset, certificate_params, generated) do
+    AuditHelper.log_certificate_failure(
+      conn,
+      :certificate_created,
+      AuditHelper.changeset_errors(changeset),
+      extra_metadata: %{
+        source: "web",
+        attempted_name: certificate_params["name"],
+        usage: certificate_params["usage"],
+        generated: generated
+      }
+    )
+
+    render(conn, :new, changeset: changeset)
   end
 
   def edit(conn, %{"id" => id}) do

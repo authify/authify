@@ -27,77 +27,75 @@ defmodule AuthifyWeb.SessionController do
   def create(conn, %{
         "login" => %{"email" => email, "password" => password, "organization_slug" => org_slug}
       }) do
-    # Check if organization registration is enabled for error rendering
     allow_org_registration = Configurations.get_global_setting(:allow_organization_registration)
 
     case Accounts.get_organization_by_slug(org_slug) do
       nil ->
-        conn
-        |> put_flash(:error, "Organization not found.")
-        |> render(:new,
-          changeset: Accounts.change_user_registration(%Authify.Accounts.User{}),
-          org_slug: org_slug,
-          allow_org_registration: allow_org_registration
-        )
+        render_login_error(conn, org_slug, allow_org_registration, "Organization not found.")
 
       organization ->
-        case Accounts.authenticate_user(email, password, organization.id) do
-          {:ok, user} ->
-            # Log successful password authentication
-            AuditLog.log_event_async(:login_success, %{
-              organization_id: organization.id,
-              actor_type: "user",
-              actor_id: user.id,
-              actor_name: "#{user.first_name} #{user.last_name}",
-              outcome: "success",
-              ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-              user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first()
-            })
-
-            # Route based on MFA status
-            route_after_authentication(conn, user, organization)
-
-          {:error, :invalid_password} ->
-            # Log failed login attempt
-            AuditLog.log_event_async(:login_failure, %{
-              organization_id: organization.id,
-              actor_type: "user",
-              actor_name: email,
-              outcome: "failure",
-              ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-              user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-              metadata: %{reason: "invalid_password", attempted_email: email}
-            })
-
-            conn
-            |> put_flash(:error, "Invalid email or password.")
-            |> render(:new,
-              changeset: Accounts.change_user_registration(%Authify.Accounts.User{}),
-              org_slug: org_slug,
-              allow_org_registration: allow_org_registration
-            )
-
-          {:error, :user_not_found} ->
-            # Log failed login attempt
-            AuditLog.log_event_async(:login_failure, %{
-              organization_id: organization.id,
-              actor_type: "user",
-              actor_name: email,
-              outcome: "failure",
-              ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-              user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-              metadata: %{reason: "user_not_found", attempted_email: email}
-            })
-
-            conn
-            |> put_flash(:error, "Invalid email or password.")
-            |> render(:new,
-              changeset: Accounts.change_user_registration(%Authify.Accounts.User{}),
-              org_slug: org_slug,
-              allow_org_registration: allow_org_registration
-            )
-        end
+        handle_authentication(
+          conn,
+          email,
+          password,
+          organization,
+          org_slug,
+          allow_org_registration
+        )
     end
+  end
+
+  defp handle_authentication(
+         conn,
+         email,
+         password,
+         organization,
+         org_slug,
+         allow_org_registration
+       ) do
+    case Accounts.authenticate_user(email, password, organization.id) do
+      {:ok, user} ->
+        log_login_success(conn, organization, user)
+        route_after_authentication(conn, user, organization)
+
+      {:error, reason} when reason in [:invalid_password, :user_not_found] ->
+        log_login_failure(conn, organization, email, reason)
+        render_login_error(conn, org_slug, allow_org_registration, "Invalid email or password.")
+    end
+  end
+
+  defp log_login_success(conn, organization, user) do
+    AuditLog.log_event_async(:login_success, %{
+      organization_id: organization.id,
+      actor_type: "user",
+      actor_id: user.id,
+      actor_name: "#{user.first_name} #{user.last_name}",
+      outcome: "success",
+      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first()
+    })
+  end
+
+  defp log_login_failure(conn, organization, email, reason) do
+    AuditLog.log_event_async(:login_failure, %{
+      organization_id: organization.id,
+      actor_type: "user",
+      actor_name: email,
+      outcome: "failure",
+      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+      metadata: %{reason: to_string(reason), attempted_email: email}
+    })
+  end
+
+  defp render_login_error(conn, org_slug, allow_org_registration, error_message) do
+    conn
+    |> put_flash(:error, error_message)
+    |> render(:new,
+      changeset: Accounts.change_user_registration(%Authify.Accounts.User{}),
+      org_slug: org_slug,
+      allow_org_registration: allow_org_registration
+    )
   end
 
   def delete(conn, params) do

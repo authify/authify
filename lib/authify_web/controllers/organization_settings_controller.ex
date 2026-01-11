@@ -91,16 +91,7 @@ defmodule AuthifyWeb.OrganizationSettingsController do
         "scopes" => scopes
       }) do
     organization = conn.assigns.current_organization
-
-    # Ensure scopes is a list (remove empty strings from checkbox values)
-    scopes_list =
-      case scopes do
-        nil -> []
-        [] -> []
-        scopes when is_list(scopes) -> Enum.reject(scopes, &(&1 == ""))
-        scopes when is_binary(scopes) -> String.split(scopes, " ") |> Enum.reject(&(&1 == ""))
-      end
-
+    scopes_list = normalize_scopes(scopes)
     app_params = Map.put(app_params, "scopes", scopes_list)
 
     try do
@@ -108,26 +99,34 @@ defmodule AuthifyWeb.OrganizationSettingsController do
 
       case OAuth.update_application(application, app_params) do
         {:ok, _application} ->
-          conn
-          |> put_flash(:info, "Management API application updated successfully")
-          |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/settings/management-api")
+          redirect_with_flash(conn, :info, "Management API application updated successfully")
 
         {:error, %Ecto.Changeset{}} ->
-          conn
-          |> put_flash(:error, "Error updating application")
-          |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/settings/management-api")
+          redirect_with_flash(conn, :error, "Error updating application")
       end
     rescue
       Ecto.NoResultsError ->
-        conn
-        |> put_flash(:error, "Application not found")
-        |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/settings/management-api")
+        redirect_with_flash(conn, :error, "Application not found")
     end
   end
 
   def update_management_api_app(conn, %{"id" => id, "application" => app_params}) do
     # Handle case where no scopes are selected
     update_management_api_app(conn, %{"id" => id, "application" => app_params, "scopes" => []})
+  end
+
+  defp normalize_scopes(nil), do: []
+  defp normalize_scopes([]), do: []
+  defp normalize_scopes(scopes) when is_list(scopes), do: Enum.reject(scopes, &(&1 == ""))
+
+  defp normalize_scopes(scopes) when is_binary(scopes) do
+    scopes |> String.split(" ") |> Enum.reject(&(&1 == ""))
+  end
+
+  defp redirect_with_flash(conn, flash_type, message) do
+    conn
+    |> put_flash(flash_type, message)
+    |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/settings/management-api")
   end
 
   def delete_management_api_app(conn, %{"id" => id}) do
