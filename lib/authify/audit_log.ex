@@ -216,48 +216,94 @@ defmodule Authify.AuditLog do
   # Private helper functions
 
   defp apply_filters(query, opts) do
-    Enum.reduce(opts, query, fn
-      {:organization_id, org_id}, q when not is_nil(org_id) ->
-        where(q, [e], e.organization_id == ^org_id)
+    query
+    |> apply_organization_filter(opts[:organization_id])
+    |> apply_actor_type_filter(opts[:actor_type])
+    |> apply_actor_id_filter(opts[:actor_id])
+    |> apply_event_type_filter(opts[:event_type])
+    |> apply_outcome_filter(opts[:outcome])
+    |> apply_resource_type_filter(opts[:resource_type])
+    |> apply_resource_id_filter(opts[:resource_id])
+    |> apply_actor_name_filter(opts[:actor_name])
+    |> apply_date_from_filter(opts[:date_from])
+    |> apply_date_to_filter(opts[:date_to])
+    |> apply_from_date_filter(opts[:from_date])
+    |> apply_to_date_filter(opts[:to_date])
+  end
 
-      {:actor_type, actor_type}, q when not is_nil(actor_type) ->
-        where(q, [e], e.actor_type == ^actor_type)
+  defp apply_organization_filter(query, nil), do: query
 
-      {:actor_id, actor_id}, q when not is_nil(actor_id) ->
-        where(q, [e], e.actor_id == ^actor_id)
+  defp apply_organization_filter(query, org_id) do
+    where(query, [e], e.organization_id == ^org_id)
+  end
 
-      {:event_type, event_type}, q when not is_nil(event_type) ->
-        where(q, [e], e.event_type == ^event_type)
+  defp apply_actor_type_filter(query, nil), do: query
 
-      {:outcome, outcome}, q when not is_nil(outcome) ->
-        where(q, [e], e.outcome == ^outcome)
+  defp apply_actor_type_filter(query, actor_type) do
+    where(query, [e], e.actor_type == ^actor_type)
+  end
 
-      {:resource_type, resource_type}, q when not is_nil(resource_type) ->
-        where(q, [e], e.resource_type == ^resource_type)
+  defp apply_actor_id_filter(query, nil), do: query
 
-      {:resource_id, resource_id}, q when not is_nil(resource_id) ->
-        where(q, [e], e.resource_id == ^resource_id)
+  defp apply_actor_id_filter(query, actor_id) do
+    where(query, [e], e.actor_id == ^actor_id)
+  end
 
-      {:actor_name, actor_name}, q when not is_nil(actor_name) and actor_name != "" ->
-        where(q, [e], ilike(e.actor_name, ^"%#{actor_name}%"))
+  defp apply_event_type_filter(query, nil), do: query
 
-      {:date_from, date_from}, q when not is_nil(date_from) ->
-        {:ok, datetime} = DateTime.new(date_from, ~T[00:00:00])
-        where(q, [e], e.inserted_at >= ^datetime)
+  defp apply_event_type_filter(query, event_type) do
+    where(query, [e], e.event_type == ^event_type)
+  end
 
-      {:date_to, date_to}, q when not is_nil(date_to) ->
-        {:ok, datetime} = DateTime.new(date_to, ~T[23:59:59])
-        where(q, [e], e.inserted_at <= ^datetime)
+  defp apply_outcome_filter(query, nil), do: query
 
-      {:from_date, from_date}, q when not is_nil(from_date) ->
-        where(q, [e], e.inserted_at >= ^from_date)
+  defp apply_outcome_filter(query, outcome) do
+    where(query, [e], e.outcome == ^outcome)
+  end
 
-      {:to_date, to_date}, q when not is_nil(to_date) ->
-        where(q, [e], e.inserted_at <= ^to_date)
+  defp apply_resource_type_filter(query, nil), do: query
 
-      _other, q ->
-        q
-    end)
+  defp apply_resource_type_filter(query, resource_type) do
+    where(query, [e], e.resource_type == ^resource_type)
+  end
+
+  defp apply_resource_id_filter(query, nil), do: query
+
+  defp apply_resource_id_filter(query, resource_id) do
+    where(query, [e], e.resource_id == ^resource_id)
+  end
+
+  defp apply_actor_name_filter(query, nil), do: query
+  defp apply_actor_name_filter(query, ""), do: query
+
+  defp apply_actor_name_filter(query, actor_name) do
+    where(query, [e], ilike(e.actor_name, ^"%#{actor_name}%"))
+  end
+
+  defp apply_date_from_filter(query, nil), do: query
+
+  defp apply_date_from_filter(query, date_from) do
+    {:ok, datetime} = DateTime.new(date_from, ~T[00:00:00])
+    where(query, [e], e.inserted_at >= ^datetime)
+  end
+
+  defp apply_date_to_filter(query, nil), do: query
+
+  defp apply_date_to_filter(query, date_to) do
+    {:ok, datetime} = DateTime.new(date_to, ~T[23:59:59])
+    where(query, [e], e.inserted_at <= ^datetime)
+  end
+
+  defp apply_from_date_filter(query, nil), do: query
+
+  defp apply_from_date_filter(query, from_date) do
+    where(query, [e], e.inserted_at >= ^from_date)
+  end
+
+  defp apply_to_date_filter(query, nil), do: query
+
+  defp apply_to_date_filter(query, to_date) do
+    where(query, [e], e.inserted_at <= ^to_date)
   end
 
   defp apply_pagination(query, opts) do

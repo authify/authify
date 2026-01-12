@@ -88,70 +88,9 @@ defmodule AuthifyWeb.API.CertificatesController do
     case ensure_scope(conn, "certificates:write") do
       :ok ->
         organization = conn.assigns.current_organization
+        is_generated = certificate_params["generate_new"] == "true"
 
-        case certificate_params["generate_new"] do
-          "true" ->
-            # Generate a new certificate
-            case Accounts.generate_saml_signing_certificate(organization, certificate_params) do
-              {:ok, certificate} ->
-                AuditHelper.log_certificate_event(conn, :certificate_created, certificate,
-                  generated: true,
-                  extra_metadata: %{source: "api"}
-                )
-
-                render_api_response(conn, certificate,
-                  resource_type: "certificate",
-                  exclude: [:private_key],
-                  status: :created
-                )
-
-              {:error, %Ecto.Changeset{} = changeset} ->
-                AuditHelper.log_certificate_failure(
-                  conn,
-                  :certificate_created,
-                  AuditHelper.changeset_errors(changeset),
-                  extra_metadata: %{
-                    source: "api",
-                    attempted_name: certificate_params["name"],
-                    usage: certificate_params["usage"],
-                    generated: true
-                  }
-                )
-
-                render_validation_errors(conn, changeset)
-            end
-
-          _ ->
-            # Manual certificate creation
-            case Accounts.create_certificate(organization, certificate_params) do
-              {:ok, certificate} ->
-                AuditHelper.log_certificate_event(conn, :certificate_created, certificate,
-                  generated: false,
-                  extra_metadata: %{source: "api"}
-                )
-
-                render_api_response(conn, certificate,
-                  resource_type: "certificate",
-                  exclude: [:private_key],
-                  status: :created
-                )
-
-              {:error, %Ecto.Changeset{} = changeset} ->
-                AuditHelper.log_certificate_failure(
-                  conn,
-                  :certificate_created,
-                  AuditHelper.changeset_errors(changeset),
-                  extra_metadata: %{
-                    source: "api",
-                    attempted_name: certificate_params["name"],
-                    usage: certificate_params["usage"],
-                    generated: false
-                  }
-                )
-
-                render_validation_errors(conn, changeset)
-            end
-        end
+        create_certificate_for_org(conn, organization, certificate_params, is_generated)
 
       {:error, response} ->
         response
@@ -171,6 +110,55 @@ defmodule AuthifyWeb.API.CertificatesController do
       {:error, response} ->
         response
     end
+  end
+
+  defp create_certificate_for_org(conn, organization, certificate_params, true) do
+    case Accounts.generate_saml_signing_certificate(organization, certificate_params) do
+      {:ok, certificate} ->
+        handle_certificate_creation_success(conn, certificate, true)
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        handle_certificate_creation_failure(conn, changeset, certificate_params, true)
+    end
+  end
+
+  defp create_certificate_for_org(conn, organization, certificate_params, false) do
+    case Accounts.create_certificate(organization, certificate_params) do
+      {:ok, certificate} ->
+        handle_certificate_creation_success(conn, certificate, false)
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        handle_certificate_creation_failure(conn, changeset, certificate_params, false)
+    end
+  end
+
+  defp handle_certificate_creation_success(conn, certificate, generated) do
+    AuditHelper.log_certificate_event(conn, :certificate_created, certificate,
+      generated: generated,
+      extra_metadata: %{source: "api"}
+    )
+
+    render_api_response(conn, certificate,
+      resource_type: "certificate",
+      exclude: [:private_key],
+      status: :created
+    )
+  end
+
+  defp handle_certificate_creation_failure(conn, changeset, certificate_params, generated) do
+    AuditHelper.log_certificate_failure(
+      conn,
+      :certificate_created,
+      AuditHelper.changeset_errors(changeset),
+      extra_metadata: %{
+        source: "api",
+        attempted_name: certificate_params["name"],
+        usage: certificate_params["usage"],
+        generated: generated
+      }
+    )
+
+    render_validation_errors(conn, changeset)
   end
 
   @doc """

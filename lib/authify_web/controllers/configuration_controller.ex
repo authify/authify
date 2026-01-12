@@ -95,161 +95,187 @@ defmodule AuthifyWeb.ConfigurationController do
   def update(conn, params) do
     user = conn.assigns.current_user
     organization = conn.assigns.current_organization
-    settings_params = Map.get(params, "settings", %{})
-    authify_domain = Map.get(params, "authify_domain")
-    custom_domains = Map.get(params, "custom_domains")
-
-    schema_name =
-      if organization.slug == "authify-global" do
-        "global"
-      else
-        "organization"
-      end
+    schema_name = determine_schema_name(organization)
 
     _config =
       Configurations.get_or_create_configuration("Organization", organization.id, schema_name)
 
     old_settings = Configurations.get_all_settings("Organization", organization.id)
+    complete_settings = normalize_boolean_settings(params, schema_name)
 
-    # Get the schema module to know which settings are boolean
-    schema_module =
-      case schema_name do
-        "global" -> Authify.Configurations.Schemas.Global
-        "organization" -> Authify.Configurations.Schemas.Organization
-      end
+    # Process domains first, then settings
+    case process_domain_updates(organization, params) do
+      {:error, domain_type, reason} ->
+        handle_domain_error(conn, organization, schema_name, domain_type, reason)
 
-    # Get all boolean settings from the schema
-    boolean_settings =
-      schema_module.settings()
-      |> Enum.filter(&(&1.value_type == :boolean))
-      |> Enum.map(& &1.name)
-
-    # Build complete settings map:
-    # - Include all provided settings
-    # - For boolean settings not in params, explicitly set to false
-    complete_settings =
-      Enum.reduce(boolean_settings, settings_params, fn setting_name, acc ->
-        setting_key = to_string(setting_name)
-
-        if Map.has_key?(acc, setting_key) do
-          acc
-        else
-          # Boolean checkbox not checked, set to false
-          Map.put(acc, setting_key, "false")
-        end
-      end)
-
-    # IMPORTANT: Process domains BEFORE settings
-    # This ensures email_link_domain validation sees the updated CNAMEs
-
-    # Handle authify_domain for global organization
-    authify_domain_result =
-      if organization.slug == "authify-global" && authify_domain != nil do
-        handle_authify_domain_update(organization, authify_domain)
-      else
-        :ok
-      end
-
-    # Handle custom_domains for tenant organizations
-    # Only process if custom_domains was actually provided in the params
-    custom_domains_result =
-      if organization.slug != "authify-global" && custom_domains != nil do
-        handle_custom_domains_update(organization, custom_domains)
-      else
-        :ok
-      end
-
-    # NOW update each setting (after domains are processed)
-    results =
-      Enum.map(complete_settings, fn {key, value} ->
-        setting_name = String.to_existing_atom(key)
-
-        # Use appropriate setter based on schema
-        if schema_name == "organization" do
-          # Use set_organization_setting_with_user for permission checks on quota settings
-          Configurations.set_organization_setting_with_user(
-            organization,
-            user,
-            setting_name,
-            value
-          )
-        else
-          # Use generic set_setting for global settings
-          Configurations.set_setting("Organization", organization.id, setting_name, value)
-        end
-      end)
-
-    # Check if any errors occurred
-    errors = Enum.filter(results, fn result -> match?({:error, _}, result) end)
-
-    cond do
-      match?({:error, _}, authify_domain_result) ->
-        {:error, reason} = authify_domain_result
-
-        AuditHelper.log_configuration_update_failure(
+      :ok ->
+        process_settings_updates(
           conn,
-          schema_name,
-          ["authify_domain #{reason}"],
-          resource_id: organization.id,
-          resource_type: "configuration"
-        )
-
-        conn
-        |> put_flash(:error, "Authify domain #{reason}")
-        |> redirect(to: ~p"/#{organization.slug}/settings/configuration")
-
-      match?({:error, _}, custom_domains_result) ->
-        {:error, reason} = custom_domains_result
-
-        AuditHelper.log_configuration_update_failure(
-          conn,
-          schema_name,
-          ["custom_domains #{reason}"],
-          resource_id: organization.id,
-          resource_type: "configuration"
-        )
-
-        conn
-        |> put_flash(:error, "Custom domains #{reason}")
-        |> redirect(to: ~p"/#{organization.slug}/settings/configuration")
-
-      Enum.empty?(errors) ->
-        new_settings = Configurations.get_all_settings("Organization", organization.id)
-
-        AuditHelper.log_configuration_update(
-          conn,
+          organization,
+          user,
           schema_name,
           old_settings,
-          new_settings,
-          resource_id: organization.id,
-          resource_type: "configuration",
-          extra_metadata: %{
-            custom_domains:
-              Organizations.list_organization_cnames(organization) |> Enum.map(& &1.domain)
-          }
+          complete_settings
         )
-
-        conn
-        |> put_flash(:info, "Configuration updated successfully.")
-        |> redirect(to: ~p"/#{organization.slug}/settings/configuration")
-
-      true ->
-        error_messages =
-          errors
-          |> Enum.map(fn {:error, msg} -> msg end)
-
-        AuditHelper.log_configuration_update_failure(
-          conn,
-          schema_name,
-          error_messages,
-          resource_id: organization.id,
-          resource_type: "configuration"
-        )
-
-        conn
-        |> put_flash(:error, "Error updating some settings. Please check your input.")
-        |> redirect(to: ~p"/#{organization.slug}/settings/configuration")
     end
+  end
+
+  defp determine_schema_name(%{slug: "authify-global"}), do: "global"
+  defp determine_schema_name(_organization), do: "organization"
+
+  defp normalize_boolean_settings(params, schema_name) do
+    settings_params = Map.get(params, "settings", %{})
+    schema_module = get_schema_module(schema_name)
+    boolean_settings = extract_boolean_setting_names(schema_module)
+
+    Enum.reduce(boolean_settings, settings_params, fn setting_name, acc ->
+      setting_key = to_string(setting_name)
+      if Map.has_key?(acc, setting_key), do: acc, else: Map.put(acc, setting_key, "false")
+    end)
+  end
+
+  defp get_schema_module("global"), do: Authify.Configurations.Schemas.Global
+  defp get_schema_module("organization"), do: Authify.Configurations.Schemas.Organization
+
+  defp extract_boolean_setting_names(schema_module) do
+    schema_module.settings()
+    |> Enum.filter(&(&1.value_type == :boolean))
+    |> Enum.map(& &1.name)
+  end
+
+  defp process_domain_updates(organization, params) do
+    authify_domain = Map.get(params, "authify_domain")
+    custom_domains = Map.get(params, "custom_domains")
+
+    case process_authify_domain(organization, authify_domain) do
+      {:error, reason} ->
+        {:error, :authify_domain, reason}
+
+      _ ->
+        case process_custom_domains(organization, custom_domains) do
+          {:error, reason} -> {:error, :custom_domains, reason}
+          _ -> :ok
+        end
+    end
+  end
+
+  defp process_authify_domain(%{slug: "authify-global"} = organization, authify_domain)
+       when not is_nil(authify_domain) do
+    handle_authify_domain_update(organization, authify_domain)
+  end
+
+  defp process_authify_domain(_organization, _authify_domain), do: :ok
+
+  defp process_custom_domains(organization, custom_domains)
+       when not is_nil(custom_domains) do
+    if organization.slug == "authify-global" do
+      :ok
+    else
+      handle_custom_domains_update(organization, custom_domains)
+    end
+  end
+
+  defp process_custom_domains(_organization, _custom_domains), do: :ok
+
+  defp process_settings_updates(
+         conn,
+         organization,
+         user,
+         schema_name,
+         old_settings,
+         complete_settings
+       ) do
+    results = apply_settings_updates(organization, user, schema_name, complete_settings)
+    errors = Enum.filter(results, &match?({:error, _}, &1))
+
+    if Enum.empty?(errors) do
+      handle_update_success(conn, organization, schema_name, old_settings)
+    else
+      error_messages = Enum.map(errors, fn {:error, msg} -> msg end)
+      handle_settings_error(conn, organization, schema_name, error_messages)
+    end
+  end
+
+  defp apply_settings_updates(organization, user, schema_name, complete_settings) do
+    Enum.map(complete_settings, fn {key, value} ->
+      setting_name = String.to_existing_atom(key)
+      update_single_setting(organization, user, schema_name, setting_name, value)
+    end)
+  end
+
+  defp update_single_setting(organization, user, "organization", setting_name, value) do
+    Configurations.set_organization_setting_with_user(organization, user, setting_name, value)
+  end
+
+  defp update_single_setting(organization, _user, _schema_name, setting_name, value) do
+    Configurations.set_setting("Organization", organization.id, setting_name, value)
+  end
+
+  defp handle_update_success(conn, organization, schema_name, old_settings) do
+    new_settings = Configurations.get_all_settings("Organization", organization.id)
+
+    AuditHelper.log_configuration_update(
+      conn,
+      schema_name,
+      old_settings,
+      new_settings,
+      resource_id: organization.id,
+      resource_type: "configuration",
+      extra_metadata: %{
+        custom_domains:
+          Organizations.list_organization_cnames(organization) |> Enum.map(& &1.domain)
+      }
+    )
+
+    conn
+    |> put_flash(:info, "Configuration updated successfully.")
+    |> redirect(to: ~p"/#{organization.slug}/settings/configuration")
+  end
+
+  defp handle_domain_error(conn, organization, schema_name, :authify_domain, reason) do
+    error_message = "Authify domain #{reason}"
+
+    AuditHelper.log_configuration_update_failure(
+      conn,
+      schema_name,
+      [error_message],
+      resource_id: organization.id,
+      resource_type: "configuration"
+    )
+
+    conn
+    |> put_flash(:error, error_message)
+    |> redirect(to: ~p"/#{organization.slug}/settings/configuration")
+  end
+
+  defp handle_domain_error(conn, organization, schema_name, :custom_domains, reason) do
+    error_message = "Custom domains #{reason}"
+
+    AuditHelper.log_configuration_update_failure(
+      conn,
+      schema_name,
+      [error_message],
+      resource_id: organization.id,
+      resource_type: "configuration"
+    )
+
+    conn
+    |> put_flash(:error, error_message)
+    |> redirect(to: ~p"/#{organization.slug}/settings/configuration")
+  end
+
+  defp handle_settings_error(conn, organization, schema_name, error_messages) do
+    AuditHelper.log_configuration_update_failure(
+      conn,
+      schema_name,
+      error_messages,
+      resource_id: organization.id,
+      resource_type: "configuration"
+    )
+
+    conn
+    |> put_flash(:error, "Error updating some settings. Please check your input.")
+    |> redirect(to: ~p"/#{organization.slug}/settings/configuration")
   end
 
   defp handle_authify_domain_update(organization, "") do

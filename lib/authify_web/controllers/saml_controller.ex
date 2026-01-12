@@ -65,72 +65,96 @@ defmodule AuthifyWeb.SAMLController do
     current_user = Authify.Guardian.Plug.current_resource(conn)
     organization = conn.assigns.current_organization
 
-    if current_user do
-      case SAML.get_session(session_id) do
-        %SAML.Session{service_provider: sp} = saml_session when not is_nil(sp) ->
-          # Validate session's service provider belongs to current organization
-          cond do
-            sp.organization_id != organization.id ->
-              render_saml_error(conn, "Invalid or expired SAML session")
+    with {:ok, current_user} <- verify_user_authenticated(conn, current_user),
+         {:ok, saml_session} <- get_valid_saml_session(session_id),
+         :ok <- validate_session_ownership(saml_session, current_user, organization),
+         {:ok, updated_session} <- ensure_session_has_user(saml_session, current_user),
+         {:ok, form_html} <- generate_and_send_response(conn, updated_session, current_user) do
+      log_saml_assertion_issued(conn, organization, current_user, updated_session)
 
-            saml_session.user_id != current_user.id and saml_session.user_id != nil ->
-              render_saml_error(conn, "Access denied: session does not belong to current user")
-
-            true ->
-              # If session doesn't have a user, assign the current user
-              saml_session =
-                if saml_session.user_id == nil do
-                  subject_id =
-                    SAML.Session.generate_subject_id(current_user, saml_session.service_provider)
-
-                  {:ok, updated_session} =
-                    SAML.update_session(saml_session, %{
-                      user_id: current_user.id,
-                      subject_id: subject_id
-                    })
-
-                  updated_session
-                else
-                  saml_session
-                end
-
-              case generate_and_send_response(conn, saml_session, current_user) do
-                {:ok, form_html} ->
-                  # Log successful SAML assertion
-                  AuditLog.log_event_async(:saml_assertion_issued, %{
-                    organization_id: organization.id,
-                    actor_type: "user",
-                    actor_id: current_user.id,
-                    actor_name: "#{current_user.first_name} #{current_user.last_name}",
-                    resource_type: "saml_assertion",
-                    resource_id: saml_session.id,
-                    outcome: "success",
-                    ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-                    user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-                    metadata: %{
-                      service_provider_id: sp.id,
-                      service_provider_name: sp.name,
-                      entity_id: sp.entity_id,
-                      session_id: saml_session.session_id,
-                      relay_state: saml_session.relay_state
-                    }
-                  })
-
-                  conn
-                  |> put_resp_content_type("text/html")
-                  |> send_resp(200, form_html)
-
-                {:error, error} ->
-                  render_saml_error(conn, error)
-              end
-          end
-
-        nil ->
-          render_saml_error(conn, "Invalid or expired SAML session")
-      end
+      conn
+      |> put_resp_content_type("text/html")
+      |> send_resp(200, form_html)
     else
-      redirect(conn, to: "/login?return_to=#{URI.encode(current_path(conn))}")
+      {:error, :not_authenticated, return_path} ->
+        redirect(conn, to: "/login?return_to=#{URI.encode(return_path)}")
+
+      {:error, :invalid_session} ->
+        render_saml_error(conn, "Invalid or expired SAML session")
+
+      {:error, :access_denied} ->
+        render_saml_error(conn, "Access denied: session does not belong to current user")
+
+      {:error, error} ->
+        render_saml_error(conn, error)
     end
+  end
+
+  defp verify_user_authenticated(conn, nil) do
+    {:error, :not_authenticated, current_path(conn)}
+  end
+
+  defp verify_user_authenticated(_conn, current_user), do: {:ok, current_user}
+
+  defp get_valid_saml_session(session_id) do
+    case SAML.get_session(session_id) do
+      %SAML.Session{service_provider: sp} = session when not is_nil(sp) ->
+        {:ok, session}
+
+      _ ->
+        {:error, :invalid_session}
+    end
+  end
+
+  defp validate_session_ownership(saml_session, current_user, organization) do
+    sp = saml_session.service_provider
+
+    cond do
+      sp.organization_id != organization.id ->
+        {:error, :invalid_session}
+
+      saml_session.user_id != current_user.id and saml_session.user_id != nil ->
+        {:error, :access_denied}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp ensure_session_has_user(saml_session, current_user) do
+    if saml_session.user_id == nil do
+      subject_id = SAML.Session.generate_subject_id(current_user, saml_session.service_provider)
+
+      SAML.update_session(saml_session, %{
+        user_id: current_user.id,
+        subject_id: subject_id
+      })
+    else
+      {:ok, saml_session}
+    end
+  end
+
+  defp log_saml_assertion_issued(conn, organization, current_user, saml_session) do
+    sp = saml_session.service_provider
+
+    AuditLog.log_event_async(:saml_assertion_issued, %{
+      organization_id: organization.id,
+      actor_type: "user",
+      actor_id: current_user.id,
+      actor_name: "#{current_user.first_name} #{current_user.last_name}",
+      resource_type: "saml_assertion",
+      resource_id: saml_session.id,
+      outcome: "success",
+      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+      metadata: %{
+        service_provider_id: sp.id,
+        service_provider_name: sp.name,
+        entity_id: sp.entity_id,
+        session_id: saml_session.session_id,
+        relay_state: saml_session.relay_state
+      }
+    })
   end
 
   @doc """
@@ -287,63 +311,71 @@ defmodule AuthifyWeb.SAMLController do
     relay_state = params["RelayState"]
     organization = conn.assigns.current_organization
 
-    case SAML.parse_saml_logout_request(saml_request) do
-      {:ok, logout_request} ->
-        # Find the service provider
-        case SAML.get_service_provider_by_entity_id(logout_request.issuer, organization) do
-          %SAML.ServiceProvider{} = sp ->
-            # Get current user from session
-            current_user = Authify.Guardian.Plug.current_resource(conn)
+    with {:ok, logout_request} <- parse_saml_logout_request(saml_request),
+         {:ok, sp} <- find_service_provider(logout_request.issuer, organization),
+         :ok <- terminate_user_sessions_if_present(conn),
+         :ok <- log_slo_event_if_user_present(conn, organization, sp),
+         {:ok, saml_response} <- SAML.generate_saml_logout_response(logout_request, sp) do
+      encoded_response = Base.encode64(saml_response)
+      send_saml_logout_response(conn, sp, encoded_response, relay_state)
+    else
+      {:error, :service_provider_not_found, issuer} ->
+        render_saml_error(conn, "Unknown service provider: #{issuer}")
 
-            if current_user do
-              # Terminate user's SAML sessions
-              SAML.terminate_all_sessions_for_user(current_user)
-
-              # Log SAML SLO event
-              AuditLog.log_event_async(:saml_slo_completed, %{
-                organization_id: organization.id,
-                actor_type: "user",
-                actor_id: current_user.id,
-                actor_name: "#{current_user.first_name} #{current_user.last_name}",
-                outcome: "success",
-                ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-                user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-                metadata: %{
-                  service_provider_id: sp.id,
-                  service_provider_name: sp.name,
-                  entity_id: sp.entity_id,
-                  initiator: "service_provider"
-                }
-              })
-
-              # Generate logout response
-              case SAML.generate_saml_logout_response(logout_request, sp) do
-                {:ok, saml_response} ->
-                  # Encode and send response back to SP
-                  encoded_response = Base.encode64(saml_response)
-                  send_saml_logout_response(conn, sp, encoded_response, relay_state)
-
-                {:error, reason} ->
-                  render_saml_error(conn, "Failed to generate logout response: #{reason}")
-              end
-            else
-              # User not logged in, just redirect to SP with success response
-              case SAML.generate_saml_logout_response(logout_request, sp) do
-                {:ok, saml_response} ->
-                  encoded_response = Base.encode64(saml_response)
-                  send_saml_logout_response(conn, sp, encoded_response, relay_state)
-
-                {:error, reason} ->
-                  render_saml_error(conn, "Failed to generate logout response: #{reason}")
-              end
-            end
-
-          nil ->
-            render_saml_error(conn, "Unknown service provider: #{logout_request.issuer}")
-        end
+      {:error, :invalid_logout_request, reason} ->
+        render_saml_error(conn, "Invalid logout request: #{reason}")
 
       {:error, reason} ->
-        render_saml_error(conn, "Invalid logout request: #{reason}")
+        render_saml_error(conn, "Failed to generate logout response: #{reason}")
+    end
+  end
+
+  defp parse_saml_logout_request(saml_request) do
+    case SAML.parse_saml_logout_request(saml_request) do
+      {:ok, logout_request} -> {:ok, logout_request}
+      {:error, reason} -> {:error, :invalid_logout_request, reason}
+    end
+  end
+
+  defp find_service_provider(issuer, organization) do
+    case SAML.get_service_provider_by_entity_id(issuer, organization) do
+      %SAML.ServiceProvider{} = sp -> {:ok, sp}
+      nil -> {:error, :service_provider_not_found, issuer}
+    end
+  end
+
+  defp terminate_user_sessions_if_present(conn) do
+    case Authify.Guardian.Plug.current_resource(conn) do
+      nil -> :ok
+      current_user -> SAML.terminate_all_sessions_for_user(current_user)
+    end
+
+    :ok
+  end
+
+  defp log_slo_event_if_user_present(conn, organization, sp) do
+    case Authify.Guardian.Plug.current_resource(conn) do
+      nil ->
+        :ok
+
+      current_user ->
+        AuditLog.log_event_async(:saml_slo_completed, %{
+          organization_id: organization.id,
+          actor_type: "user",
+          actor_id: current_user.id,
+          actor_name: "#{current_user.first_name} #{current_user.last_name}",
+          outcome: "success",
+          ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
+          user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
+          metadata: %{
+            service_provider_id: sp.id,
+            service_provider_name: sp.name,
+            entity_id: sp.entity_id,
+            initiator: "service_provider"
+          }
+        })
+
+        :ok
     end
   end
 
