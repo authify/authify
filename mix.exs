@@ -4,7 +4,7 @@ defmodule Authify.MixProject do
   def project do
     [
       app: :authify,
-      version: "0.10.0",
+      version: "0.10.1",
       elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -59,7 +59,7 @@ defmodule Authify.MixProject do
       {:lazy_html, ">= 0.1.0", only: :test},
       {:myxql, ">= 0.0.0"},
       {:nimble_totp, "~> 1.0"},
-      {:phoenix, "~> 1.8.1"},
+      {:phoenix, "~> 1.8.3"},
       {:phoenix_ecto, "~> 4.5"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_dashboard, "~> 0.8.3"},

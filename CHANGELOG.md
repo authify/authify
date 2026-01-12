@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-01-11
+
+### Changed
+
+- Added the ABCSize credo check and made the CyclomaticComplexity check more strict in the CI pipeline
+- Refactored functions that now violate the new ABCSize or CyclomaticComplexity thresholds to comply with the stricter checks
+- Updated all dependencies to their latest versions, including Erlang/OTP 28.3 and Elixir 1.19.5.
+
 ## [0.10.0] - 2026-01-09
 
 ### Added
