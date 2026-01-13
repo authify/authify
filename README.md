@@ -236,6 +236,11 @@ Built with:
 - **[Ecto](https://hexdocs.pm/ecto/)** - Database wrapper and query generator
 - **[Bootstrap](https://getbootstrap.com/)** - UI framework
 
+Special thanks to:
+- **[ExScim](https://github.com/ExScim/ex_scim)** - SCIM 2.0 filter parser implementation (adapted with security enhancements)
+
+For complete acknowledgments and attribution details, see [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md).
+
 ---
 
 **Authify** - Self-hosted identity provider for the modern web 🚀

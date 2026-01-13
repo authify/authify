@@ -58,6 +58,7 @@ defmodule Authify.MixProject do
       {:jason, "~> 1.2"},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:myxql, ">= 0.0.0"},
+      {:nimble_parsec, "~> 1.4"},
       {:nimble_totp, "~> 1.0"},
       {:phoenix, "~> 1.8.3"},
       {:phoenix_ecto, "~> 4.5"},

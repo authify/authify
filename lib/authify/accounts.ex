@@ -18,6 +18,8 @@ defmodule Authify.Accounts do
     User
   }
 
+  alias Authify.SCIM.{AttributeMapper, FilterParser, QueryFilter}
+
   ## Organizations
 
   @doc """
@@ -2059,10 +2061,19 @@ defmodule Authify.Accounts do
   ## Options
     * `:page` - Page number (default: 1)
     * `:per_page` - Results per page (default: 25, max: 100)
-    * `:filter` - SCIM filter query (not implemented yet, reserved for Phase 2)
+    * `:filter` - SCIM filter query string
+    * `:sort_by` - SCIM attribute to sort by (e.g., "userName", "meta.created")
+    * `:sort_order` - Sort direction, "ascending" or "descending" (default: "ascending")
 
-  Note: Full SCIM filter support will be added in Phase 2 (FilterParser).
-  This function currently returns all users with pagination.
+  ## Examples
+
+      iex> list_users_scim(org_id, filter: "userName eq \\"jsmith\\"")
+      [%User{username: "jsmith"}]
+
+      iex> list_users_scim(org_id, filter: "active eq true and userName sw \\"j\\"")
+      [%User{username: "jsmith", active: true}, ...]
+
+  Returns `{:ok, users}` on success or `{:error, reason}` if filter is invalid.
   """
   def list_users_scim(organization_id, opts \\ []) do
     page = Keyword.get(opts, :page, 1)
@@ -2070,20 +2081,44 @@ defmodule Authify.Accounts do
     offset = (page - 1) * per_page
 
     # Base query - returns all users (active and inactive for SCIM)
-    query =
+    base_query =
       from(u in User,
         where: u.organization_id == ^organization_id,
-        preload: [:organization, :groups],
-        order_by: [asc: u.id]
+        preload: [:organization, :groups]
       )
 
-    # NOTE: SCIM filter support will be added in Phase 2 (FilterParser implementation)
-    # query = apply_scim_filter(query, opts[:filter])
+    # Apply SCIM filter if provided
+    query_result =
+      case Keyword.get(opts, :filter) do
+        nil ->
+          {:ok, base_query}
 
-    query
-    |> limit(^per_page)
-    |> offset(^offset)
-    |> Repo.all()
+        filter_string ->
+          with {:ok, ast} <- FilterParser.parse(filter_string),
+               {:ok, filtered_query} <- QueryFilter.apply_filter(base_query, ast, :user) do
+            {:ok, filtered_query}
+          else
+            {:error, reason} -> {:error, reason}
+          end
+      end
+
+    case query_result do
+      {:ok, query} ->
+        # Apply sorting
+        query = apply_scim_sort(query, opts[:sort_by], opts[:sort_order])
+
+        # Apply pagination
+        users =
+          query
+          |> limit(^per_page)
+          |> offset(^offset)
+          |> Repo.all()
+
+        {:ok, users}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   @doc """
@@ -2092,56 +2127,172 @@ defmodule Authify.Accounts do
   ## Options
     * `:page` - Page number (default: 1)
     * `:per_page` - Results per page (default: 25, max: 100)
-    * `:filter` - SCIM filter query (not implemented yet, reserved for Phase 2)
+    * `:filter` - SCIM filter query string
+    * `:sort_by` - SCIM attribute to sort by (e.g., "displayName")
+    * `:sort_order` - Sort direction, "ascending" or "descending" (default: "ascending")
 
-  Note: Full SCIM filter support will be added in Phase 2 (FilterParser).
+  ## Examples
+
+      iex> list_groups_scim(org_id, filter: "displayName eq \\"Engineering\\"")
+      {:ok, [%Group{name: "Engineering"}]}
+
+  Returns `{:ok, groups}` on success or `{:error, reason}` if filter is invalid.
   """
   def list_groups_scim(organization_id, opts \\ []) do
     page = Keyword.get(opts, :page, 1)
     per_page = min(Keyword.get(opts, :per_page, 25), 100)
     offset = (page - 1) * per_page
 
-    query =
+    # Base query
+    base_query =
       from(g in Group,
         where: g.organization_id == ^organization_id,
-        preload: [:users],
-        order_by: [asc: g.id]
+        preload: [:users]
       )
 
-    # NOTE: SCIM filter support will be added in Phase 2 (FilterParser implementation)
+    # Apply SCIM filter if provided
+    query_result =
+      case Keyword.get(opts, :filter) do
+        nil ->
+          {:ok, base_query}
 
-    query
-    |> limit(^per_page)
-    |> offset(^offset)
-    |> Repo.all()
+        filter_string ->
+          with {:ok, ast} <- FilterParser.parse(filter_string),
+               {:ok, filtered_query} <- QueryFilter.apply_filter(base_query, ast, :group) do
+            {:ok, filtered_query}
+          else
+            {:error, reason} -> {:error, reason}
+          end
+      end
+
+    case query_result do
+      {:ok, query} ->
+        # Apply sorting
+        query = apply_scim_sort(query, opts[:sort_by], opts[:sort_order])
+
+        # Apply pagination
+        groups =
+          query
+          |> limit(^per_page)
+          |> offset(^offset)
+          |> Repo.all()
+
+        {:ok, groups}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   @doc """
   Counts users for SCIM pagination (includes inactive users).
 
   ## Options
-    * `:filter` - SCIM filter query (reserved for Phase 2)
+    * `:filter` - SCIM filter query string
+
+  Returns `{:ok, count}` on success or `{:error, reason}` if filter is invalid.
   """
-  def count_users_scim(organization_id, _opts \\ []) do
-    # NOTE: Filter support will be added in Phase 2 (FilterParser implementation)
-    from(u in User,
-      where: u.organization_id == ^organization_id
-    )
-    |> Repo.aggregate(:count, :id)
+  def count_users_scim(organization_id, opts \\ []) do
+    base_query =
+      from(u in User,
+        where: u.organization_id == ^organization_id
+      )
+
+    # Apply SCIM filter if provided
+    query_result =
+      case Keyword.get(opts, :filter) do
+        nil ->
+          {:ok, base_query}
+
+        filter_string ->
+          with {:ok, ast} <- FilterParser.parse(filter_string),
+               {:ok, filtered_query} <- QueryFilter.apply_filter(base_query, ast, :user) do
+            {:ok, filtered_query}
+          else
+            {:error, reason} -> {:error, reason}
+          end
+      end
+
+    case query_result do
+      {:ok, query} ->
+        count = Repo.aggregate(query, :count, :id)
+        {:ok, count}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   @doc """
   Counts groups for SCIM pagination.
 
   ## Options
-    * `:filter` - SCIM filter query (reserved for Phase 2)
+    * `:filter` - SCIM filter query string
+
+  Returns `{:ok, count}` on success or `{:error, reason}` if filter is invalid.
   """
-  def count_groups_scim(organization_id, _opts \\ []) do
-    # NOTE: Filter support will be added in Phase 2 (FilterParser implementation)
-    from(g in Group,
-      where: g.organization_id == ^organization_id
-    )
-    |> Repo.aggregate(:count, :id)
+  def count_groups_scim(organization_id, opts \\ []) do
+    base_query =
+      from(g in Group,
+        where: g.organization_id == ^organization_id
+      )
+
+    # Apply SCIM filter if provided
+    query_result =
+      case Keyword.get(opts, :filter) do
+        nil ->
+          {:ok, base_query}
+
+        filter_string ->
+          with {:ok, ast} <- FilterParser.parse(filter_string),
+               {:ok, filtered_query} <- QueryFilter.apply_filter(base_query, ast, :group) do
+            {:ok, filtered_query}
+          else
+            {:error, reason} -> {:error, reason}
+          end
+      end
+
+    case query_result do
+      {:ok, query} ->
+        count = Repo.aggregate(query, :count, :id)
+        {:ok, count}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  # Helper function to apply SCIM sorting
+  defp apply_scim_sort(query, nil, _sort_order), do: query
+
+  defp apply_scim_sort(query, sort_by, sort_order) when is_binary(sort_by) do
+    # Determine resource type from query
+    resource_type =
+      case query.from do
+        %{source: {"users", _}} -> :user
+        %{source: {"groups", _}} -> :group
+        _ -> nil
+      end
+
+    if resource_type do
+      # Map SCIM attribute to Ecto field
+      case AttributeMapper.scim_to_ecto_field(sort_by, resource_type) do
+        {:ok, field_atom} ->
+          direction =
+            case sort_order do
+              "descending" -> :desc
+              _ -> :asc
+            end
+
+          from(r in query, order_by: [{^direction, field(r, ^field_atom)}])
+
+        {:error, _} ->
+          # Invalid sort attribute, ignore sorting
+          query
+      end
+    else
+      query
+    end
   end
 
   @doc """
