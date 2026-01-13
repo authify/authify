@@ -28,6 +28,8 @@ defmodule Authify.Accounts.User do
              :password_confirmation,
              :totp_secret,
              :totp_backup_codes,
+             :scim_created_at,
+             :scim_updated_at,
              :__meta__
            ]}
 
@@ -72,6 +74,11 @@ defmodule Authify.Accounts.User do
     field :totp_backup_codes, :string
     field :totp_backup_codes_generated_at, :utc_datetime
 
+    # SCIM provisioning fields
+    field :external_id, :string
+    field :scim_created_at, :utc_datetime
+    field :scim_updated_at, :utc_datetime
+
     belongs_to :organization, Organization
 
     has_many :group_memberships, GroupMembership, on_delete: :delete_all
@@ -89,7 +96,8 @@ defmodule Authify.Accounts.User do
     :role,
     :active,
     :email_confirmed_at,
-    :theme_preference
+    :theme_preference,
+    :external_id
   ]
   @password_fields [:password, :password_confirmation]
 
@@ -103,6 +111,7 @@ defmodule Authify.Accounts.User do
     |> validate_role()
     |> validate_password()
     |> validate_theme_preference()
+    |> validate_external_id()
     |> foreign_key_constraint(:organization_id, name: "users_organization_id_fkey")
   end
 
@@ -147,6 +156,38 @@ defmodule Authify.Accounts.User do
 
   defp validate_theme_preference(changeset) do
     validate_inclusion(changeset, :theme_preference, ["auto", "light", "dark"])
+  end
+
+  defp validate_external_id(changeset) do
+    changeset
+    |> validate_length(:external_id, max: 255)
+    |> validate_format(:external_id, ~r/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/,
+      message:
+        "must start with alphanumeric character and can contain letters, numbers, dots, hyphens, and underscores"
+    )
+    |> validate_external_id_immutability()
+    |> unique_constraint([:external_id, :organization_id],
+      message: "external_id already exists in this organization"
+    )
+  end
+
+  # Ensure external_id cannot be changed once set
+  defp validate_external_id_immutability(changeset) do
+    case {get_field(changeset, :id), get_change(changeset, :external_id)} do
+      {id, new_external_id} when not is_nil(id) and not is_nil(new_external_id) ->
+        # This is an update (user has an id)
+        old_external_id = changeset.data.external_id
+
+        if old_external_id && old_external_id != new_external_id do
+          add_error(changeset, :external_id, "cannot be changed once set")
+        else
+          changeset
+        end
+
+      _ ->
+        # This is a new user or external_id is not being changed
+        changeset
+    end
   end
 
   defp validate_password(%Ecto.Changeset{valid?: false} = changeset), do: changeset
