@@ -2025,4 +2025,251 @@ defmodule Authify.Accounts do
     )
     |> Repo.delete_all()
   end
+
+  ## SCIM Provisioning Functions
+
+  @doc """
+  Gets a user by external_id within an organization.
+
+  Returns nil if user not found or external_id doesn't match organization.
+  """
+  def get_user_by_external_id(external_id, organization_id)
+      when is_binary(external_id) and is_integer(organization_id) do
+    Repo.get_by(User, external_id: external_id, organization_id: organization_id)
+    |> Repo.preload(:organization)
+  end
+
+  def get_user_by_external_id(_external_id, _organization_id), do: nil
+
+  @doc """
+  Gets a group by external_id within an organization.
+
+  Returns nil if group not found or external_id doesn't match organization.
+  """
+  def get_group_by_external_id(external_id, organization_id)
+      when is_binary(external_id) and is_integer(organization_id) do
+    Repo.get_by(Group, external_id: external_id, organization_id: organization_id)
+  end
+
+  def get_group_by_external_id(_external_id, _organization_id), do: nil
+
+  @doc """
+  Lists users for SCIM with optional filter and pagination.
+
+  ## Options
+    * `:page` - Page number (default: 1)
+    * `:per_page` - Results per page (default: 25, max: 100)
+    * `:filter` - SCIM filter query (not implemented yet, reserved for Phase 2)
+
+  Note: Full SCIM filter support will be added in Phase 2 (FilterParser).
+  This function currently returns all users with pagination.
+  """
+  def list_users_scim(organization_id, opts \\ []) do
+    page = Keyword.get(opts, :page, 1)
+    per_page = min(Keyword.get(opts, :per_page, 25), 100)
+    offset = (page - 1) * per_page
+
+    # Base query - returns all users (active and inactive for SCIM)
+    query =
+      from(u in User,
+        where: u.organization_id == ^organization_id,
+        preload: [:organization, :groups],
+        order_by: [asc: u.id]
+      )
+
+    # NOTE: SCIM filter support will be added in Phase 2 (FilterParser implementation)
+    # query = apply_scim_filter(query, opts[:filter])
+
+    query
+    |> limit(^per_page)
+    |> offset(^offset)
+    |> Repo.all()
+  end
+
+  @doc """
+  Lists groups for SCIM with optional filter and pagination.
+
+  ## Options
+    * `:page` - Page number (default: 1)
+    * `:per_page` - Results per page (default: 25, max: 100)
+    * `:filter` - SCIM filter query (not implemented yet, reserved for Phase 2)
+
+  Note: Full SCIM filter support will be added in Phase 2 (FilterParser).
+  """
+  def list_groups_scim(organization_id, opts \\ []) do
+    page = Keyword.get(opts, :page, 1)
+    per_page = min(Keyword.get(opts, :per_page, 25), 100)
+    offset = (page - 1) * per_page
+
+    query =
+      from(g in Group,
+        where: g.organization_id == ^organization_id,
+        preload: [:users],
+        order_by: [asc: g.id]
+      )
+
+    # NOTE: SCIM filter support will be added in Phase 2 (FilterParser implementation)
+
+    query
+    |> limit(^per_page)
+    |> offset(^offset)
+    |> Repo.all()
+  end
+
+  @doc """
+  Counts users for SCIM pagination (includes inactive users).
+
+  ## Options
+    * `:filter` - SCIM filter query (reserved for Phase 2)
+  """
+  def count_users_scim(organization_id, _opts \\ []) do
+    # NOTE: Filter support will be added in Phase 2 (FilterParser implementation)
+    from(u in User,
+      where: u.organization_id == ^organization_id
+    )
+    |> Repo.aggregate(:count, :id)
+  end
+
+  @doc """
+  Counts groups for SCIM pagination.
+
+  ## Options
+    * `:filter` - SCIM filter query (reserved for Phase 2)
+  """
+  def count_groups_scim(organization_id, _opts \\ []) do
+    # NOTE: Filter support will be added in Phase 2 (FilterParser implementation)
+    from(g in Group,
+      where: g.organization_id == ^organization_id
+    )
+    |> Repo.aggregate(:count, :id)
+  end
+
+  @doc """
+  Creates a user via SCIM provisioning.
+
+  Sets scim_created_at and scim_updated_at timestamps.
+  Generates a random password if not provided.
+  """
+  def create_user_scim(attrs, organization_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    # Generate secure random password if not provided
+    attrs =
+      if Map.get(attrs, "password") || Map.get(attrs, :password) do
+        attrs
+      else
+        password = generate_random_password()
+        Map.merge(attrs, %{password: password, password_confirmation: password})
+      end
+
+    attrs =
+      attrs
+      |> Map.put(:organization_id, organization_id)
+      |> Map.put(:scim_created_at, now)
+      |> Map.put(:scim_updated_at, now)
+
+    %User{}
+    |> User.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates a user via SCIM provisioning.
+
+  Updates scim_updated_at timestamp.
+  """
+  def update_user_scim(%User{} = user, attrs) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    attrs = Map.put(attrs, :scim_updated_at, now)
+
+    user
+    |> User.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Applies SCIM PATCH operations to a user.
+
+  This is a placeholder for Phase 5 implementation.
+  SCIM PATCH operations (add, remove, replace) will be implemented
+  when the SCIM Users controller is built.
+
+  ## Parameters
+    * `user` - The user to patch
+    * `patch_ops` - List of SCIM patch operations
+
+  ## Example patch_ops structure:
+      [
+        %{"op" => "replace", "path" => "active", "value" => false},
+        %{"op" => "add", "path" => "emails", "value" => [%{"value" => "new@example.com"}]}
+      ]
+  """
+  def patch_user_scim(%User{} = _user, _patch_ops) do
+    {:error, :not_implemented}
+  end
+
+  @doc """
+  Creates a group via SCIM provisioning.
+
+  Sets scim_created_at and scim_updated_at timestamps.
+  """
+  def create_group_scim(attrs, organization_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    attrs =
+      attrs
+      |> Map.put(:organization_id, organization_id)
+      |> Map.put(:scim_created_at, now)
+      |> Map.put(:scim_updated_at, now)
+
+    %Group{}
+    |> Group.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates a group via SCIM provisioning.
+
+  Updates scim_updated_at timestamp.
+  """
+  def update_group_scim(%Group{} = group, attrs) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    attrs = Map.put(attrs, :scim_updated_at, now)
+
+    group
+    |> Group.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Applies SCIM PATCH operations to a group.
+
+  This is a placeholder for Phase 6 implementation.
+  SCIM PATCH operations for groups (especially members array management)
+  will be implemented when the SCIM Groups controller is built.
+
+  ## Parameters
+    * `group` - The group to patch
+    * `patch_ops` - List of SCIM patch operations
+  """
+  def patch_group_scim(%Group{} = _group, _patch_ops) do
+    {:error, :not_implemented}
+  end
+
+  # Private helper function to generate secure random password
+  defp generate_random_password do
+    # Generate a 24-character random password that meets complexity requirements
+    # Includes uppercase, lowercase, digits, and special characters
+    upper = Enum.take_random(?A..?Z, 6) |> List.to_string()
+    lower = Enum.take_random(?a..?z, 6) |> List.to_string()
+    digits = Enum.take_random(?0..?9, 6) |> List.to_string()
+    special = Enum.take_random(~c"!@#$%^&*", 6) |> List.to_string()
+
+    (upper <> lower <> digits <> special)
+    |> String.graphemes()
+    |> Enum.shuffle()
+    |> Enum.join()
+  end
 end
