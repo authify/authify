@@ -152,13 +152,8 @@ defmodule AuthifyWeb.SCIM.BaseController do
   @doc false
   defmacro __using__(_opts) do
     quote do
-      use Phoenix.Controller, namespace: AuthifyWeb
-
+      use AuthifyWeb, :controller
       import AuthifyWeb.SCIM.BaseController
-
-      # Make Plug and Phoenix.Controller functions available
-      import Plug.Conn
-      import Phoenix.Controller
     end
   end
 end

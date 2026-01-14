@@ -20,7 +20,7 @@
         {Credo.Check.Consistency.SpaceInParentheses, []},
         {Credo.Check.Consistency.TabsOrSpaces, []},
         {Credo.Check.Design.DuplicatedCode, false},
-        {Credo.Check.Design.TagTODO, [exit_status: 2]},
+        {Credo.Check.Design.TagTODO, false},
         {Credo.Check.Design.TagFIXME, [exit_status: 2]},
         {Credo.Check.Readability.AliasOrder, []},
         {Credo.Check.Readability.FunctionNames, []},

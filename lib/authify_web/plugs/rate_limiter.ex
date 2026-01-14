@@ -104,6 +104,20 @@ defmodule AuthifyWeb.Plugs.RateLimiter do
   end
 
   @doc """
+  Rate limits SCIM 2.0 endpoints.
+
+  Reads configuration from organization settings.
+  Default: 100 requests per minute per IP (if no config found)
+  SCIM is used for automated provisioning, similar rate to Management API.
+  """
+  def scim_rate_limit(conn, opts \\ []) do
+    {limit, scale_ms} = get_configured_limits(conn, :scim, opts, 100, 60_000)
+    scope = Keyword.get(opts, :scope, "scim")
+
+    check_rate(conn, "#{scope}:#{get_client_id(conn)}", scale_ms, limit)
+  end
+
+  @doc """
   Generic rate limiter with custom parameters.
 
   Useful for specific endpoints that need different rate limits.

@@ -47,6 +47,12 @@ defmodule AuthifyWeb.Router do
     plug AuthifyWeb.Auth.APIAuth
   end
 
+  pipeline :scim do
+    plug :accepts, ["json", "scim+json"]
+    plug AuthifyWeb.Plugs.RateLimiter, :scim_rate_limit
+    plug AuthifyWeb.Auth.APIAuth
+  end
+
   pipeline :oauth do
     plug :accepts, ["html", "json"]
     plug :fetch_session
@@ -355,6 +361,34 @@ defmodule AuthifyWeb.Router do
     # Audit Logs (read-only)
     get "/audit-logs", AuditLogsController, :index
     get "/audit-logs/:id", AuditLogsController, :show
+  end
+
+  # SCIM 2.0 endpoints for user provisioning (organization-scoped, RFC 7644)
+  scope "/:org_slug/scim/v2", AuthifyWeb.SCIM do
+    pipe_through [:organization, :scim]
+
+    # Discovery endpoints
+    get "/ServiceProviderConfig", ServiceProviderConfigController, :show
+    get "/ResourceTypes", ResourceTypesController, :index
+    get "/ResourceTypes/:id", ResourceTypesController, :show
+    get "/Schemas", SchemasController, :index
+    get "/Schemas/:id", SchemasController, :show
+
+    # TODO: Users resource endpoints (Phase 5)
+    # get "/Users", UsersController, :index
+    # post "/Users", UsersController, :create
+    # get "/Users/:id", UsersController, :show
+    # put "/Users/:id", UsersController, :update
+    # patch "/Users/:id", UsersController, :patch
+    # delete "/Users/:id", UsersController, :delete
+
+    # TODO: Groups resource endpoints (Phase 6)
+    # get "/Groups", GroupsController, :index
+    # post "/Groups", GroupsController, :create
+    # get "/Groups/:id", GroupsController, :show
+    # put "/Groups/:id", GroupsController, :update
+    # patch "/Groups/:id", GroupsController, :patch
+    # delete "/Groups/:id", GroupsController, :delete
   end
 
   # OIDC Discovery endpoint (organization-scoped, RFC-compliant)
