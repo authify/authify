@@ -143,10 +143,32 @@ defmodule AuthifyWeb.SCIM.BaseController do
   end
 
   defp scope_matches?(user_scope, required_scope) do
-    # Exact match or write includes read
-    user_scope == required_scope or
-      (String.ends_with?(user_scope, ":write") and
-         String.replace_suffix(user_scope, ":write", ":read") == required_scope)
+    cond do
+      # Exact match
+      user_scope == required_scope ->
+        true
+
+      # Write includes read at same level (scim:users:write includes scim:users:read)
+      String.ends_with?(user_scope, ":write") and
+          String.replace_suffix(user_scope, ":write", ":read") == required_scope ->
+        true
+
+      # Broad scope includes specific scope (scim:read includes scim:users:read, scim:groups:read)
+      (user_scope == "scim:read" or user_scope == "scim:write") and
+        String.starts_with?(required_scope, "scim:") and
+          String.ends_with?(required_scope, ":read") ->
+        true
+
+      # scim:write includes all scim:*:write scopes
+      user_scope == "scim:write" and
+        String.starts_with?(required_scope, "scim:") and
+          String.ends_with?(required_scope, ":write") ->
+        true
+
+      # No match
+      true ->
+        false
+    end
   end
 
   @doc false

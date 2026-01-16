@@ -7,11 +7,11 @@ defmodule AuthifyWeb.API.ProfileController do
   def show(conn, _params) do
     case ensure_scope(conn, "profile:read") do
       :ok ->
-        current_user = conn.assigns.current_user
+        current_user = conn.assigns.current_user |> Authify.Repo.preload(:emails)
 
         render_api_response(conn, current_user,
           resource_type: "user",
-          exclude: [:password_hash, :email_verified_at, :password_reset_token]
+          exclude: [:password_hash, :password_reset_token]
         )
 
       {:error, response} ->
@@ -22,7 +22,7 @@ defmodule AuthifyWeb.API.ProfileController do
   def update(conn, %{"user" => user_params}) do
     case ensure_scope(conn, "profile:write") do
       :ok ->
-        current_user = conn.assigns.current_user
+        current_user = conn.assigns.current_user |> Authify.Repo.preload(:emails)
 
         # Only allow updating certain profile fields
         allowed_params =

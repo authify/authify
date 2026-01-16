@@ -1,7 +1,7 @@
 defmodule Authify.SCIM.ResourceFormatterTest do
   use Authify.DataCase, async: true
 
-  alias Authify.Accounts.{Group, User}
+  alias Authify.Accounts.{Group, User, UserEmail}
   alias Authify.SCIM.ResourceFormatter
 
   @base_url "https://authify.example.com/acme/scim/v2"
@@ -12,7 +12,15 @@ defmodule Authify.SCIM.ResourceFormatterTest do
         id: 123,
         external_id: "hr-12345",
         username: "jsmith",
-        email: "jsmith@example.com",
+        emails: [
+          %UserEmail{
+            id: 1,
+            value: "jsmith@example.com",
+            type: "work",
+            primary: true,
+            user_id: 123
+          }
+        ],
         first_name: "John",
         last_name: "Smith",
         active: true,
@@ -51,7 +59,15 @@ defmodule Authify.SCIM.ResourceFormatterTest do
         id: 456,
         external_id: nil,
         username: nil,
-        email: "minimal@example.com",
+        emails: [
+          %UserEmail{
+            id: 2,
+            value: "minimal@example.com",
+            type: "work",
+            primary: true,
+            user_id: 456
+          }
+        ],
         first_name: nil,
         last_name: nil,
         active: true,
@@ -89,7 +105,7 @@ defmodule Authify.SCIM.ResourceFormatterTest do
       user = %User{
         id: 789,
         username: "jdoe",
-        email: "jdoe@example.com",
+        emails: [%UserEmail{value: "\1", type: "work", primary: true}],
         active: true,
         groups: groups,
         inserted_at: ~N[2024-01-15 10:00:00],
@@ -114,7 +130,7 @@ defmodule Authify.SCIM.ResourceFormatterTest do
       user = %User{
         id: 999,
         username: "inactive",
-        email: "inactive@example.com",
+        emails: [%UserEmail{value: "\1", type: "work", primary: true}],
         active: false,
         groups: [],
         inserted_at: ~N[2024-01-15 10:00:00],
@@ -130,7 +146,7 @@ defmodule Authify.SCIM.ResourceFormatterTest do
       user = %User{
         id: 100,
         username: "madonna",
-        email: "madonna@example.com",
+        emails: [%UserEmail{value: "\1", type: "work", primary: true}],
         first_name: "Madonna",
         last_name: nil,
         active: true,
@@ -150,7 +166,7 @@ defmodule Authify.SCIM.ResourceFormatterTest do
       user = %User{
         id: 101,
         username: "cher",
-        email: "cher@example.com",
+        emails: [%UserEmail{value: "\1", type: "work", primary: true}],
         first_name: nil,
         last_name: "Cher",
         active: true,
@@ -170,9 +186,21 @@ defmodule Authify.SCIM.ResourceFormatterTest do
   describe "format_group/3" do
     test "formats a complete group with members" do
       users = [
-        %User{id: 1, username: "user1", email: "user1@example.com"},
-        %User{id: 2, username: "user2", email: "user2@example.com"},
-        %User{id: 3, username: nil, email: "user3@example.com"}
+        %User{
+          id: 1,
+          username: "user1",
+          emails: [%UserEmail{value: "user1@example.com", type: "work", primary: true}]
+        },
+        %User{
+          id: 2,
+          username: "user2",
+          emails: [%UserEmail{value: "user2@example.com", type: "work", primary: true}]
+        },
+        %User{
+          id: 3,
+          username: nil,
+          emails: [%UserEmail{value: "user3@example.com", type: "work", primary: true}]
+        }
       ]
 
       group = %Group{

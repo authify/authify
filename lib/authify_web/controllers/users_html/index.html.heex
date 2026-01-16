@@ -196,8 +196,8 @@
                   </div>
                 </td>
                 <td class="text-muted">
-                  {user_item.email}
-                  <%= if user_item.email_confirmed_at do %>
+                  {Authify.Accounts.User.get_primary_email_value(user_item)}
+                  <%= if Authify.Accounts.User.primary_email_verified?(user_item) do %>
                     <span class="badge bg-success ms-1" title="Email verified">
                       <i class="bi bi-check-circle"></i>
                     </span>

@@ -3,6 +3,7 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
 
   import Authify.AccountsFixtures
   alias Authify.Accounts
+  alias Authify.Accounts.User
   alias Authify.AuditLog
 
   describe "GET /password_reset/new" do
@@ -24,7 +25,7 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
     test "generates reset token for valid email", %{conn: conn, user: user} do
       conn =
         post(conn, ~p"/password_reset", %{
-          "password_reset" => %{"email" => user.email}
+          "password_reset" => %{"email" => User.get_primary_email_value(user)}
         })
 
       assert redirected_to(conn) == ~p"/login"

@@ -2,6 +2,7 @@ defmodule AuthifyWeb.OAuthController do
   use AuthifyWeb, :controller
 
   alias Authify.Accounts
+  alias Authify.Accounts.User
   alias Authify.OAuth
   alias AuthifyWeb.OAuthController.AuditLogger
 
@@ -562,7 +563,7 @@ defmodule AuthifyWeb.OAuthController do
       if "profile" in scopes do
         Map.merge(claims, %{
           "name" => Accounts.User.full_name(user),
-          "preferred_username" => user.email
+          "preferred_username" => User.get_primary_email_value(user)
         })
       else
         claims
@@ -571,7 +572,7 @@ defmodule AuthifyWeb.OAuthController do
     claims =
       if "email" in scopes do
         Map.merge(claims, %{
-          "email" => user.email,
+          "email" => User.get_primary_email_value(user),
           "email_verified" => true
         })
       else

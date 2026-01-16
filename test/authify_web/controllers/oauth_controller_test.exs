@@ -4,6 +4,8 @@ defmodule AuthifyWeb.OAuthControllerTest do
   import Authify.AccountsFixtures
   import Authify.OAuthFixtures
 
+  alias Authify.Accounts.User
+
   describe "authorize" do
     setup do
       organization = organization_fixture()
@@ -375,7 +377,7 @@ defmodule AuthifyWeb.OAuthControllerTest do
 
       response = json_response(conn, 200)
       assert response["sub"] == to_string(user.id)
-      assert response["email"] == user.email
+      assert response["email"] == User.get_primary_email_value(user)
       assert response["name"]
     end
 
@@ -471,7 +473,7 @@ defmodule AuthifyWeb.OAuthControllerTest do
 
       response = json_response(conn, 200)
       assert response["sub"] == to_string(user.id)
-      assert response["email"] == user.email
+      assert response["email"] == User.get_primary_email_value(user)
       assert is_list(response["groups"])
       assert "Developers" in response["groups"]
       assert "Admins" in response["groups"]
@@ -513,7 +515,7 @@ defmodule AuthifyWeb.OAuthControllerTest do
 
       response = json_response(conn, 200)
       assert response["sub"] == to_string(user.id)
-      assert response["email"] == user.email
+      assert response["email"] == User.get_primary_email_value(user)
       refute Map.has_key?(response, "groups")
     end
 
@@ -825,7 +827,7 @@ defmodule AuthifyWeb.OAuthControllerTest do
 
       # Check OIDC-compliant claims
       assert response["sub"] == to_string(user.id)
-      assert response["email"] == user.email
+      assert response["email"] == User.get_primary_email_value(user)
       # Should be present
       assert response["email_verified"]
       # Should be present for profile scope

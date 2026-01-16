@@ -78,8 +78,8 @@
 
               <dt class="col-sm-3">Email</dt>
               <dd class="col-sm-9">
-                <code>{@user.email}</code>
-                <%= if @user.email_confirmed_at do %>
+                <code>{@user_email}</code>
+                <%= if @user_email_verified do %>
                   <span class="badge bg-success ms-2">Verified</span>
                 <% else %>
                   <span class="badge bg-warning ms-2">Unverified</span>
@@ -108,10 +108,10 @@
                 {Calendar.strftime(@user.inserted_at, "%B %d, %Y")}
               </dd>
 
-              <%= if @user.email_confirmed_at do %>
+              <%= if @user_email_verified_at do %>
                 <dt class="col-sm-3">Email Verified</dt>
                 <dd class="col-sm-9">
-                  {Calendar.strftime(@user.email_confirmed_at, "%B %d, %Y at %I:%M %p")}
+                  {Calendar.strftime(@user_email_verified_at, "%B %d, %Y at %I:%M %p")}
                 </dd>
               <% end %>
             </dl>

@@ -3,15 +3,19 @@ defmodule AuthifyWeb.ProfileController do
   import Phoenix.Component, only: [to_form: 1]
 
   alias Authify.Accounts
-  alias Authify.Accounts.PersonalAccessToken
+  alias Authify.Accounts.{PersonalAccessToken, User}
   alias AuthifyWeb.Helpers.AuditHelper
 
   def show(conn, _params) do
-    current_user = conn.assigns.current_user
+    current_user = conn.assigns.current_user |> Authify.Repo.preload(:emails)
     organization = conn.assigns.current_organization
+    primary_email = User.get_primary_email(current_user)
 
     render(conn, :show,
       user: current_user,
+      user_email: primary_email.value,
+      user_email_verified: primary_email.verified_at != nil,
+      user_email_verified_at: primary_email.verified_at,
       organization: organization
     )
   end
@@ -114,75 +118,100 @@ defmodule AuthifyWeb.ProfileController do
   end
 
   def resend_verification(conn, _params) do
-    current_user = conn.assigns.current_user |> Authify.Repo.preload(:organization)
+    current_user = conn.assigns.current_user |> Authify.Repo.preload([:organization, :emails])
+    primary_email = User.get_primary_email(current_user)
 
-    # Check if already verified
-    if current_user.email_confirmed_at do
-      AuditHelper.log_email_verification_resend_failure(
-        conn,
-        current_user,
-        "already_verified",
-        extra_metadata: %{"source" => "web"}
-      )
-
-      conn
-      |> put_flash(:info, "Your email is already verified.")
-      |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
+    if primary_email.verified_at do
+      handle_already_verified(conn, current_user)
     else
-      # Generate new verification token
-      case Accounts.generate_email_verification_token(current_user) do
-        {:ok, _updated_user, plaintext_token} ->
-          # Build the verification URL
-          verification_url =
-            Accounts.build_email_verification_url(current_user.organization, plaintext_token)
-
-          # Send verification email
-          case Authify.Email.send_email_verification_email(current_user, verification_url) do
-            {:ok, _metadata} ->
-              require Logger
-              Logger.info("Email verification resent to #{current_user.email}")
-
-              AuditHelper.log_email_verification_resent(conn, current_user,
-                extra_metadata: %{"source" => "web"}
-              )
-
-              conn
-              |> put_flash(
-                :info,
-                "Verification email sent! Please check your inbox and click the verification link."
-              )
-              |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
-
-            {:error, reason} ->
-              require Logger
-              Logger.error("Failed to send verification email: #{inspect(reason)}")
-
-              AuditHelper.log_email_verification_resend_failure(
-                conn,
-                current_user,
-                "email_send_failed",
-                extra_metadata: %{"source" => "web", "email_error" => inspect(reason)}
-              )
-
-              conn
-              |> put_flash(:error, "Unable to send verification email. Please try again later.")
-              |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
-          end
-
-        {:error, changeset} ->
-          AuditHelper.log_email_verification_resend_failure(
-            conn,
-            current_user,
-            "token_generation_failed",
-            errors: changeset,
-            extra_metadata: %{"source" => "web"}
-          )
-
-          conn
-          |> put_flash(:error, "Unable to generate verification token. Please try again.")
-          |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
-      end
+      send_verification_email(conn, current_user, primary_email)
     end
+  end
+
+  defp handle_already_verified(conn, current_user) do
+    AuditHelper.log_email_verification_resend_failure(
+      conn,
+      current_user,
+      "already_verified",
+      extra_metadata: %{"source" => "web"}
+    )
+
+    conn
+    |> put_flash(:info, "Your email is already verified.")
+    |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
+  end
+
+  defp send_verification_email(conn, current_user, primary_email) do
+    case Accounts.generate_email_verification_token(primary_email) do
+      {:ok, updated_email, plaintext_token} ->
+        handle_verification_token_generated(conn, current_user, updated_email, plaintext_token)
+
+      {:error, changeset} ->
+        handle_token_generation_error(conn, current_user, primary_email, changeset)
+    end
+  end
+
+  defp handle_verification_token_generated(conn, current_user, updated_email, plaintext_token) do
+    verification_url =
+      Accounts.build_email_verification_url(current_user.organization, plaintext_token)
+
+    case Authify.Email.send_email_verification_email(current_user, verification_url) do
+      {:ok, _metadata} ->
+        handle_email_sent_successfully(conn, current_user, updated_email)
+
+      {:error, reason} ->
+        handle_email_send_error(conn, current_user, reason)
+    end
+  end
+
+  defp handle_email_sent_successfully(conn, current_user, updated_email) do
+    require Logger
+
+    Logger.info("Email verification resent to #{User.get_primary_email_value(current_user)}")
+
+    AuditHelper.log_email_verification_resent(conn, current_user,
+      extra_metadata: %{"source" => "web", "email" => updated_email.value}
+    )
+
+    conn
+    |> put_flash(
+      :info,
+      "Verification email sent! Please check your inbox and click the verification link."
+    )
+    |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
+  end
+
+  defp handle_email_send_error(conn, current_user, reason) do
+    require Logger
+    Logger.error("Failed to send verification email: #{inspect(reason)}")
+
+    AuditHelper.log_email_verification_resend_failure(
+      conn,
+      current_user,
+      "email_send_failed",
+      extra_metadata: %{"source" => "web", "email_error" => inspect(reason)}
+    )
+
+    conn
+    |> put_flash(:error, "Unable to send verification email. Please try again later.")
+    |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
+  end
+
+  defp handle_token_generation_error(conn, current_user, primary_email, changeset) do
+    AuditHelper.log_email_verification_resend_failure(
+      conn,
+      current_user,
+      "token_generation_failed",
+      errors: changeset,
+      extra_metadata: %{
+        "source" => "web",
+        "email_id" => primary_email.id
+      }
+    )
+
+    conn
+    |> put_flash(:error, "Unable to generate verification token. Please try again.")
+    |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
   end
 
   # Personal Access Token actions

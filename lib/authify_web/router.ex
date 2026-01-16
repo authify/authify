@@ -374,13 +374,13 @@ defmodule AuthifyWeb.Router do
     get "/Schemas", SchemasController, :index
     get "/Schemas/:id", SchemasController, :show
 
-    # TODO: Users resource endpoints (Phase 5)
-    # get "/Users", UsersController, :index
-    # post "/Users", UsersController, :create
-    # get "/Users/:id", UsersController, :show
-    # put "/Users/:id", UsersController, :update
-    # patch "/Users/:id", UsersController, :patch
-    # delete "/Users/:id", UsersController, :delete
+    # Users resource endpoints (Phase 5)
+    get "/Users", UsersController, :index
+    post "/Users", UsersController, :create
+    get "/Users/:id", UsersController, :show
+    put "/Users/:id", UsersController, :update
+    patch "/Users/:id", UsersController, :patch
+    delete "/Users/:id", UsersController, :delete
 
     # TODO: Groups resource endpoints (Phase 6)
     # get "/Groups", GroupsController, :index

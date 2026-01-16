@@ -12,10 +12,13 @@ defmodule AuthifyWeb.DashboardController do
       system_stats = Accounts.get_system_stats()
       invitation_stats = Accounts.get_invitation_stats()
 
+      # Preload emails for recent users
+      recent_users_with_emails = Authify.Repo.preload(system_stats.recent_users, :emails)
+
       render(conn, :index,
         user: user,
         organization: organization,
-        users: system_stats.recent_users,
+        users: recent_users_with_emails,
         user_count: system_stats.total_users,
         is_global_dashboard: true,
         system_stats: system_stats,
@@ -23,7 +26,7 @@ defmodule AuthifyWeb.DashboardController do
       )
     else
       # Regular organization dashboard
-      users = Accounts.list_users(organization.id)
+      users = Accounts.list_users(organization.id) |> Authify.Repo.preload(:emails)
 
       render(conn, :index,
         user: user,

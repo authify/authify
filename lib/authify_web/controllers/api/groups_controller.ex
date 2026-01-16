@@ -2,6 +2,7 @@ defmodule AuthifyWeb.API.GroupsController do
   use AuthifyWeb.API.BaseController
 
   alias Authify.Accounts
+  alias Authify.Accounts.User
   alias AuthifyWeb.Helpers.AuditHelper
 
   @doc """
@@ -272,7 +273,7 @@ defmodule AuthifyWeb.API.GroupsController do
           AuditHelper.log_event_async(conn, "group.user_added", "group", group.id, "success", %{
             "group_name" => group.name,
             "user_id" => user.id,
-            "user_email" => user.email,
+            "user_email" => User.get_primary_email_value(user),
             "source" => "api"
           })
 
@@ -328,7 +329,7 @@ defmodule AuthifyWeb.API.GroupsController do
               %{
                 "group_name" => group.name,
                 "user_id" => user.id,
-                "user_email" => user.email,
+                "user_email" => User.get_primary_email_value(user),
                 "source" => "api"
               }
             )

@@ -24,14 +24,21 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Profile do
         id: "42",
         type: "user",
         attributes: %{
-          email: "user@example.com",
+          primary_email: "user@example.com",
+          emails: [
+            %{
+              value: "user@example.com",
+              type: "work",
+              primary: true,
+              verified_at: "2024-01-15T10:00:00Z"
+            }
+          ],
           first_name: "Jane",
           last_name: "Smith",
           username: "jsmith",
           role: "user",
           active: true,
           theme_preference: "dark",
-          email_confirmed_at: "2024-01-15T10:00:00Z",
           organization_id: 123,
           inserted_at: "2024-01-01T00:00:00Z",
           updated_at: "2024-01-15T10:00:00Z"
@@ -50,7 +57,26 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Profile do
     %{
       type: "object",
       properties: %{
-        email: %{type: "string", format: "email", description: "User's email address"},
+        primary_email: %{type: "string", format: "email", description: "Primary email address"},
+        emails: %{
+          type: "array",
+          description: "List of user email addresses",
+          items: %{
+            type: "object",
+            properties: %{
+              value: %{type: "string", format: "email"},
+              type: %{type: "string", nullable: true},
+              primary: %{type: "boolean"},
+              verified_at: %{
+                type: "string",
+                format: "date-time",
+                nullable: true,
+                description: "Timestamp when the email was verified"
+              }
+            },
+            required: ["value"]
+          }
+        },
         first_name: %{type: "string", nullable: true, description: "First name"},
         last_name: %{type: "string", nullable: true, description: "Last name"},
         username: %{
@@ -70,17 +96,11 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Profile do
           default: "auto",
           description: "User's theme preference"
         },
-        email_confirmed_at: %{
-          type: "string",
-          format: "date-time",
-          nullable: true,
-          description: "Email confirmation timestamp"
-        },
         organization_id: %{type: "integer", description: "Organization ID"},
         inserted_at: %{type: "string", format: "date-time", description: "Creation timestamp"},
         updated_at: %{type: "string", format: "date-time", description: "Last update timestamp"}
       },
-      required: ["email", "role", "active", "organization_id"]
+      required: ["primary_email", "role", "active", "organization_id"]
     }
   end
 

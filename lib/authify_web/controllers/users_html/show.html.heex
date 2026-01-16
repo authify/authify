@@ -41,8 +41,8 @@
               <div class="col-md-6">
                 <h6 class="text-muted">Email</h6>
                 <p>
-                  {@target_user.email}
-                  <%= if @target_user.email_confirmed_at do %>
+                  {@target_user_email}
+                  <%= if @target_user_email_verified do %>
                     <span class="badge bg-success ms-2" title="Email verified">
                       <i class="bi bi-check-circle"></i> Verified
                     </span>

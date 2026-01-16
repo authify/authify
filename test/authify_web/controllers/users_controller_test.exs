@@ -4,6 +4,7 @@ defmodule AuthifyWeb.UsersControllerTest do
   import Authify.AccountsFixtures
 
   alias Authify.Accounts
+  alias Authify.Accounts.User
   alias Authify.Guardian
 
   describe "disable_user" do
@@ -154,8 +155,8 @@ defmodule AuthifyWeb.UsersControllerTest do
       conn = get(conn, ~p"/#{organization.slug}/users")
 
       assert html_response(conn, 200) =~ "Users"
-      assert html_response(conn, 200) =~ admin_user.email
-      assert html_response(conn, 200) =~ regular_user.email
+      assert html_response(conn, 200) =~ User.get_primary_email_value(admin_user)
+      assert html_response(conn, 200) =~ User.get_primary_email_value(regular_user)
       assert html_response(conn, 200) =~ organization.name
     end
 
@@ -188,7 +189,7 @@ defmodule AuthifyWeb.UsersControllerTest do
         "first_name" => "Global",
         "last_name" => "Admin",
         "username" => "globaladmin",
-        "email" => "globaladmin@test.com",
+        "emails" => [%{"value" => "globaladmin@test.com", "type" => "work", "primary" => true}],
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -207,7 +208,7 @@ defmodule AuthifyWeb.UsersControllerTest do
       conn = get(conn, ~p"/#{global_org.slug}/users")
 
       assert html_response(conn, 200) =~ "Global Admins"
-      assert html_response(conn, 200) =~ global_admin.email
+      assert html_response(conn, 200) =~ User.get_primary_email_value(global_admin)
       assert html_response(conn, 200) =~ "Global"
     end
 
@@ -235,7 +236,7 @@ defmodule AuthifyWeb.UsersControllerTest do
 
       conn = get(conn, ~p"/#{organization.slug}/users/#{regular_user.id}")
 
-      assert html_response(conn, 200) =~ regular_user.email
+      assert html_response(conn, 200) =~ User.get_primary_email_value(regular_user)
       assert html_response(conn, 200) =~ regular_user.first_name
       assert html_response(conn, 200) =~ "User Details"
     end
@@ -273,7 +274,7 @@ defmodule AuthifyWeb.UsersControllerTest do
         "first_name" => "Global",
         "last_name" => "Admin",
         "username" => "globaladmin",
-        "email" => "globaladmin@test.com",
+        "emails" => [%{"value" => "globaladmin@test.com", "type" => "work", "primary" => true}],
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -291,7 +292,7 @@ defmodule AuthifyWeb.UsersControllerTest do
 
       conn = get(conn, ~p"/#{global_org.slug}/users/#{regular_user.id}")
 
-      assert html_response(conn, 200) =~ regular_user.email
+      assert html_response(conn, 200) =~ User.get_primary_email_value(regular_user)
       assert html_response(conn, 200) =~ regular_user.first_name
       assert html_response(conn, 200) =~ "User Details"
     end
@@ -355,7 +356,7 @@ defmodule AuthifyWeb.UsersControllerTest do
 
       # Verify user was created and added to organization
       created_user = Accounts.get_user!(id)
-      assert created_user.email == "john.doe@example.com"
+      assert User.get_primary_email_value(created_user) == "john.doe@example.com"
       assert created_user.first_name == "John"
       assert created_user.last_name == "Doe"
       assert created_user.active
@@ -604,7 +605,7 @@ defmodule AuthifyWeb.UsersControllerTest do
         "first_name" => "Global",
         "last_name" => "Admin",
         "username" => "globaladmin",
-        "email" => "globaladmin@test.com",
+        "emails" => [%{"value" => "globaladmin@test.com", "type" => "work", "primary" => true}],
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }

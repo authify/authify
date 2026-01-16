@@ -12,6 +12,7 @@ defmodule AuthifyWeb.OAuthRealWorldFlowsTest do
 
   import Authify.AccountsFixtures
 
+  alias Authify.Accounts.User
   alias Authify.OAuth.Application
 
   describe "Complete user signup to OAuth API access flow" do
@@ -34,9 +35,10 @@ defmodule AuthifyWeb.OAuthRealWorldFlowsTest do
       {:ok, {organization, admin}} =
         Authify.Accounts.create_organization_with_admin(org_attrs, user_attrs)
 
+      admin = Authify.Repo.preload(admin, :emails)
       assert organization.slug == "acme-corp"
       assert admin.role == "admin"
-      assert admin.email == "admin@acme.example.com"
+      assert User.get_primary_email_value(admin) == "admin@acme.example.com"
 
       # Step 2: Admin creates an OAuth application
       app_attrs = %{
@@ -75,7 +77,7 @@ defmodule AuthifyWeb.OAuthRealWorldFlowsTest do
           "password_confirmation" => "SecureP@ssw0rd!"
         })
 
-      assert user.email == "employee@acme.example.com"
+      assert User.get_primary_email_value(user) == "employee@acme.example.com"
       assert user.first_name == "John"
 
       # Step 5: User initiates OAuth authorization flow
@@ -490,7 +492,7 @@ defmodule AuthifyWeb.OAuthRealWorldFlowsTest do
       create_conn = post(create_conn, ~p"/#{org.slug}/api/users", new_user_attrs)
       create_response = json_response(create_conn, 201)
 
-      assert create_response["data"]["attributes"]["email"] == "newuser@example.com"
+      assert create_response["data"]["attributes"]["primary_email"] == "newuser@example.com"
       assert create_response["data"]["id"]
     end
   end

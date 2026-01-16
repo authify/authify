@@ -138,7 +138,9 @@
                 <div class="list-group-item d-flex justify-content-between align-items-center">
                   <div>
                     <i class="bi bi-person-circle me-2 text-primary"></i>
-                    <span class="fw-medium">{user.email}</span>
+                    <span class="fw-medium">
+                      {Authify.Accounts.User.get_primary_email_value(user)}
+                    </span>
                     <%= if user.first_name || user.last_name do %>
                       <br />
                       <small class="text-muted ms-4">

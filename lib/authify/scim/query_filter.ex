@@ -57,7 +57,8 @@ defmodule Authify.SCIM.QueryFilter do
   def apply_filter(query, ast, resource_type) do
     case build_dynamic(ast, resource_type) do
       {:ok, dynamic} ->
-        {:ok, from(q in query, where: ^dynamic)}
+        # Mark query with :user or :group alias so parent_as can reference it in subqueries
+        {:ok, from(q in query, as: ^resource_type, where: ^dynamic)}
 
       {:error, _} = error ->
         error
@@ -67,41 +68,67 @@ defmodule Authify.SCIM.QueryFilter do
   # Build dynamic query from AST
   defp build_dynamic({:eq, field, value}, resource_type) do
     with {:ok, field_atom} <- AttributeMapper.scim_to_ecto_field(field, resource_type) do
-      {:ok, dynamic([r], field(r, ^field_atom) == ^normalize_value(value))}
+      if field_atom == :email and resource_type == :user do
+        # Email filtering requires joining with user_emails table
+        {:ok, build_email_filter(:eq, normalize_value(value))}
+      else
+        {:ok, dynamic([r], field(r, ^field_atom) == ^normalize_value(value))}
+      end
     end
   end
 
   defp build_dynamic({:ne, field, value}, resource_type) do
     with {:ok, field_atom} <- AttributeMapper.scim_to_ecto_field(field, resource_type) do
-      {:ok, dynamic([r], field(r, ^field_atom) != ^normalize_value(value))}
+      if field_atom == :email and resource_type == :user do
+        {:ok, build_email_filter(:ne, normalize_value(value))}
+      else
+        {:ok, dynamic([r], field(r, ^field_atom) != ^normalize_value(value))}
+      end
     end
   end
 
   defp build_dynamic({:co, field, value}, resource_type) do
     with {:ok, field_atom} <- AttributeMapper.scim_to_ecto_field(field, resource_type) do
-      # "contains" operator - case-insensitive (MySQL like is case-insensitive by default)
-      {:ok, dynamic([r], like(field(r, ^field_atom), ^"%#{value}%"))}
+      if field_atom == :email and resource_type == :user do
+        {:ok, build_email_filter(:co, value)}
+      else
+        # "contains" operator - case-insensitive (MySQL like is case-insensitive by default)
+        {:ok, dynamic([r], like(field(r, ^field_atom), ^"%#{value}%"))}
+      end
     end
   end
 
   defp build_dynamic({:sw, field, value}, resource_type) do
     with {:ok, field_atom} <- AttributeMapper.scim_to_ecto_field(field, resource_type) do
-      # "starts with" operator - case-insensitive (MySQL like is case-insensitive by default)
-      {:ok, dynamic([r], like(field(r, ^field_atom), ^"#{value}%"))}
+      if field_atom == :email and resource_type == :user do
+        {:ok, build_email_filter(:sw, value)}
+      else
+        # "starts with" operator - case-insensitive (MySQL like is case-insensitive by default)
+        {:ok, dynamic([r], like(field(r, ^field_atom), ^"#{value}%"))}
+      end
     end
   end
 
   defp build_dynamic({:ew, field, value}, resource_type) do
     with {:ok, field_atom} <- AttributeMapper.scim_to_ecto_field(field, resource_type) do
-      # "ends with" operator - case-insensitive (MySQL like is case-insensitive by default)
-      {:ok, dynamic([r], like(field(r, ^field_atom), ^"%#{value}"))}
+      if field_atom == :email and resource_type == :user do
+        {:ok, build_email_filter(:ew, value)}
+      else
+        # "ends with" operator - case-insensitive (MySQL like is case-insensitive by default)
+        {:ok, dynamic([r], like(field(r, ^field_atom), ^"%#{value}"))}
+      end
     end
   end
 
   defp build_dynamic({:pr, field}, resource_type) do
     with {:ok, field_atom} <- AttributeMapper.scim_to_ecto_field(field, resource_type) do
-      # "present" operator - field is not null
-      {:ok, dynamic([r], not is_nil(field(r, ^field_atom)))}
+      if field_atom == :email and resource_type == :user do
+        # User always has at least one email (primary), so this is always true
+        {:ok, dynamic([r], true)}
+      else
+        # "present" operator - field is not null
+        {:ok, dynamic([r], not is_nil(field(r, ^field_atom)))}
+      end
     end
   end
 
@@ -158,6 +185,72 @@ defmodule Authify.SCIM.QueryFilter do
     # A full implementation would need to handle JSON queries or associations
     with {:ok, field_atom} <- AttributeMapper.scim_to_ecto_field(target, resource_type) do
       {:ok, dynamic([r], not is_nil(field(r, ^field_atom)))}
+    end
+  end
+
+  # Build email filter using EXISTS subquery against user_emails table
+  # Since users can have multiple emails, we need to check if ANY email matches
+  defp build_email_filter(operator, value) do
+    alias Authify.Accounts.UserEmail
+
+    case operator do
+      :eq ->
+        # Check if user has an email with this exact value
+        dynamic(
+          [r],
+          exists(
+            from(ue in UserEmail, where: ue.user_id == parent_as(:user).id and ue.value == ^value)
+          )
+        )
+
+      :ne ->
+        # Check if user doesn't have an email with this value
+        # (or equivalently, check if NO email matches)
+        dynamic(
+          [r],
+          not exists(
+            from(ue in UserEmail, where: ue.user_id == parent_as(:user).id and ue.value == ^value)
+          )
+        )
+
+      :co ->
+        # Check if user has an email containing this value
+        pattern = "%#{value}%"
+
+        dynamic(
+          [r],
+          exists(
+            from(ue in UserEmail,
+              where: ue.user_id == parent_as(:user).id and like(ue.value, ^pattern)
+            )
+          )
+        )
+
+      :sw ->
+        # Check if user has an email starting with this value
+        pattern = "#{value}%"
+
+        dynamic(
+          [r],
+          exists(
+            from(ue in UserEmail,
+              where: ue.user_id == parent_as(:user).id and like(ue.value, ^pattern)
+            )
+          )
+        )
+
+      :ew ->
+        # Check if user has an email ending with this value
+        pattern = "%#{value}"
+
+        dynamic(
+          [r],
+          exists(
+            from(ue in UserEmail,
+              where: ue.user_id == parent_as(:user).id and like(ue.value, ^pattern)
+            )
+          )
+        )
     end
   end
 

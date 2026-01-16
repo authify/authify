@@ -4,6 +4,7 @@ defmodule AuthifyWeb.Auth.PersonalAccessTokenAuthTest do
   import Authify.AccountsFixtures
 
   alias Authify.Accounts
+  alias Authify.Accounts.User
 
   # Helper function to create a user with PAT for testing
   defp create_user_with_token(scopes \\ "profile:read profile:write") do
@@ -30,7 +31,9 @@ defmodule AuthifyWeb.Auth.PersonalAccessTokenAuthTest do
 
       assert json_response(conn, 200)
       response = json_response(conn, 200)
-      assert response["data"]["attributes"]["email"] == user.email
+
+      assert response["data"]["attributes"]["primary_email"] ==
+               User.get_primary_email_value(user)
     end
 
     test "rejects invalid PAT", %{conn: conn} do
@@ -122,7 +125,7 @@ defmodule AuthifyWeb.Auth.PersonalAccessTokenAuthTest do
       user_data = response["data"]
       user_attrs = user_data["attributes"]
       assert user_data["id"] == to_string(user.id)
-      assert user_attrs["email"] == user.email
+      assert user_attrs["primary_email"] == User.get_primary_email_value(user)
       assert user_attrs["first_name"] == user.first_name
       assert user_attrs["last_name"] == user.last_name
     end

@@ -24,11 +24,24 @@ defmodule Authify.SCIM.ResourceFormatter do
     SCIM User resource map
   """
   def format_user(%User{} = user, base_url) do
+    # Get primary email value for userName
+    primary_email =
+      case user.emails do
+        emails when is_list(emails) ->
+          case Enum.find(emails, & &1.primary) do
+            nil -> nil
+            email -> email.value
+          end
+
+        _ ->
+          nil
+      end
+
     %{
       schemas: [@user_schema],
       id: to_string(user.id),
       externalId: user.external_id,
-      userName: user.username || user.email,
+      userName: user.username || primary_email,
       name: format_user_name(user),
       emails: format_user_emails(user),
       active: user.active,
@@ -134,14 +147,14 @@ defmodule Authify.SCIM.ResourceFormatter do
     |> remove_nil_values()
   end
 
-  defp format_user_emails(%User{email: email}) when is_binary(email) do
-    [
+  defp format_user_emails(%User{emails: emails}) when is_list(emails) do
+    Enum.map(emails, fn email ->
       %{
-        value: email,
-        primary: true,
-        type: "work"
+        value: email.value,
+        primary: email.primary,
+        type: email.type || "work"
       }
-    ]
+    end)
   end
 
   defp format_user_emails(_user), do: []
@@ -160,9 +173,11 @@ defmodule Authify.SCIM.ResourceFormatter do
 
   defp format_group_members(%Group{users: users}, base_url) when is_list(users) do
     Enum.map(users, fn user ->
+      display_name = user.username || User.get_primary_email_value(user)
+
       %{
         "value" => to_string(user.id),
-        "display" => user.username || user.email,
+        "display" => display_name,
         "$ref" => "#{base_url}/Users/#{user.id}"
       }
     end)

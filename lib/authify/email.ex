@@ -7,6 +7,7 @@ defmodule Authify.Email do
   """
 
   import Swoosh.Email
+  alias Authify.Accounts.User
   alias Authify.Mailer
 
   @doc """
@@ -212,7 +213,7 @@ defmodule Authify.Email do
     {from_name, from_email} = get_from_address_or_default(organization)
 
     new()
-    |> to(user.email)
+    |> to(User.get_primary_email_value(user))
     |> from({from_name, from_email})
     |> subject("Password Reset Request - #{organization.name}")
     |> html_body(password_reset_html_body(user, organization, reset_url))
@@ -393,7 +394,7 @@ defmodule Authify.Email do
     {from_name, from_email} = get_from_address_or_default(organization)
 
     new()
-    |> to(user.email)
+    |> to(User.get_primary_email_value(user))
     |> from({from_name, from_email})
     |> subject("Please verify your email - #{organization.name}")
     |> html_body(email_verification_html_body(user, organization, verification_url))

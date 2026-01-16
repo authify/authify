@@ -3,6 +3,7 @@ defmodule AuthifyWeb.API.AuditLogsControllerTest do
 
   import Authify.AccountsFixtures
 
+  alias Authify.Accounts.User
   alias Authify.AuditLog
 
   setup %{conn: conn} do
@@ -15,7 +16,7 @@ defmodule AuthifyWeb.API.AuditLogsControllerTest do
         organization_id: organization.id,
         actor_type: "user",
         actor_id: admin_user.id,
-        actor_name: admin_user.email,
+        actor_name: User.get_primary_email_value(admin_user),
         outcome: "success",
         ip_address: "192.168.1.1",
         user_agent: "Test Browser 1.0"

@@ -214,7 +214,7 @@ defmodule AuthifyWeb.NavigationComponents do
             <br />
             <strong>{Authify.Accounts.User.full_name(@user)}</strong>
             <br />
-            <small class="text-muted">{@user.email}</small>
+            <small class="text-muted">{Authify.Accounts.User.get_primary_email_value(@user)}</small>
           </div>
           <ul class="nav flex-column">
             <%= if Authify.Accounts.User.active_member_of?(@user, @organization.id) do %>

@@ -5,6 +5,7 @@ defmodule AuthifyWeb.ProfileControllerTest do
 
   alias Authify.Accounts
   alias Authify.Accounts.PersonalAccessToken
+  alias Authify.Accounts.User
   alias Authify.AuditLog
 
   setup :register_and_log_in_user
@@ -42,9 +43,13 @@ defmodule AuthifyWeb.ProfileControllerTest do
     end
 
     test "failed profile update logs failure", %{conn: conn, user: user} do
+      # Try to update with invalid username format (starts with -, not allowed)
       conn =
         patch(conn, ~p"/#{user.organization.slug}/profile", %{
-          "user" => %{"email" => ""}
+          "user" => %{
+            "first_name" => user.first_name,
+            "username" => "-invalid"
+          }
         })
 
       assert html_response(conn, 200)
@@ -59,7 +64,7 @@ defmodule AuthifyWeb.ProfileControllerTest do
       event = hd(events)
       assert event.outcome == "failure"
       assert event.metadata["source"] == "web"
-      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "email"))
+      assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "username"))
     end
   end
 
@@ -123,13 +128,23 @@ defmodule AuthifyWeb.ProfileControllerTest do
   describe "email verification resend" do
     test "successful resend logs audit event", %{conn: conn, user: user} do
       # Ensure user is unverified
-      {:ok, unverified_user} =
-        Accounts.update_user(user, %{email_confirmed_at: nil, email_verification_token: nil})
+      user = Authify.Repo.preload(user, :emails)
+      primary_email = Authify.Accounts.User.get_primary_email(user)
+
+      {:ok, _reset_email} =
+        Authify.Accounts.UserEmail
+        |> Authify.Repo.get!(primary_email.id)
+        |> Ecto.Changeset.change(%{
+          verified_at: nil,
+          verification_token: nil,
+          verification_expires_at: nil
+        })
+        |> Authify.Repo.update()
 
       conn =
         conn
         |> recycle()
-        |> log_in_user(unverified_user)
+        |> log_in_user(Authify.Repo.preload(user, :emails))
         |> post(~p"/#{user.organization.slug}/profile/resend-verification")
 
       assert redirected_to(conn) == ~p"/#{user.organization.slug}/profile"
@@ -145,17 +160,23 @@ defmodule AuthifyWeb.ProfileControllerTest do
       event = hd(events)
       assert event.outcome == "success"
       assert event.metadata["source"] == "web"
-      assert event.metadata["user_id"] == unverified_user.id
-      assert event.metadata["email"] == unverified_user.email
+      assert event.metadata["user_id"] == user.id
+      assert event.metadata["email"] == User.get_primary_email_value(user)
       assert event.metadata["organization_slug"] == user.organization.slug
     end
 
     test "already verified logs failure", %{conn: conn, user: user} do
-      # Ensure user is verified
-      {:ok, verified_user} =
-        Accounts.update_user(user, %{
-          email_confirmed_at: DateTime.utc_now() |> DateTime.truncate(:second)
-        })
+      # Ensure user is verified by verifying their primary email
+      user = Authify.Repo.preload(user, :emails)
+      primary_email = Authify.Accounts.User.get_primary_email(user)
+
+      {:ok, _verified_email} =
+        Authify.Accounts.UserEmail
+        |> Authify.Repo.get!(primary_email.id)
+        |> Authify.Accounts.UserEmail.verify_changeset()
+        |> Authify.Repo.update()
+
+      verified_user = Authify.Repo.preload(user, :emails, force: true)
 
       conn =
         conn
@@ -178,7 +199,7 @@ defmodule AuthifyWeb.ProfileControllerTest do
       assert event.metadata["source"] == "web"
       assert event.metadata["reason"] == "already_verified"
       assert event.metadata["user_id"] == verified_user.id
-      assert event.metadata["email"] == verified_user.email
+      assert event.metadata["email"] == User.get_primary_email_value(verified_user)
     end
 
     # Note: Testing email send failure is challenging with the test adapter since it always succeeds.

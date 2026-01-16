@@ -42,10 +42,13 @@ defmodule AuthifyWeb.MfaController do
           manual_entry_key = format_secret_for_manual_entry(secret)
 
           # Store secret in session temporarily (for verification)
+          current_user_with_emails = Authify.Repo.preload(current_user, :emails)
+
           conn
           |> put_session(:mfa_setup_secret, secret)
           |> render(:setup,
-            user: current_user,
+            user: current_user_with_emails,
+            user_email: User.get_primary_email_value(current_user_with_emails),
             organization: organization,
             secret: secret,
             totp_uri: totp_uri,
@@ -170,14 +173,16 @@ defmodule AuthifyWeb.MfaController do
   end
 
   defp render_setup_with_error(conn, current_user, organization, secret, flash_message, error) do
-    totp_uri = generate_totp_uri(current_user, secret, organization)
+    current_user_with_emails = Authify.Repo.preload(current_user, :emails)
+    totp_uri = generate_totp_uri(current_user_with_emails, secret, organization)
     qr_code_data_uri = generate_qr_code(totp_uri)
     manual_entry_key = format_secret_for_manual_entry(secret)
 
     conn
     |> put_flash(:error, flash_message)
     |> render(:setup,
-      user: current_user,
+      user: current_user_with_emails,
+      user_email: User.get_primary_email_value(current_user_with_emails),
       organization: organization,
       secret: secret,
       totp_uri: totp_uri,
@@ -297,7 +302,11 @@ defmodule AuthifyWeb.MfaController do
     organization = conn.assigns.current_organization
 
     # Verify password
-    case Accounts.authenticate_user(current_user.email, password, organization.id) do
+    case Accounts.authenticate_user(
+           User.get_primary_email_value(current_user),
+           password,
+           organization.id
+         ) do
       {:ok, _user} ->
         # Disable TOTP
         case MFA.disable_totp(current_user) do
@@ -646,7 +655,7 @@ defmodule AuthifyWeb.MfaController do
 
   defp generate_totp_uri(user, secret, organization) do
     # Format: otpauth://totp/Authify:user@example.com?secret=BASE32&issuer=OrgName
-    label = "#{organization.name}:#{user.email}"
+    label = "#{organization.name}:#{User.get_primary_email_value(user)}"
     issuer = organization.name
     # Base32-encode the binary secret for the URI (without padding per TOTP spec)
     base32_secret = Base.encode32(secret, padding: false)

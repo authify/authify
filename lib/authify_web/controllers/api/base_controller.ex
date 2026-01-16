@@ -112,6 +112,61 @@ defmodule AuthifyWeb.API.BaseController do
   # Private helper functions
 
   defp format_resource(resource, opts) when is_map(resource) do
+    resource
+    |> maybe_preload_resource(opts)
+    |> do_format_resource(opts)
+  end
+
+  defp format_resource(resource, opts) do
+    resource
+    |> maybe_preload_resource(opts)
+    |> do_format_resource(opts)
+  end
+
+  defp maybe_preload_resource(resource, opts) do
+    preload_fields =
+      resource
+      |> default_preloads_for()
+      |> merge_preloads(Keyword.get(opts, :preload))
+
+    cond do
+      preload_fields == [] ->
+        resource
+
+      schema_struct?(resource) ->
+        Authify.Repo.preload(resource, preload_fields)
+
+      true ->
+        resource
+    end
+  end
+
+  defp merge_preloads(defaults, nil), do: defaults
+  defp merge_preloads(defaults, []), do: defaults
+
+  defp merge_preloads(defaults, value) when is_list(value) do
+    defaults
+    |> Enum.concat(value)
+    |> Enum.uniq()
+  end
+
+  defp merge_preloads(defaults, value) do
+    defaults
+    |> Enum.concat(List.wrap(value))
+    |> Enum.uniq()
+  end
+
+  defp default_preloads_for(%Authify.Accounts.User{}), do: [:emails]
+  defp default_preloads_for(%{__struct__: _}), do: []
+  defp default_preloads_for(_), do: []
+
+  defp schema_struct?(%{__struct__: module}) do
+    function_exported?(module, :__schema__, 1)
+  end
+
+  defp schema_struct?(_), do: false
+
+  defp do_format_resource(resource, opts) do
     resource_type = opts[:resource_type] || infer_resource_type(resource)
 
     %{
@@ -122,8 +177,6 @@ defmodule AuthifyWeb.API.BaseController do
     }
   end
 
-  defp format_resource(resource, _opts), do: resource
-
   defp extract_attributes(resource, opts) do
     excluded_fields = [:id, :__meta__, :__struct__] ++ (opts[:exclude] || [])
 
@@ -132,6 +185,20 @@ defmodule AuthifyWeb.API.BaseController do
       resource
       |> Jason.encode!()
       |> Jason.decode!()
+
+    # Ensure primary email is always available
+    json_map =
+      case resource do
+        %{__struct__: struct} when struct == Authify.Accounts.User ->
+          Map.put(
+            json_map,
+            "primary_email",
+            Authify.Accounts.User.get_primary_email_value(resource)
+          )
+
+        _ ->
+          json_map
+      end
 
     # Handle special client_secret_display field for OAuth applications
     json_map =

@@ -94,7 +94,7 @@
                     <%= for user <- Enum.take(@users, 10) do %>
                       <tr>
                         <td>{Authify.Accounts.User.full_name(user)}</td>
-                        <td>{user.email}</td>
+                        <td>{Authify.Accounts.User.get_primary_email_value(user)}</td>
                         <td>
                           <span class={"badge #{if user.role == "admin", do: "bg-primary", else: "bg-secondary"}"}>
                             {String.capitalize(user.role)}
