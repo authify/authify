@@ -3,7 +3,7 @@ defmodule AuthifyWeb.ProfileController do
   import Phoenix.Component, only: [to_form: 1]
 
   alias Authify.Accounts
-  alias Authify.Accounts.{PersonalAccessToken, User}
+  alias Authify.Accounts.{PersonalAccessToken, User, UserEmail}
   alias AuthifyWeb.Helpers.AuditHelper
 
   def show(conn, _params) do
@@ -212,6 +212,165 @@ defmodule AuthifyWeb.ProfileController do
     conn
     |> put_flash(:error, "Unable to generate verification token. Please try again.")
     |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
+  end
+
+  # Email management actions
+
+  def emails(conn, _params) do
+    current_user = conn.assigns.current_user |> Authify.Repo.preload(:emails)
+    organization = conn.assigns.current_organization
+    changeset = UserEmail.nested_changeset(%UserEmail{}, %{})
+
+    render(conn, :emails,
+      user: current_user,
+      emails: current_user.emails,
+      organization: organization,
+      changeset: changeset
+    )
+  end
+
+  def add_email(conn, %{"user_email" => email_params}) do
+    current_user = conn.assigns.current_user |> Authify.Repo.preload(:emails)
+    organization = conn.assigns.current_organization
+
+    # Normalize params - convert string keys to atom keys for the changeset
+    email_attrs = %{
+      "value" => email_params["value"],
+      "type" => email_params["type"] || "work"
+    }
+
+    case Accounts.add_email_to_user(current_user, email_attrs) do
+      {:ok, new_email} ->
+        # Send verification email for the new address
+        user_with_org = Authify.Repo.preload(current_user, :organization)
+        Accounts.send_email_verification(user_with_org, new_email)
+
+        AuditHelper.log_email_added(conn, current_user, new_email,
+          extra_metadata: %{"source" => "web"}
+        )
+
+        conn
+        |> put_flash(
+          :info,
+          "Email address added. Please check your inbox for a verification link."
+        )
+        |> redirect(to: ~p"/#{organization.slug}/profile/emails")
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        updated_user = Authify.Repo.preload(current_user, :emails)
+
+        render(conn, :emails,
+          user: updated_user,
+          emails: updated_user.emails,
+          organization: organization,
+          changeset: changeset
+        )
+    end
+  end
+
+  def delete_email(conn, %{"id" => id}) do
+    current_user = conn.assigns.current_user |> Authify.Repo.preload(:emails)
+    organization = conn.assigns.current_organization
+    email_id = String.to_integer(id)
+
+    case Accounts.delete_email(current_user, email_id) do
+      {:ok, deleted_email} ->
+        AuditHelper.log_email_deleted(conn, current_user, deleted_email,
+          extra_metadata: %{"source" => "web"}
+        )
+
+        conn
+        |> put_flash(:info, "Email address removed.")
+        |> redirect(to: ~p"/#{organization.slug}/profile/emails")
+
+      {:error, :email_not_found} ->
+        conn
+        |> put_flash(:error, "Email address not found.")
+        |> redirect(to: ~p"/#{organization.slug}/profile/emails")
+
+      {:error, :cannot_delete_primary} ->
+        conn
+        |> put_flash(
+          :error,
+          "Cannot delete your primary email address. Set another email as primary first."
+        )
+        |> redirect(to: ~p"/#{organization.slug}/profile/emails")
+    end
+  end
+
+  def set_primary_email(conn, %{"id" => id}) do
+    current_user = conn.assigns.current_user |> Authify.Repo.preload(:emails)
+    organization = conn.assigns.current_organization
+    email_id = String.to_integer(id)
+
+    # Find the email to check if it's verified
+    email = Enum.find(current_user.emails, &(&1.id == email_id))
+
+    cond do
+      is_nil(email) ->
+        conn
+        |> put_flash(:error, "Email address not found.")
+        |> redirect(to: ~p"/#{organization.slug}/profile/emails")
+
+      is_nil(email.verified_at) ->
+        conn
+        |> put_flash(:error, "Only verified email addresses can be set as primary.")
+        |> redirect(to: ~p"/#{organization.slug}/profile/emails")
+
+      true ->
+        case Accounts.set_primary_email(current_user, email_id) do
+          {:ok, _updated_user} ->
+            AuditHelper.log_primary_email_changed(conn, current_user, email,
+              extra_metadata: %{"source" => "web"}
+            )
+
+            conn
+            |> put_flash(:info, "Primary email updated to #{email.value}.")
+            |> redirect(to: ~p"/#{organization.slug}/profile/emails")
+
+          {:error, :email_not_found} ->
+            conn
+            |> put_flash(:error, "Email address not found.")
+            |> redirect(to: ~p"/#{organization.slug}/profile/emails")
+        end
+    end
+  end
+
+  def resend_email_verification(conn, %{"id" => id}) do
+    current_user = conn.assigns.current_user |> Authify.Repo.preload([:emails, :organization])
+    organization = conn.assigns.current_organization
+    email_id = String.to_integer(id)
+
+    email = Enum.find(current_user.emails, &(&1.id == email_id))
+
+    cond do
+      is_nil(email) ->
+        conn
+        |> put_flash(:error, "Email address not found.")
+        |> redirect(to: ~p"/#{organization.slug}/profile/emails")
+
+      email.verified_at != nil ->
+        conn
+        |> put_flash(:info, "This email address is already verified.")
+        |> redirect(to: ~p"/#{organization.slug}/profile/emails")
+
+      true ->
+        case Accounts.send_email_verification(current_user, email) do
+          {:ok, _updated_email} ->
+            AuditHelper.log_email_verification_resent(conn, current_user,
+              extra_metadata: %{"source" => "web", "email" => email.value}
+            )
+
+            conn
+            |> put_flash(:info, "Verification email sent to #{email.value}.")
+            |> redirect(to: ~p"/#{organization.slug}/profile/emails")
+
+          {:error, _reason} ->
+            conn
+            |> put_flash(:error, "Unable to send verification email. Please try again later.")
+            |> redirect(to: ~p"/#{organization.slug}/profile/emails")
+        end
+    end
   end
 
   # Personal Access Token actions

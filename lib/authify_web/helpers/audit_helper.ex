@@ -375,6 +375,82 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   end
 
   @doc """
+  Logs when a user adds a new email address.
+  """
+  def log_email_added(conn, user, email, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
+    metadata =
+      %{
+        "user_id" => user.id,
+        "email_id" => email.id,
+        "email_value" => email.value,
+        "email_type" => email.type,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :email_added,
+      opts[:resource_type] || "user_email",
+      opts[:resource_id] || email.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs when a user deletes an email address.
+  """
+  def log_email_deleted(conn, user, email, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
+    metadata =
+      %{
+        "user_id" => user.id,
+        "email_id" => email.id,
+        "email_value" => email.value,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :email_deleted,
+      opts[:resource_type] || "user_email",
+      opts[:resource_id] || email.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs when a user changes their primary email address.
+  """
+  def log_primary_email_changed(conn, user, email, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
+    metadata =
+      %{
+        "user_id" => user.id,
+        "new_primary_email_id" => email.id,
+        "new_primary_email_value" => email.value,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :primary_email_changed,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
   Logs successful email verification resend events.
   """
   def log_email_verification_resent(conn, user, opts \\ []) do

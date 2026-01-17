@@ -227,15 +227,6 @@ defmodule AuthifyWeb.NavigationComponents do
                   <i class="bi bi-person-circle"></i> My Profile
                 </a>
               </li>
-              <li class="nav-item">
-                <a
-                  class={["nav-link", if(@current_page == "mfa", do: "active", else: "")]}
-                  aria-current={if @current_page == "mfa", do: "page", else: false}
-                  href={"/#{@organization.slug}/profile/mfa"}
-                >
-                  <i class="bi bi-shield-lock"></i> Multi-Factor Auth
-                </a>
-              </li>
             <% end %>
             <li class="nav-item">
               <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal">

@@ -1,0 +1,229 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@user}
+      organization={@organization}
+      current_page="profile"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Email Addresses</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <a
+          href={~p"/#{@current_organization.slug}/profile"}
+          class="btn btn-outline-secondary btn-sm"
+        >
+          <i class="bi bi-arrow-left"></i> Back to Profile
+        </a>
+      </div>
+    </div>
+
+    <p class="text-muted mb-4">
+      Manage your email addresses. Your primary email is used for login and notifications.
+      You can add additional email addresses and set any verified address as primary.
+    </p>
+
+    <div class="row">
+      <%!-- Add new email form --%>
+      <div class="col-lg-5">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-plus-circle"></i> Add Email Address
+            </h5>
+          </div>
+          <div class="card-body">
+            <%= if @changeset.action do %>
+              <div class="alert alert-danger">
+                <h6>Please check the errors below.</h6>
+              </div>
+            <% end %>
+
+            <.form
+              for={@changeset}
+              action={~p"/#{@current_organization.slug}/profile/emails"}
+              as={:user_email}
+            >
+              <div class="mb-3">
+                <label for="user_email_value" class="form-label">
+                  <i class="bi bi-envelope"></i> Email Address
+                </label>
+                <input
+                  type="email"
+                  name="user_email[value]"
+                  id="user_email_value"
+                  class={[
+                    "form-control",
+                    @changeset.action && @changeset.errors[:value] && "is-invalid"
+                  ]}
+                  placeholder="name@example.com"
+                  required
+                />
+                <%= if @changeset.action do %>
+                  <%= for {msg, _} <- Keyword.get_values(@changeset.errors, :value) do %>
+                    <div class="invalid-feedback d-block">{msg}</div>
+                  <% end %>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_email_type" class="form-label">
+                  <i class="bi bi-tag"></i> Email Type
+                </label>
+                <select
+                  name="user_email[type]"
+                  id="user_email_type"
+                  class="form-select"
+                >
+                  <option value="work" selected>Work</option>
+                  <option value="home">Personal</option>
+                  <option value="other">Other</option>
+                </select>
+                <div class="form-text">
+                  Categorize this email address for your reference.
+                </div>
+              </div>
+
+              <div class="alert alert-info small">
+                <i class="bi bi-info-circle"></i>
+                New email addresses must be verified before they can be set as primary.
+                A verification link will be sent after adding.
+              </div>
+
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-plus"></i> Add Email
+              </button>
+            </.form>
+          </div>
+        </div>
+      </div>
+
+      <%!-- Email list --%>
+      <div class="col-lg-7">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-envelope"></i> Your Email Addresses
+            </h5>
+          </div>
+
+          <%= if @emails == [] do %>
+            <div class="card-body text-center py-5">
+              <i class="bi bi-envelope display-4 text-muted"></i>
+              <h6 class="mt-3 text-muted">No email addresses</h6>
+              <p class="text-muted">Add your first email address to get started.</p>
+            </div>
+          <% else %>
+            <div class="list-group list-group-flush">
+              <div
+                :for={email <- Enum.sort_by(@emails, & &1.primary, :desc)}
+                class="list-group-item"
+              >
+                <div class="d-flex w-100 justify-content-between align-items-center">
+                  <div class="flex-grow-1">
+                    <div class="d-flex align-items-center mb-1">
+                      <i class="bi bi-envelope me-2 text-muted"></i>
+                      <strong>{email.value}</strong>
+                      <%= if email.primary do %>
+                        <span class="badge bg-primary ms-2">Primary</span>
+                      <% end %>
+                      <%= if email.verified_at do %>
+                        <span class="badge bg-success ms-2">Verified</span>
+                      <% else %>
+                        <span class="badge bg-warning text-dark ms-2">Unverified</span>
+                      <% end %>
+                    </div>
+                    <div class="small text-muted">
+                      <span class="me-3">
+                        <i class="bi bi-tag"></i> {String.capitalize(email.type)}
+                      </span>
+                      <span>
+                        <i class="bi bi-calendar"></i>
+                        Added {Calendar.strftime(email.inserted_at, "%b %d, %Y")}
+                      </span>
+                      <%= if email.verified_at do %>
+                        <span class="ms-3">
+                          <i class="bi bi-check-circle"></i>
+                          Verified {Calendar.strftime(email.verified_at, "%b %d, %Y")}
+                        </span>
+                      <% end %>
+                    </div>
+                  </div>
+                  <div class="btn-group btn-group-sm ms-3">
+                    <%= if !email.verified_at do %>
+                      <form
+                        action={
+                          ~p"/#{@current_organization.slug}/profile/emails/#{email.id}/resend-verification"
+                        }
+                        method="post"
+                        class="d-inline"
+                      >
+                        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+                        <button
+                          type="submit"
+                          class="btn btn-outline-primary"
+                          title="Resend verification email"
+                        >
+                          <i class="bi bi-envelope-arrow-up"></i>
+                        </button>
+                      </form>
+                    <% end %>
+                    <%= if !email.primary && email.verified_at do %>
+                      <form
+                        action={
+                          ~p"/#{@current_organization.slug}/profile/emails/#{email.id}/set-primary"
+                        }
+                        method="post"
+                        class="d-inline"
+                      >
+                        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+                        <button
+                          type="submit"
+                          class="btn btn-outline-success"
+                          title="Set as primary email"
+                          onclick="return confirm('Set this as your primary email address?')"
+                        >
+                          <i class="bi bi-star"></i>
+                        </button>
+                      </form>
+                    <% end %>
+                    <%= if !email.primary do %>
+                      <.link
+                        method="delete"
+                        href={~p"/#{@current_organization.slug}/profile/emails/#{email.id}"}
+                        data-confirm="Are you sure you want to remove this email address?"
+                        class="btn btn-outline-danger"
+                        title="Remove email"
+                      >
+                        <i class="bi bi-trash"></i>
+                      </.link>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> About Email Addresses
+            </h6>
+          </div>
+          <div class="card-body">
+            <ul class="small mb-0">
+              <li>
+                Your <strong>primary email</strong> is used for login and important notifications
+              </li>
+              <li>Only <strong>verified emails</strong> can be set as primary</li>
+              <li>You cannot delete your primary email - set another as primary first</li>
+              <li>Verification links expire after 24 hours</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

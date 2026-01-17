@@ -166,6 +166,13 @@ defmodule AuthifyWeb.Router do
     post "/profile/personal-access-tokens", ProfileController, :create_personal_access_token
     delete "/profile/personal-access-tokens/:id", ProfileController, :delete_personal_access_token
 
+    # Email management
+    get "/profile/emails", ProfileController, :emails
+    post "/profile/emails", ProfileController, :add_email
+    delete "/profile/emails/:id", ProfileController, :delete_email
+    post "/profile/emails/:id/set-primary", ProfileController, :set_primary_email
+    post "/profile/emails/:id/resend-verification", ProfileController, :resend_email_verification
+
     # MFA setup and management
     get "/profile/mfa", MfaController, :show
     get "/profile/mfa/setup", MfaController, :setup

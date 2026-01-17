@@ -76,24 +76,20 @@
                 <% end %>
               </dd>
 
-              <dt class="col-sm-3">Email</dt>
+              <dt class="col-sm-3">Primary Email</dt>
               <dd class="col-sm-9">
                 <code>{@user_email}</code>
                 <%= if @user_email_verified do %>
                   <span class="badge bg-success ms-2">Verified</span>
                 <% else %>
                   <span class="badge bg-warning ms-2">Unverified</span>
-                  <form
-                    action={~p"/#{@current_organization.slug}/profile/resend-verification"}
-                    method="post"
-                    class="d-inline ms-2"
-                  >
-                    <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-                    <button type="submit" class="btn btn-sm btn-outline-primary">
-                      <i class="bi bi-envelope"></i> Resend Verification Email
-                    </button>
-                  </form>
                 <% end %>
+                <a
+                  href={~p"/#{@current_organization.slug}/profile/emails"}
+                  class="btn btn-sm btn-outline-secondary ms-2"
+                >
+                  <i class="bi bi-gear"></i> Manage Emails
+                </a>
               </dd>
 
               <dt class="col-sm-3">Account Status</dt>
@@ -244,9 +240,13 @@
             <p class="small mb-2">Common profile tasks:</p>
             <ul class="small mb-0">
               <li>Update your name and contact information</li>
+              <li>
+                <a href={~p"/#{@current_organization.slug}/profile/emails"}>
+                  Manage your email addresses
+                </a>
+              </li>
               <li>Change your password regularly</li>
-              <li>Verify your email address</li>
-              <li>Review your organization memberships</li>
+              <li>Set up multi-factor authentication</li>
             </ul>
           </div>
         </div>

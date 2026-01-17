@@ -877,11 +877,14 @@ defmodule Authify.Accounts do
       {:error, %Ecto.Changeset{}}
   """
   def add_email_to_user(%User{} = user, email_attrs) when is_map(email_attrs) do
+    # Normalize to string keys for consistency with changeset
     attrs =
       email_attrs
-      |> Map.put(:user_id, user.id)
-      |> Map.put_new(:type, "work")
-      |> Map.put_new(:primary, false)
+      |> Enum.map(fn {k, v} -> {to_string(k), v} end)
+      |> Map.new()
+      |> Map.put("user_id", user.id)
+      |> Map.put_new("type", "work")
+      |> Map.put_new("primary", false)
 
     %UserEmail{}
     |> UserEmail.changeset(attrs)
@@ -921,6 +924,33 @@ defmodule Authify.Accounts do
       |> Ecto.Changeset.change(%{primary: true})
       |> Repo.update!()
     end)
+  end
+
+  @doc """
+  Deletes an email address from a user's account.
+
+  Cannot delete the primary email address - user must first set another email as primary.
+
+  ## Parameters
+    * `user` - User struct
+    * `email_id` - ID of the email to delete
+
+  ## Returns
+    * `{:ok, user_email}` - Successfully deleted
+    * `{:error, :email_not_found}` - Email doesn't exist or doesn't belong to user
+    * `{:error, :cannot_delete_primary}` - Cannot delete primary email
+  """
+  def delete_email(%User{} = user, email_id) when is_integer(email_id) do
+    case Repo.get_by(UserEmail, id: email_id, user_id: user.id) do
+      nil ->
+        {:error, :email_not_found}
+
+      %UserEmail{primary: true} ->
+        {:error, :cannot_delete_primary}
+
+      email ->
+        Repo.delete(email)
+    end
   end
 
   @doc """

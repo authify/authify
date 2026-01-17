@@ -6,6 +6,7 @@ defmodule AuthifyWeb.ProfileControllerTest do
   alias Authify.Accounts
   alias Authify.Accounts.PersonalAccessToken
   alias Authify.Accounts.User
+  alias Authify.Accounts.UserEmail
   alias Authify.AuditLog
 
   setup :register_and_log_in_user
@@ -414,6 +415,206 @@ defmodule AuthifyWeb.ProfileControllerTest do
 
       assert Enum.sort(event.metadata["scopes"]) ==
                ["invitations:read", "invitations:write", "users:read"]
+    end
+  end
+
+  describe "email management" do
+    test "renders emails page with existing emails", %{conn: conn, user: user} do
+      org = user.organization
+      conn = get(conn, ~p"/#{org.slug}/profile/emails")
+      response = html_response(conn, 200)
+
+      assert response =~ "Email Addresses"
+      assert response =~ "Add Email Address"
+      # User should have their primary email displayed
+      assert response =~ User.get_primary_email_value(user)
+    end
+
+    test "adds a new email address", %{conn: conn, user: user} do
+      org = user.organization
+      new_email = "newemail-#{System.unique_integer([:positive])}@example.com"
+
+      conn =
+        post(conn, ~p"/#{org.slug}/profile/emails", %{
+          "user_email" => %{"value" => new_email, "type" => "work"}
+        })
+
+      assert redirected_to(conn) == ~p"/#{org.slug}/profile/emails"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Email address added"
+
+      # Verify email was added
+      updated_user = Authify.Repo.preload(user, :emails, force: true)
+      assert Enum.any?(updated_user.emails, &(&1.value == new_email))
+
+      # Verify audit log
+      events = AuditLog.list_events(organization_id: org.id, event_type: "email_added")
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "success"
+      assert event.metadata["email_value"] == new_email
+    end
+
+    test "shows error when adding duplicate email", %{conn: conn, user: user} do
+      org = user.organization
+      existing_email = User.get_primary_email_value(user)
+
+      conn =
+        post(conn, ~p"/#{org.slug}/profile/emails", %{
+          "user_email" => %{"value" => existing_email, "type" => "work"}
+        })
+
+      response = html_response(conn, 200)
+      assert response =~ "already in use"
+    end
+
+    test "shows error when adding invalid email format", %{conn: conn, user: user} do
+      org = user.organization
+
+      conn =
+        post(conn, ~p"/#{org.slug}/profile/emails", %{
+          "user_email" => %{"value" => "not-an-email", "type" => "work"}
+        })
+
+      response = html_response(conn, 200)
+      assert response =~ "invalid format"
+    end
+
+    test "deletes non-primary email", %{conn: conn, user: user} do
+      org = user.organization
+
+      # Add a secondary email first
+      {:ok, secondary_email} =
+        Accounts.add_email_to_user(user, %{"value" => "secondary@example.com", "type" => "home"})
+
+      conn = delete(conn, ~p"/#{org.slug}/profile/emails/#{secondary_email.id}")
+
+      assert redirected_to(conn) == ~p"/#{org.slug}/profile/emails"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Email address removed"
+
+      # Verify email was deleted
+      updated_user = Authify.Repo.preload(user, :emails, force: true)
+      refute Enum.any?(updated_user.emails, &(&1.id == secondary_email.id))
+
+      # Verify audit log
+      events = AuditLog.list_events(organization_id: org.id, event_type: "email_deleted")
+      assert length(events) == 1
+    end
+
+    test "cannot delete primary email", %{conn: conn, user: user} do
+      org = user.organization
+      user = Authify.Repo.preload(user, :emails)
+      primary_email = User.get_primary_email(user)
+
+      conn = delete(conn, ~p"/#{org.slug}/profile/emails/#{primary_email.id}")
+
+      assert redirected_to(conn) == ~p"/#{org.slug}/profile/emails"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Cannot delete your primary email"
+
+      # Verify email was NOT deleted
+      updated_user = Authify.Repo.preload(user, :emails, force: true)
+      assert Enum.any?(updated_user.emails, &(&1.id == primary_email.id))
+    end
+
+    test "sets verified email as primary", %{conn: conn, user: user} do
+      org = user.organization
+
+      # Add and verify a secondary email
+      {:ok, secondary_email} =
+        Accounts.add_email_to_user(user, %{
+          "value" => "secondary-primary@example.com",
+          "type" => "home"
+        })
+
+      # Verify the secondary email
+      {:ok, verified_email} =
+        secondary_email
+        |> UserEmail.verify_changeset()
+        |> Authify.Repo.update()
+
+      conn = post(conn, ~p"/#{org.slug}/profile/emails/#{verified_email.id}/set-primary")
+
+      assert redirected_to(conn) == ~p"/#{org.slug}/profile/emails"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Primary email updated"
+
+      # Verify the change
+      updated_user = Authify.Repo.preload(user, :emails, force: true)
+      new_primary = User.get_primary_email(updated_user)
+      assert new_primary.id == verified_email.id
+
+      # Verify audit log
+      events = AuditLog.list_events(organization_id: org.id, event_type: "primary_email_changed")
+      assert length(events) == 1
+    end
+
+    test "cannot set unverified email as primary", %{conn: conn, user: user} do
+      org = user.organization
+
+      # Add a secondary email (unverified)
+      {:ok, unverified_email} =
+        Accounts.add_email_to_user(user, %{"value" => "unverified@example.com", "type" => "home"})
+
+      conn = post(conn, ~p"/#{org.slug}/profile/emails/#{unverified_email.id}/set-primary")
+
+      assert redirected_to(conn) == ~p"/#{org.slug}/profile/emails"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "verified"
+
+      # Verify the primary email was NOT changed
+      updated_user = Authify.Repo.preload(user, :emails, force: true)
+      new_primary = User.get_primary_email(updated_user)
+      refute new_primary.id == unverified_email.id
+    end
+
+    test "resends verification email for unverified address", %{conn: conn, user: user} do
+      org = user.organization
+
+      # Add an unverified email
+      {:ok, unverified_email} =
+        Accounts.add_email_to_user(user, %{"value" => "verify-me@example.com", "type" => "work"})
+
+      conn =
+        post(conn, ~p"/#{org.slug}/profile/emails/#{unverified_email.id}/resend-verification")
+
+      assert redirected_to(conn) == ~p"/#{org.slug}/profile/emails"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Verification email sent"
+
+      # Verify audit log
+      events =
+        AuditLog.list_events(organization_id: org.id, event_type: "email_verification_resent")
+
+      refute Enum.empty?(events)
+    end
+
+    test "shows message when resending verification for already verified email", %{
+      conn: conn,
+      user: user
+    } do
+      org = user.organization
+
+      # Add and verify a secondary email
+      {:ok, email} =
+        Accounts.add_email_to_user(user, %{
+          "value" => "already-verified@example.com",
+          "type" => "work"
+        })
+
+      {:ok, verified_email} =
+        email
+        |> UserEmail.verify_changeset()
+        |> Authify.Repo.update()
+
+      conn = post(conn, ~p"/#{org.slug}/profile/emails/#{verified_email.id}/resend-verification")
+
+      assert redirected_to(conn) == ~p"/#{org.slug}/profile/emails"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "already verified"
+    end
+
+    test "shows error when email not found", %{conn: conn, user: user} do
+      org = user.organization
+
+      conn = delete(conn, ~p"/#{org.slug}/profile/emails/999999")
+
+      assert redirected_to(conn) == ~p"/#{org.slug}/profile/emails"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "not found"
     end
   end
 end
