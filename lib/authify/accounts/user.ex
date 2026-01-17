@@ -415,6 +415,18 @@ defmodule Authify.Accounts.User do
 
   defp put_password_hash(changeset), do: changeset
 
+  def apply_scim_timestamps(changeset, attrs \\ %{}) do
+    changeset
+    |> allow_scim_field(:scim_created_at, Map.get(attrs, :scim_created_at))
+    |> allow_scim_field(:scim_updated_at, Map.get(attrs, :scim_updated_at))
+  end
+
+  defp allow_scim_field(changeset, _field, nil), do: changeset
+
+  defp allow_scim_field(changeset, field, value) do
+    Ecto.Changeset.put_change(changeset, field, value)
+  end
+
   @doc """
   Verifies the password.
   """

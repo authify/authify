@@ -2462,6 +2462,7 @@ defmodule Authify.Accounts do
   def create_group(attrs \\ %{}) do
     %Group{}
     |> Group.changeset(attrs)
+    |> Group.apply_scim_timestamps(attrs)
     |> Repo.insert()
   end
 
@@ -2471,6 +2472,7 @@ defmodule Authify.Accounts do
   def update_group(%Group{} = group, attrs) do
     group
     |> Group.changeset(attrs)
+    |> Group.apply_scim_timestamps(attrs)
     |> Repo.update()
   end
 
@@ -2811,8 +2813,6 @@ defmodule Authify.Accounts do
   def create_user_scim(attrs, organization_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    # Generate secure random password if not provided
-    # SCIM-provisioned users will receive an invitation email to set their real password
     password = generate_random_password()
 
     attrs =
@@ -2825,6 +2825,7 @@ defmodule Authify.Accounts do
 
     %User{}
     |> User.registration_changeset(attrs)
+    |> User.apply_scim_timestamps(attrs)
     |> Repo.insert()
   end
 
@@ -2840,34 +2841,12 @@ defmodule Authify.Accounts do
 
     user
     |> User.changeset(attrs)
+    |> User.apply_scim_timestamps(attrs)
     |> Repo.update()
   end
 
   @doc """
-  Applies SCIM PATCH operations to a user.
-
-  This is a placeholder for Phase 5 implementation.
-  SCIM PATCH operations (add, remove, replace) will be implemented
-  when the SCIM Users controller is built.
-
-  ## Parameters
-    * `user` - The user to patch
-    * `patch_ops` - List of SCIM patch operations
-
-  ## Example patch_ops structure:
-      [
-        %{"op" => "replace", "path" => "active", "value" => false},
-        %{"op" => "add", "path" => "emails", "value" => [%{"value" => "new@example.com"}]}
-      ]
-  """
-  def patch_user_scim(%User{} = _user, _patch_ops) do
-    {:error, :not_implemented}
-  end
-
-  @doc """
   Creates a group via SCIM provisioning.
-
-  Sets scim_created_at and scim_updated_at timestamps.
   """
   def create_group_scim(attrs, organization_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -2880,13 +2859,12 @@ defmodule Authify.Accounts do
 
     %Group{}
     |> Group.changeset(attrs)
+    |> Group.apply_scim_timestamps(attrs)
     |> Repo.insert()
   end
 
   @doc """
   Updates a group via SCIM provisioning.
-
-  Updates scim_updated_at timestamp.
   """
   def update_group_scim(%Group{} = group, attrs) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -2895,6 +2873,7 @@ defmodule Authify.Accounts do
 
     group
     |> Group.changeset(attrs)
+    |> Group.apply_scim_timestamps(attrs)
     |> Repo.update()
   end
 
