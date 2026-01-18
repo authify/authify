@@ -755,4 +755,44 @@ defmodule AuthifyWeb.SCIM.UsersControllerTest do
       assert conn.status == 403
     end
   end
+
+  describe "SCIM feature toggle" do
+    test "blocks access when SCIM inbound provisioning is disabled", %{
+      conn: conn,
+      organization: organization
+    } do
+      # Disable SCIM for the organization
+      Authify.Configurations.set_organization_setting(
+        organization,
+        :scim_inbound_provisioning_enabled,
+        false
+      )
+
+      # Try to access SCIM endpoints - all should return 404
+      conn_list = get(conn, "/#{organization.slug}/scim/v2/Users")
+      assert conn_list.status == 404
+      response = json_response(conn_list, 404)
+      assert response["schemas"] == ["urn:ietf:params:scim:api:messages:2.0:Error"]
+      assert response["detail"] =~ "SCIM provisioning is not enabled"
+
+      # Try to create a user
+      conn_create =
+        post(conn, "/#{organization.slug}/scim/v2/Users", %{
+          "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
+          "userName" => "test@example.com"
+        })
+
+      assert conn_create.status == 404
+
+      # Try to access discovery endpoints
+      conn_config = get(conn, "/#{organization.slug}/scim/v2/ServiceProviderConfig")
+      assert conn_config.status == 404
+    end
+
+    test "allows access when SCIM is enabled (default)", %{conn: conn, organization: organization} do
+      # SCIM should be enabled by default
+      conn = get(conn, "/#{organization.slug}/scim/v2/Users")
+      assert conn.status == 200
+    end
+  end
 end

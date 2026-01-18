@@ -51,6 +51,7 @@ defmodule AuthifyWeb.Router do
     plug :accepts, ["json", "scim+json"]
     plug AuthifyWeb.Plugs.RateLimiter, :scim_rate_limit
     plug AuthifyWeb.Auth.APIAuth
+    plug AuthifyWeb.Plugs.ScimFeatureToggle
   end
 
   pipeline :oauth do

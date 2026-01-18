@@ -411,5 +411,35 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
       assert Enum.at(response["Operations"], 0)["bulkId"] == "myuser1"
       assert Enum.at(response["Operations"], 1)["bulkId"] == "mygroup1"
     end
+
+    test "blocks access when SCIM inbound provisioning is disabled", %{
+      conn: conn,
+      organization: organization
+    } do
+      # Disable SCIM for the organization
+      Authify.Configurations.set_organization_setting(
+        organization,
+        :scim_inbound_provisioning_enabled,
+        false
+      )
+
+      bulk_request = %{
+        "schemas" => ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+        "Operations" => [
+          %{
+            "method" => "POST",
+            "path" => "/Users",
+            "data" => %{"userName" => "test@example.com"}
+          }
+        ]
+      }
+
+      conn = post(conn, "/#{organization.slug}/scim/v2/Bulk", bulk_request)
+
+      assert conn.status == 404
+      response = json_response(conn, 404)
+      assert response["schemas"] == ["urn:ietf:params:scim:api:messages:2.0:Error"]
+      assert response["detail"] =~ "SCIM provisioning is not enabled"
+    end
   end
 end
