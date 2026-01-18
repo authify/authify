@@ -381,6 +381,9 @@ defmodule AuthifyWeb.Router do
     get "/Schemas", SchemasController, :index
     get "/Schemas/:id", SchemasController, :show
 
+    # Bulk operations endpoint (RFC 7644 Section 3.7)
+    post "/Bulk", BulkController, :create
+
     # Users resource endpoints (Phase 5)
     get "/Users", UsersController, :index
     post "/Users", UsersController, :create

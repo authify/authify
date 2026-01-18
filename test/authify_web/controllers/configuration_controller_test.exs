@@ -49,7 +49,7 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
       response = html_response(conn, 200)
       assert response =~ "Enable SCIM 2.0 Inbound Provisioning"
       assert response =~ "scim_inbound_provisioning_enabled"
-      assert response =~ "Allow external systems"
+      assert response =~ "Allow external identity providers"
     end
   end
 

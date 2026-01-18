@@ -10,5 +10,5 @@ Config.CSP: Missing Content-Security-Policy,lib/authify_web/router.ex:62,307FC51
 Config.CSP: Missing Content-Security-Policy,lib/authify_web/router.ex:10,4723B64
 Config.CSP: Missing Content-Security-Policy,lib/authify_web/router.ex:17,6E55B0E
 
-Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:417,42DA4E8
-Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:414,4A2E4
+Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:417,2A98530
+Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:420,575E4FC

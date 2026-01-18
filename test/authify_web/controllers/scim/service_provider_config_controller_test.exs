@@ -34,9 +34,10 @@ defmodule AuthifyWeb.SCIM.ServiceProviderConfigControllerTest do
       # Verify patch support
       assert response["patch"]["supported"] == true
 
-      # Verify bulk not supported
-      assert response["bulk"]["supported"] == false
-      assert response["bulk"]["maxOperations"] == 0
+      # Verify bulk operations supported
+      assert response["bulk"]["supported"] == true
+      assert response["bulk"]["maxOperations"] == 1000
+      assert response["bulk"]["maxPayloadSize"] == 1_048_576
 
       # Verify filter support
       assert response["filter"]["supported"] == true
@@ -64,7 +65,7 @@ defmodule AuthifyWeb.SCIM.ServiceProviderConfigControllerTest do
                "http://localhost:4002/#{organization.slug}/scim/v2/ServiceProviderConfig"
 
       # Verify documentation URI
-      assert String.contains?(response["documentationUri"], "scim-integration-guide")
+      assert String.downcase(response["documentationUri"]) =~ "scim-integration-guide"
     end
   end
 end

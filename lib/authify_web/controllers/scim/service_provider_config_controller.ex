@@ -19,15 +19,14 @@ defmodule AuthifyWeb.SCIM.ServiceProviderConfigController do
   def show(conn, _params) do
     config = %{
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
-      documentationUri:
-        "https://github.com/authify/authify/blob/main/docs/scim-integration-guide.md",
+      documentationUri: "https://github.com/authify/authify/wiki/SCIM-Integration-Guide",
       patch: %{
         supported: true
       },
       bulk: %{
-        supported: false,
-        maxOperations: 0,
-        maxPayloadSize: 0
+        supported: true,
+        maxOperations: 1000,
+        maxPayloadSize: 1_048_576
       },
       filter: %{
         supported: true,
@@ -48,8 +47,7 @@ defmodule AuthifyWeb.SCIM.ServiceProviderConfigController do
           name: "OAuth 2.0 Bearer Token",
           description: "Authentication using OAuth 2.0 Bearer Tokens",
           specUri: "https://tools.ietf.org/html/rfc6750",
-          documentationUri:
-            "https://github.com/authify/authify/blob/main/docs/scim-integration-guide.md#authentication",
+          documentationUri: "https://github.com/authify/authify/wiki/SCIM-Integration-Guide",
           primary: true
         }
       ],
