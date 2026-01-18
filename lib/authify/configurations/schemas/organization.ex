@@ -40,6 +40,15 @@ defmodule Authify.Configurations.Schemas.Organization do
           required: false,
           validation_fn: nil
         },
+        %{
+          name: :scim_inbound_provisioning_enabled,
+          description:
+            "Enable SCIM 2.0 Service Provider endpoints - allows external identity providers and HR systems to provision users and groups into this organization",
+          value_type: :boolean,
+          default_value: true,
+          required: false,
+          validation_fn: nil
+        },
         # MFA (Multi-Factor Authentication) settings
         %{
           name: :require_mfa,

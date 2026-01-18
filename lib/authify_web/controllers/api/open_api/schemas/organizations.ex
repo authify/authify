@@ -157,6 +157,11 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Organizations do
                   type: "boolean",
                   description: "Enable OAuth2/OIDC identity provider"
                 },
+                scim_inbound_provisioning_enabled: %{
+                  type: "boolean",
+                  description:
+                    "Enable SCIM 2.0 Service Provider endpoints - allows external systems to provision users/groups into this organization"
+                },
                 description: %{
                   type: "string",
                   description: "Organization description (max 1000 chars)"
