@@ -9,6 +9,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
 
   alias Authify.Accounts
   alias Authify.SCIM.ResourceFormatter
+  alias AuthifyWeb.SCIM.PatchOperations
 
   @doc """
   GET /scim/v2/Users
@@ -212,7 +213,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
               # Parse PATCH operations
               operations = params["Operations"] || []
 
-              case apply_patch_operations(user, operations) do
+              case PatchOperations.apply_user_patch_operations(user, operations) do
                 {:ok, updated_user} ->
                   updated_user = Authify.Repo.preload(updated_user, :groups)
                   base_url = build_base_url(conn)
@@ -408,45 +409,6 @@ defmodule AuthifyWeb.SCIM.UsersController do
 
   defp maybe_put(attrs, _key, nil), do: attrs
   defp maybe_put(attrs, key, value), do: Map.put(attrs, key, value)
-
-  # Applies SCIM PATCH operations to a user
-  defp apply_patch_operations(user, operations) do
-    Enum.reduce_while(operations, {:ok, user}, fn op, {:ok, current_user} ->
-      case apply_single_patch_op(current_user, op) do
-        {:ok, updated_user} -> {:cont, {:ok, updated_user}}
-        {:error, _} = error -> {:halt, error}
-      end
-    end)
-  end
-
-  defp apply_single_patch_op(user, %{"op" => "replace", "path" => path, "value" => value}) do
-    case normalize_path(path) do
-      "active" ->
-        Accounts.update_user_scim(user, %{active: value})
-
-      "name.givenname" ->
-        Accounts.update_user_scim(user, %{first_name: value})
-
-      "name.familyname" ->
-        Accounts.update_user_scim(user, %{last_name: value})
-
-      _ ->
-        {:error, "Unsupported PATCH path: #{path}"}
-    end
-  end
-
-  defp apply_single_patch_op(user, %{"op" => "replace", "value" => value}) when is_map(value) do
-    # Replace operation with no path - update entire resource
-    attrs = map_scim_to_user_attrs(value)
-    Accounts.update_user_scim(user, attrs)
-  end
-
-  defp apply_single_patch_op(_user, op) do
-    {:error, "Unsupported PATCH operation: #{op["op"]}"}
-  end
-
-  defp normalize_path(nil), do: nil
-  defp normalize_path(path) when is_binary(path), do: String.downcase(path)
 
   defp format_changeset_errors(changeset) do
     errors =

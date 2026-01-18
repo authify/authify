@@ -9,6 +9,7 @@ defmodule AuthifyWeb.SCIM.GroupsController do
 
   alias Authify.Accounts
   alias Authify.SCIM.ResourceFormatter
+  alias AuthifyWeb.SCIM.PatchOperations
 
   @doc """
   GET /scim/v2/Groups
@@ -208,7 +209,7 @@ defmodule AuthifyWeb.SCIM.GroupsController do
               # Parse PATCH operations
               operations = params["Operations"] || []
 
-              case apply_patch_operations(group, operations, organization) do
+              case PatchOperations.apply_group_patch_operations(group, operations, organization) do
                 {:ok, updated_group} ->
                   updated_group = Authify.Repo.preload(updated_group, :users)
                   base_url = build_base_url(conn)
@@ -339,120 +340,6 @@ defmodule AuthifyWeb.SCIM.GroupsController do
     if params["externalId"],
       do: Map.put(attrs, :external_id, params["externalId"]),
       else: attrs
-  end
-
-  # Applies SCIM PATCH operations to a group
-  defp apply_patch_operations(group, operations, organization) do
-    Enum.reduce_while(operations, {:ok, group}, fn op, {:ok, current_group} ->
-      case apply_single_patch_op(current_group, op, organization) do
-        {:ok, updated_group} -> {:cont, {:ok, updated_group}}
-        {:error, _} = error -> {:halt, error}
-      end
-    end)
-  end
-
-  defp apply_single_patch_op(
-         group,
-         %{"op" => "replace", "path" => path, "value" => value},
-         _organization
-       ) do
-    case normalize_path(path) do
-      "displayname" ->
-        Accounts.update_group_scim(group, %{name: value})
-
-      _ ->
-        {:error, "Unsupported PATCH path: #{path}"}
-    end
-  end
-
-  defp apply_single_patch_op(group, %{"op" => "replace", "value" => value}, _organization)
-       when is_map(value) do
-    # Replace operation with no path - update entire resource
-    attrs = map_scim_to_group_attrs(value)
-    Accounts.update_group_scim(group, attrs)
-  end
-
-  defp apply_single_patch_op(
-         group,
-         %{"op" => "add", "path" => "members", "value" => members},
-         organization
-       )
-       when is_list(members) do
-    # Add members to the group
-    case add_members_to_group(group, members, organization) do
-      :ok -> {:ok, Authify.Repo.preload(group, :users, force: true)}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp apply_single_patch_op(group, %{"op" => "remove", "path" => path}, organization) do
-    # Remove members from the group
-    # Path format: members[value eq "user-id"]
-    case parse_member_filter(path) do
-      {:ok, user_id} ->
-        case remove_member_from_group(group, user_id, organization) do
-          :ok -> {:ok, Authify.Repo.preload(group, :users, force: true)}
-          {:error, reason} -> {:error, reason}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp apply_single_patch_op(_group, op, _organization) do
-    {:error, "Unsupported PATCH operation: #{op["op"]} with path #{op["path"]}"}
-  end
-
-  defp normalize_path(nil), do: nil
-  defp normalize_path(path) when is_binary(path), do: String.downcase(path)
-
-  # Add multiple members to a group
-  defp add_members_to_group(group, members, organization) do
-    Enum.reduce_while(members, :ok, fn member, :ok ->
-      user_id = member["value"]
-
-      case Accounts.get_user(user_id) do
-        nil ->
-          {:halt, {:error, "User with id '#{user_id}' not found"}}
-
-        user ->
-          if user.organization_id == organization.id do
-            case Accounts.add_user_to_group(user, group) do
-              {:ok, _} -> {:cont, :ok}
-              # Already a member, ignore
-              {:error, %Ecto.Changeset{}} -> {:cont, :ok}
-              {:error, reason} -> {:halt, {:error, "Failed to add member: #{inspect(reason)}"}}
-            end
-          else
-            {:halt, {:error, "User '#{user_id}' does not belong to this organization"}}
-          end
-      end
-    end)
-  end
-
-  # Remove a member from a group
-  defp remove_member_from_group(group, user_id, organization) do
-    case Accounts.get_user(user_id) do
-      nil ->
-        {:error, "User with id '#{user_id}' not found"}
-
-      user ->
-        if user.organization_id == organization.id do
-          Accounts.remove_user_from_group(user, group)
-          :ok
-        else
-          {:error, "User '#{user_id}' does not belong to this organization"}
-        end
-    end
-  end
-
-  # Parse member filter from path like: members[value eq "123"]
-  defp parse_member_filter(path) do
-    case Regex.run(~r/members\[value eq "(.+?)"\]/i, path) do
-      [_, user_id] -> {:ok, user_id}
-      _ -> {:error, "Invalid member filter path: #{path}"}
-    end
   end
 
   defp format_changeset_errors(changeset) do

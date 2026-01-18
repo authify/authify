@@ -10,6 +10,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
 
   alias Authify.Accounts
   alias Authify.SCIM.ResourceFormatter
+  alias AuthifyWeb.SCIM.PatchOperations
 
   @bulk_request_schema "urn:ietf:params:scim:api:messages:2.0:BulkRequest"
   @bulk_response_schema "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
@@ -375,6 +376,78 @@ defmodule AuthifyWeb.SCIM.BulkController do
           {:error, 404,
            build_error_response(
              %{"method" => "DELETE", "bulkId" => bulk_id},
+             404,
+             "Group not found"
+           )}
+        end
+    end
+  end
+
+  defp execute_operation("PATCH", :user, id, data, bulk_id, organization, _conn)
+       when id != nil do
+    case Accounts.get_user(id) do
+      nil ->
+        {:error, 404,
+         build_error_response(%{"method" => "PATCH", "bulkId" => bulk_id}, 404, "User not found")}
+
+      user ->
+        if user.organization_id == organization.id do
+          operations = data["Operations"] || []
+
+          case PatchOperations.apply_user_patch_operations(user, operations) do
+            {:ok, _updated_user} ->
+              response = %{
+                method: "PATCH",
+                bulkId: bulk_id,
+                status: "200"
+              }
+
+              {:ok, response, %{}}
+
+            {:error, reason} ->
+              {:error, 400,
+               build_error_response(%{"method" => "PATCH", "bulkId" => bulk_id}, 400, reason)}
+          end
+        else
+          {:error, 404,
+           build_error_response(
+             %{"method" => "PATCH", "bulkId" => bulk_id},
+             404,
+             "User not found"
+           )}
+        end
+    end
+  end
+
+  defp execute_operation("PATCH", :group, id, data, bulk_id, organization, _conn)
+       when id != nil do
+    case Accounts.get_group(id) do
+      nil ->
+        {:error, 404,
+         build_error_response(%{"method" => "PATCH", "bulkId" => bulk_id}, 404, "Group not found")}
+
+      group ->
+        if group.organization_id == organization.id do
+          operations = data["Operations"] || []
+
+          case PatchOperations.apply_group_patch_operations(group, operations, organization) do
+            {:ok, _updated_group} ->
+              response = %{
+                method: "PATCH",
+                bulkId: bulk_id,
+                status: "200"
+              }
+
+              {:ok, response, %{}}
+
+            {:error, reason} ->
+              {:error, 400,
+               build_error_response(%{"method" => "PATCH", "bulkId" => bulk_id}, 400, reason)}
+          end
+        else
+          {:error, 404,
+           build_error_response(
+             %{"method" => "PATCH", "bulkId" => bulk_id},
              404,
              "Group not found"
            )}

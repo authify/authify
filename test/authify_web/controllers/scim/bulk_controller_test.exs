@@ -303,7 +303,7 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
         "schemas" => ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
         "Operations" => [
           %{
-            "method" => "PATCH",
+            "method" => "HEAD",
             "path" => "/Users/123",
             "data" => %{}
           }
@@ -440,6 +440,216 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
       response = json_response(conn, 404)
       assert response["schemas"] == ["urn:ietf:params:scim:api:messages:2.0:Error"]
       assert response["detail"] =~ "SCIM provisioning is not enabled"
+    end
+
+    test "supports PATCH operations for users", %{conn: conn, organization: organization} do
+      # Create a user first
+      existing_user = user_fixture(organization: organization, first_name: "Alice")
+
+      bulk_request = %{
+        "schemas" => ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+        "Operations" => [
+          %{
+            "method" => "PATCH",
+            "path" => "/Users/#{existing_user.id}",
+            "data" => %{
+              "Operations" => [
+                %{
+                  "op" => "replace",
+                  "path" => "name.givenName",
+                  "value" => "Alicia"
+                }
+              ]
+            }
+          }
+        ]
+      }
+
+      conn = post(conn, "/#{organization.slug}/scim/v2/Bulk", bulk_request)
+
+      assert conn.status == 200
+      response = json_response(conn, 200)
+
+      assert length(response["Operations"]) == 1
+      assert Enum.at(response["Operations"], 0)["status"] == "200"
+
+      # Verify the update
+      updated_user = Authify.Accounts.get_user(existing_user.id)
+      assert updated_user.first_name == "Alicia"
+    end
+
+    test "supports PATCH operations for groups", %{conn: conn, organization: organization} do
+      # Create a group first
+      {:ok, group} =
+        Authify.Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+
+      bulk_request = %{
+        "schemas" => ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+        "Operations" => [
+          %{
+            "method" => "PATCH",
+            "path" => "/Groups/#{group.id}",
+            "data" => %{
+              "Operations" => [
+                %{
+                  "op" => "replace",
+                  "path" => "displayName",
+                  "value" => "Engineering Team"
+                }
+              ]
+            }
+          }
+        ]
+      }
+
+      conn = post(conn, "/#{organization.slug}/scim/v2/Bulk", bulk_request)
+
+      assert conn.status == 200
+      response = json_response(conn, 200)
+
+      assert length(response["Operations"]) == 1
+      assert Enum.at(response["Operations"], 0)["status"] == "200"
+
+      # Verify the update
+      updated_group = Authify.Accounts.get_group(group.id)
+      assert updated_group.name == "Engineering Team"
+    end
+
+    test "supports PATCH with add members operation", %{conn: conn, organization: organization} do
+      # Create a group and users
+      {:ok, group} =
+        Authify.Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+
+      user1 = user_fixture(organization: organization, email: "user1@example.com")
+      user2 = user_fixture(organization: organization, email: "user2@example.com")
+
+      bulk_request = %{
+        "schemas" => ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+        "Operations" => [
+          %{
+            "method" => "PATCH",
+            "path" => "/Groups/#{group.id}",
+            "data" => %{
+              "Operations" => [
+                %{
+                  "op" => "add",
+                  "path" => "members",
+                  "value" => [
+                    %{"value" => to_string(user1.id)},
+                    %{"value" => to_string(user2.id)}
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+
+      conn = post(conn, "/#{organization.slug}/scim/v2/Bulk", bulk_request)
+
+      assert conn.status == 200
+      response = json_response(conn, 200)
+
+      assert length(response["Operations"]) == 1
+      assert Enum.at(response["Operations"], 0)["status"] == "200"
+
+      # Verify the members were added
+      updated_group = Authify.Accounts.get_group(group.id) |> Authify.Repo.preload(:users)
+      user_ids = Enum.map(updated_group.users, & &1.id)
+      assert user1.id in user_ids
+      assert user2.id in user_ids
+    end
+
+    test "supports PATCH with remove member operation", %{conn: conn, organization: organization} do
+      # Create a group with a user
+      {:ok, group} =
+        Authify.Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+
+      user = user_fixture(organization: organization, email: "user@example.com")
+      {:ok, _} = Authify.Accounts.add_user_to_group(user, group)
+
+      bulk_request = %{
+        "schemas" => ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+        "Operations" => [
+          %{
+            "method" => "PATCH",
+            "path" => "/Groups/#{group.id}",
+            "data" => %{
+              "Operations" => [
+                %{
+                  "op" => "remove",
+                  "path" => "members[value eq \"#{user.id}\"]"
+                }
+              ]
+            }
+          }
+        ]
+      }
+
+      conn = post(conn, "/#{organization.slug}/scim/v2/Bulk", bulk_request)
+
+      assert conn.status == 200
+      response = json_response(conn, 200)
+
+      assert length(response["Operations"]) == 1
+      assert Enum.at(response["Operations"], 0)["status"] == "200"
+
+      # Verify the member was removed
+      updated_group = Authify.Accounts.get_group(group.id) |> Authify.Repo.preload(:users)
+      user_ids = Enum.map(updated_group.users, & &1.id)
+      assert user.id not in user_ids
+    end
+
+    test "supports mixed operations including PATCH", %{conn: conn, organization: organization} do
+      # Create existing resources
+      existing_user = user_fixture(organization: organization, first_name: "Alice")
+
+      {:ok, existing_group} =
+        Authify.Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+
+      bulk_request = %{
+        "schemas" => ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+        "Operations" => [
+          %{
+            "method" => "POST",
+            "path" => "/Users",
+            "data" => %{"userName" => "newuser@example.com"}
+          },
+          %{
+            "method" => "PATCH",
+            "path" => "/Users/#{existing_user.id}",
+            "data" => %{
+              "Operations" => [
+                %{"op" => "replace", "path" => "active", "value" => false}
+              ]
+            }
+          },
+          %{
+            "method" => "PATCH",
+            "path" => "/Groups/#{existing_group.id}",
+            "data" => %{
+              "Operations" => [
+                %{"op" => "replace", "path" => "displayName", "value" => "Engineering Team"}
+              ]
+            }
+          },
+          %{
+            "method" => "DELETE",
+            "path" => "/Users/#{existing_user.id}"
+          }
+        ]
+      }
+
+      conn = post(conn, "/#{organization.slug}/scim/v2/Bulk", bulk_request)
+
+      assert conn.status == 200
+      response = json_response(conn, 200)
+
+      assert length(response["Operations"]) == 4
+      assert Enum.at(response["Operations"], 0)["status"] == "201"
+      assert Enum.at(response["Operations"], 1)["status"] == "200"
+      assert Enum.at(response["Operations"], 2)["status"] == "200"
+      assert Enum.at(response["Operations"], 3)["status"] == "204"
     end
   end
 end
