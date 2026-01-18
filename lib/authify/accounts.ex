@@ -2457,6 +2457,25 @@ defmodule Authify.Accounts do
   end
 
   @doc """
+  Gets a single group by ID (without organization scoping).
+  Returns nil if the group does not exist.
+  """
+  def get_group(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int_id, ""} -> get_group(int_id)
+      _ -> nil
+    end
+  end
+
+  def get_group(id) when is_integer(id) do
+    from(g in Group,
+      where: g.id == ^id,
+      preload: [:users]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
   Creates a group.
   """
   def create_group(attrs \\ %{}) do

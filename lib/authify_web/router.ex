@@ -389,13 +389,13 @@ defmodule AuthifyWeb.Router do
     patch "/Users/:id", UsersController, :patch
     delete "/Users/:id", UsersController, :delete
 
-    # TODO: Groups resource endpoints (Phase 6)
-    # get "/Groups", GroupsController, :index
-    # post "/Groups", GroupsController, :create
-    # get "/Groups/:id", GroupsController, :show
-    # put "/Groups/:id", GroupsController, :update
-    # patch "/Groups/:id", GroupsController, :patch
-    # delete "/Groups/:id", GroupsController, :delete
+    # Groups resource endpoints
+    get "/Groups", GroupsController, :index
+    post "/Groups", GroupsController, :create
+    get "/Groups/:id", GroupsController, :show
+    put "/Groups/:id", GroupsController, :update
+    patch "/Groups/:id", GroupsController, :patch
+    delete "/Groups/:id", GroupsController, :delete
   end
 
   # OIDC Discovery endpoint (organization-scoped, RFC-compliant)
