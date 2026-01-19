@@ -39,7 +39,7 @@ defmodule AuthifyWeb.SCIM.ServiceProviderConfigController do
         supported: true
       },
       etag: %{
-        supported: false
+        supported: true
       },
       authenticationSchemes: [
         %{

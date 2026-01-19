@@ -193,7 +193,8 @@ defmodule Authify.SCIM.ResourceFormatter do
       resourceType: resource_type,
       created: format_datetime(created),
       lastModified: format_datetime(last_modified),
-      location: "#{base_url}/#{resource_type}s/#{resource.id}"
+      location: "#{base_url}/#{resource_type}s/#{resource.id}",
+      version: Authify.SCIM.Version.generate_version(resource)
     }
   end
 

@@ -83,7 +83,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
                 user = Authify.Repo.preload(user, [:emails, :groups])
                 base_url = Helpers.build_base_url(conn)
                 resource = ResourceFormatter.format_user(user, base_url)
-                render_scim_resource(conn, resource)
+                render_scim_resource(conn, resource, resource_struct: user)
 
               {:error, :not_found} ->
                 render_scim_error(conn, 404, :no_target, "User not found")
@@ -132,7 +132,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
 
     conn
     |> put_resp_header("location", "#{base_url}/Users/#{user.id}")
-    |> render_scim_resource(resource, status: 201)
+    |> render_scim_resource(resource, status: 201, resource_struct: user)
   end
 
   defp handle_create_error(conn, changeset, attrs) do
@@ -219,7 +219,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
                     updated_user = Authify.Repo.preload(updated_user, :groups)
                     base_url = Helpers.build_base_url(conn)
                     resource = ResourceFormatter.format_user(updated_user, base_url)
-                    render_scim_resource(conn, resource)
+                    render_scim_resource(conn, resource, resource_struct: updated_user)
 
                   {:error, reason} ->
                     render_scim_error(conn, 400, :invalid_value, reason)
@@ -255,7 +255,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
                 updated_user = Authify.Repo.preload(updated_user, :groups)
                 base_url = Helpers.build_base_url(conn)
                 resource = ResourceFormatter.format_user(updated_user, base_url)
-                render_scim_resource(conn, resource)
+                render_scim_resource(conn, resource, resource_struct: updated_user)
 
               {:error, %Ecto.Changeset{} = changeset} ->
                 detail = Helpers.format_changeset_errors(changeset)

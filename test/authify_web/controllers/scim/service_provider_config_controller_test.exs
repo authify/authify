@@ -49,8 +49,8 @@ defmodule AuthifyWeb.SCIM.ServiceProviderConfigControllerTest do
       # Verify sort support
       assert response["sort"]["supported"] == true
 
-      # Verify etag not supported
-      assert response["etag"]["supported"] == false
+      # Verify etag support
+      assert response["etag"]["supported"] == true
 
       # Verify authentication schemes
       assert [auth_scheme] = response["authenticationSchemes"]

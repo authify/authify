@@ -52,6 +52,7 @@ defmodule AuthifyWeb.Router do
     plug AuthifyWeb.Plugs.RateLimiter, :scim_rate_limit
     plug AuthifyWeb.Auth.APIAuth
     plug AuthifyWeb.Plugs.ScimFeatureToggle
+    plug AuthifyWeb.Plugs.SCIMETagValidation
   end
 
   pipeline :oauth do

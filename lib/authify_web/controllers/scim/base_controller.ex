@@ -21,13 +21,26 @@ defmodule AuthifyWeb.SCIM.BaseController do
     - resource: Formatted SCIM resource map
     - opts: Optional keyword list
       - :status - HTTP status code (default: 200)
+      - :resource_struct - The original resource struct for ETag generation
 
   ## Examples
       render_scim_resource(conn, user_resource)
       render_scim_resource(conn, user_resource, status: 201)
+      render_scim_resource(conn, user_resource, status: 200, resource_struct: user)
   """
   def render_scim_resource(conn, resource, opts \\ []) do
     status = Keyword.get(opts, :status, 200)
+
+    # Add ETag header if resource struct provided
+    conn =
+      case Keyword.get(opts, :resource_struct) do
+        nil ->
+          conn
+
+        resource_struct ->
+          etag = Authify.SCIM.Version.generate_etag(resource_struct)
+          put_resp_header(conn, "etag", etag)
+      end
 
     conn
     |> put_resp_content_type(@scim_content_type)
