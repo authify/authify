@@ -22,8 +22,9 @@ defmodule AuthifyWeb.SCIM.MeController do
 
   Returns the authenticated user's SCIM resource.
   Requires `scim:me` or broader read scope.
+  Supports attributes and excludedAttributes query parameters.
   """
-  def show(conn, _params) do
+  def show(conn, params) do
     case ensure_scim_scope(conn, "scim:me") do
       {:ok, _conn} ->
         user = get_authenticated_user(conn)
@@ -32,7 +33,12 @@ defmodule AuthifyWeb.SCIM.MeController do
           # Preload emails and groups for SCIM response
           user = Authify.Repo.preload(user, [:emails, :groups])
           base_url = Helpers.build_base_url(conn)
-          resource = ResourceFormatter.format_user(user, base_url)
+
+          resource =
+            user
+            |> ResourceFormatter.format_user(base_url)
+            |> Helpers.filter_attributes(params)
+
           render_scim_resource(conn, resource, resource_struct: user)
         else
           render_scim_error(conn, 401, :sensitive, "Authentication required")

@@ -43,7 +43,9 @@ defmodule AuthifyWeb.SCIM.UsersController do
 
                 resources =
                   Enum.map(users, fn user ->
-                    ResourceFormatter.format_user(user, base_url)
+                    user
+                    |> ResourceFormatter.format_user(base_url)
+                    |> Helpers.filter_attributes(params)
                   end)
 
                 render_scim_list(conn, resources, total, start_index, count, :user)
@@ -65,8 +67,9 @@ defmodule AuthifyWeb.SCIM.UsersController do
   GET /scim/v2/Users/:id
 
   Returns a single user by ID.
+  Supports attributes and excludedAttributes query parameters.
   """
-  def show(conn, %{"id" => id}) do
+  def show(conn, %{"id" => id} = params) do
     organization = conn.assigns[:current_organization]
 
     case ensure_scim_scope(conn, "scim:users:read") do
@@ -82,7 +85,12 @@ defmodule AuthifyWeb.SCIM.UsersController do
                 # Preload emails and groups for SCIM response
                 user = Authify.Repo.preload(user, [:emails, :groups])
                 base_url = Helpers.build_base_url(conn)
-                resource = ResourceFormatter.format_user(user, base_url)
+
+                resource =
+                  user
+                  |> ResourceFormatter.format_user(base_url)
+                  |> Helpers.filter_attributes(params)
+
                 render_scim_resource(conn, resource, resource_struct: user)
 
               {:error, :not_found} ->

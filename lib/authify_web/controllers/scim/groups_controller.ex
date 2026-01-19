@@ -43,7 +43,9 @@ defmodule AuthifyWeb.SCIM.GroupsController do
 
                 resources =
                   Enum.map(groups, fn group ->
-                    ResourceFormatter.format_group(group, organization.id, base_url)
+                    group
+                    |> ResourceFormatter.format_group(organization.id, base_url)
+                    |> Helpers.filter_attributes(params)
                   end)
 
                 render_scim_list(conn, resources, total, start_index, count, :group)
@@ -65,8 +67,9 @@ defmodule AuthifyWeb.SCIM.GroupsController do
   GET /scim/v2/Groups/:id
 
   Returns a single group by ID.
+  Supports attributes and excludedAttributes query parameters.
   """
-  def show(conn, %{"id" => id}) do
+  def show(conn, %{"id" => id} = params) do
     organization = conn.assigns[:current_organization]
 
     case ensure_scim_scope(conn, "scim:groups:read") do
@@ -82,7 +85,12 @@ defmodule AuthifyWeb.SCIM.GroupsController do
                 # Preload users for SCIM response
                 group = Authify.Repo.preload(group, :users)
                 base_url = Helpers.build_base_url(conn)
-                resource = ResourceFormatter.format_group(group, organization.id, base_url)
+
+                resource =
+                  group
+                  |> ResourceFormatter.format_group(organization.id, base_url)
+                  |> Helpers.filter_attributes(params)
+
                 render_scim_resource(conn, resource, resource_struct: group)
 
               {:error, :not_found} ->

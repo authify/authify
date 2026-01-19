@@ -112,6 +112,181 @@ defmodule AuthifyWeb.SCIM.Helpers do
   end
 
   @doc """
+  Filters a SCIM resource based on attributes and excludedAttributes parameters.
+
+  Per RFC 7644 Section 3.4.2.5, clients can request specific attributes or
+  exclude certain attributes from the response.
+
+  ## Parameters
+    - resource: The formatted SCIM resource map
+    - params: Query parameters map containing "attributes" and/or "excludedAttributes"
+
+  ## Returns
+    Filtered SCIM resource map
+
+  ## Notes
+    - Always includes: id, schemas, meta (required per RFC)
+    - attributes and excludedAttributes are mutually exclusive
+    - Supports nested attributes (e.g., "name.givenName")
+    - If neither parameter specified, returns full resource
+
+  ## Examples
+
+      iex> filter_attributes(resource, %{"attributes" => "userName,emails"})
+      %{"id" => "123", "schemas" => [...], "meta" => {...}, "userName" => "jsmith", "emails" => [...]}
+
+      iex> filter_attributes(resource, %{"excludedAttributes" => "groups"})
+      %{"id" => "123", ..., "groups" => nil}  # groups excluded
+  """
+  def filter_attributes(resource, params) when is_map(params) do
+    cond do
+      # attributes takes precedence over excludedAttributes
+      params["attributes"] && params["attributes"] != "" ->
+        apply_attributes_filter(resource, params["attributes"])
+
+      params["excludedAttributes"] && params["excludedAttributes"] != "" ->
+        apply_excluded_attributes_filter(resource, params["excludedAttributes"])
+
+      true ->
+        resource
+    end
+  end
+
+  # Private functions for attribute filtering
+
+  # Apply inclusion filter (attributes parameter)
+  defp apply_attributes_filter(resource, attributes_param) do
+    requested_attrs = parse_attribute_list(attributes_param)
+
+    # Always include these per RFC 7644
+    always_included = MapSet.new(["id", "schemas", "meta"])
+
+    # Combine requested with always-included
+    included_attrs = MapSet.union(requested_attrs, always_included)
+
+    filter_resource_attributes(resource, included_attrs, :include)
+  end
+
+  # Apply exclusion filter (excludedAttributes parameter)
+  defp apply_excluded_attributes_filter(resource, excluded_param) do
+    excluded_attrs = parse_attribute_list(excluded_param)
+
+    # Never exclude these per RFC 7644
+    never_excluded = MapSet.new(["id", "schemas", "meta"])
+
+    # Remove never-excluded from the exclusion list
+    excluded_attrs = MapSet.difference(excluded_attrs, never_excluded)
+
+    filter_resource_attributes(resource, excluded_attrs, :exclude)
+  end
+
+  # Parse comma-separated attribute list into MapSet
+  defp parse_attribute_list(attr_string) when is_binary(attr_string) do
+    attr_string
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> MapSet.new()
+  end
+
+  defp parse_attribute_list(_), do: MapSet.new()
+
+  # Filter resource based on attribute set
+  defp filter_resource_attributes(resource, attr_set, mode) when is_map(resource) do
+    resource
+    |> Enum.filter(fn {key, _value} ->
+      key_string = to_string(key)
+      should_include_attribute?(key_string, attr_set, mode)
+    end)
+    |> Enum.into(%{}, fn {key, value} ->
+      # For included attributes, check if we need to filter nested attributes
+      filtered_value =
+        if mode == :include && is_complex_attribute?(key) do
+          filter_nested_attributes(value, key, attr_set)
+        else
+          value
+        end
+
+      {key, filtered_value}
+    end)
+  end
+
+  # Determine if an attribute should be included based on mode
+  defp should_include_attribute?(key, attr_set, :include) do
+    # Include if exact match or if it's a parent of a nested attribute
+    MapSet.member?(attr_set, key) || has_nested_attributes?(key, attr_set)
+  end
+
+  defp should_include_attribute?(key, attr_set, :exclude) do
+    # Exclude if exact match
+    !MapSet.member?(attr_set, key)
+  end
+
+  # Check if there are nested attributes for this parent key
+  defp has_nested_attributes?(parent_key, attr_set) do
+    prefix = parent_key <> "."
+
+    Enum.any?(attr_set, fn attr ->
+      String.starts_with?(attr, prefix)
+    end)
+  end
+
+  # Filter nested attributes (e.g., name.givenName)
+  defp filter_nested_attributes(value, parent_key, attr_set) when is_map(value) do
+    parent_key_string = to_string(parent_key)
+    # Find all sub-attributes requested for this parent
+    sub_attrs =
+      attr_set
+      |> Enum.filter(fn attr ->
+        String.starts_with?(attr, parent_key_string <> ".")
+      end)
+      |> Enum.map(fn attr ->
+        # Extract the sub-attribute name (e.g., "name.givenName" -> "givenName")
+        attr
+        |> String.replace_prefix(parent_key_string <> ".", "")
+        |> String.split(".")
+        |> hd()
+      end)
+      |> MapSet.new()
+
+    if MapSet.size(sub_attrs) > 0 do
+      # Filter to only requested sub-attributes
+      value
+      |> Enum.filter(fn {key, _} ->
+        MapSet.member?(sub_attrs, to_string(key))
+      end)
+      |> Enum.into(%{})
+    else
+      # Include full value if parent was explicitly requested
+      value
+    end
+  end
+
+  # For lists (e.g., emails), filter each item if it's a map
+  defp filter_nested_attributes(value, parent_key, attr_set) when is_list(value) do
+    parent_key_string = to_string(parent_key)
+
+    Enum.map(value, fn item ->
+      if is_map(item) do
+        filter_nested_attributes(item, parent_key_string, attr_set)
+      else
+        item
+      end
+    end)
+  end
+
+  defp filter_nested_attributes(value, _parent_key, _attr_set), do: value
+
+  # Check if an attribute is complex (has nested structure)
+  defp is_complex_attribute?(key) when is_binary(key) do
+    key in ["name", "emails", "phoneNumbers", "addresses", "groups", "members"]
+  end
+
+  defp is_complex_attribute?(key) when is_atom(key) do
+    is_complex_attribute?(Atom.to_string(key))
+  end
+
+  @doc """
   Validates that a resource belongs to the given organization.
 
   Returns :ok if the resource's organization_id matches, otherwise returns
