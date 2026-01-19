@@ -156,32 +156,49 @@ defmodule AuthifyWeb.SCIM.BaseController do
   end
 
   defp scope_matches?(user_scope, required_scope) do
-    cond do
-      # Exact match
-      user_scope == required_scope ->
-        true
+    user_scope == required_scope or
+      write_includes_read?(user_scope, required_scope) or
+      me_scope_included?(user_scope, required_scope) or
+      users_scope_includes_me?(user_scope, required_scope) or
+      broad_scope_matches?(user_scope, required_scope)
+  end
 
-      # Write includes read at same level (scim:users:write includes scim:users:read)
-      String.ends_with?(user_scope, ":write") and
-          String.replace_suffix(user_scope, ":write", ":read") == required_scope ->
-        true
+  # Write includes read at same level (scim:users:write includes scim:users:read)
+  defp write_includes_read?(user_scope, required_scope) do
+    String.ends_with?(user_scope, ":write") and
+      String.replace_suffix(user_scope, ":write", ":read") == required_scope
+  end
 
-      # Broad scope includes specific scope (scim:read includes scim:users:read, scim:groups:read)
-      (user_scope == "scim:read" or user_scope == "scim:write") and
-        String.starts_with?(required_scope, "scim:") and
-          String.ends_with?(required_scope, ":read") ->
-        true
+  # scim:me:write includes scim:me
+  defp me_scope_included?(user_scope, required_scope) do
+    user_scope == "scim:me:write" and required_scope == "scim:me"
+  end
 
-      # scim:write includes all scim:*:write scopes
-      user_scope == "scim:write" and
-        String.starts_with?(required_scope, "scim:") and
-          String.ends_with?(required_scope, ":write") ->
-        true
+  # scim:users:* includes scim:me:* (user scopes include self-service)
+  defp users_scope_includes_me?(user_scope, required_scope) do
+    (user_scope == "scim:users:read" and required_scope == "scim:me") or
+      (user_scope == "scim:users:write" and
+         (required_scope == "scim:me" or required_scope == "scim:me:write"))
+  end
 
-      # No match
-      true ->
-        false
-    end
+  # Broad scopes (scim:read, scim:write) include specific scopes
+  defp broad_scope_matches?(user_scope, required_scope) do
+    scim_read_matches?(user_scope, required_scope) or
+      scim_write_matches?(user_scope, required_scope)
+  end
+
+  # scim:read includes scim:users:read, scim:groups:read, scim:me
+  defp scim_read_matches?(user_scope, required_scope) do
+    user_scope == "scim:read" and
+      String.starts_with?(required_scope, "scim:") and
+      (String.ends_with?(required_scope, ":read") or required_scope == "scim:me")
+  end
+
+  # scim:write includes all scim:*:write scopes
+  defp scim_write_matches?(user_scope, required_scope) do
+    user_scope == "scim:write" and
+      String.starts_with?(required_scope, "scim:") and
+      String.ends_with?(required_scope, ":write")
   end
 
   @doc false

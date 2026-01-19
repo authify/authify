@@ -74,6 +74,10 @@ defmodule AuthifyWeb.Plugs.SCIMETagValidation do
 
   defp fetch_resource(conn) do
     case conn.path_info do
+      # /Me endpoint - use authenticated user
+      [_org_slug, "scim", "v2", "Me" | _] ->
+        fetch_me(conn)
+
       # Path with organization slug: /org-slug/scim/v2/Users/123
       [_org_slug, "scim", "v2", "Users", user_id | _] ->
         fetch_user(conn, user_id)
@@ -82,6 +86,9 @@ defmodule AuthifyWeb.Plugs.SCIMETagValidation do
         fetch_group(conn, group_id)
 
       # Path without organization slug (legacy/fallback)
+      ["scim", "v2", "Me" | _] ->
+        fetch_me(conn)
+
       ["scim", "v2", "Users", user_id | _] ->
         fetch_user(conn, user_id)
 
@@ -90,6 +97,22 @@ defmodule AuthifyWeb.Plugs.SCIMETagValidation do
 
       _ ->
         {:error, :not_found}
+    end
+  end
+
+  defp fetch_me(conn) do
+    case conn.assigns[:current_user] do
+      nil ->
+        {:error, :not_found}
+
+      user ->
+        # Refetch from DB to get latest scim_updated_at timestamp
+        org = conn.assigns[:current_organization]
+
+        case Accounts.get_user_in_organization(user.id, org.id) do
+          nil -> {:error, :not_found}
+          fresh_user -> {:ok, fresh_user}
+        end
     end
   end
 

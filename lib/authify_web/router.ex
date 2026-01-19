@@ -386,6 +386,12 @@ defmodule AuthifyWeb.Router do
     # Bulk operations endpoint (RFC 7644 Section 3.7)
     post "/Bulk", BulkController, :create
 
+    # /Me endpoint for authenticated user self-service (RFC 7644 Section 3.11)
+    # Note: DELETE not supported - users cannot self-deactivate per security policy
+    get "/Me", MeController, :show
+    put "/Me", MeController, :update
+    patch "/Me", MeController, :patch
+
     # Users resource endpoints (Phase 5)
     get "/Users", UsersController, :index
     post "/Users", UsersController, :create
