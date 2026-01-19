@@ -361,7 +361,16 @@ defmodule Authify.Accounts do
   Deletes a user.
   """
   def delete_user(%User{} = user) do
-    Repo.delete(user)
+    result = Repo.delete(user)
+
+    case result do
+      {:ok, deleted_user} ->
+        broadcast_resource_event(deleted_user, :deleted, :user)
+        {:ok, deleted_user}
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -2499,7 +2508,16 @@ defmodule Authify.Accounts do
   Deletes a group.
   """
   def delete_group(%Group{} = group) do
-    Repo.delete(group)
+    result = Repo.delete(group)
+
+    case result do
+      {:ok, deleted_group} ->
+        broadcast_resource_event(deleted_group, :deleted, :group)
+        {:ok, deleted_group}
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -2842,10 +2860,20 @@ defmodule Authify.Accounts do
       |> Map.put(:password, password)
       |> Map.put(:password_confirmation, password)
 
-    %User{}
-    |> User.registration_changeset(attrs)
-    |> User.apply_scim_timestamps(attrs)
-    |> Repo.insert()
+    result =
+      %User{}
+      |> User.registration_changeset(attrs)
+      |> User.apply_scim_timestamps(attrs)
+      |> Repo.insert()
+
+    case result do
+      {:ok, user} ->
+        broadcast_resource_event(user, :created, :user)
+        {:ok, user}
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -2858,10 +2886,22 @@ defmodule Authify.Accounts do
 
     attrs = Map.put(attrs, :scim_updated_at, now)
 
-    user
-    |> User.changeset(attrs)
-    |> User.apply_scim_timestamps(attrs)
-    |> Repo.update()
+    result =
+      user
+      |> User.changeset(attrs)
+      |> User.apply_scim_timestamps(attrs)
+      |> Repo.update()
+
+    case result do
+      {:ok, updated_user} ->
+        # Preload emails for SCIM provisioning
+        user_with_emails = Repo.preload(updated_user, :emails, force: true)
+        broadcast_resource_event(user_with_emails, :updated, :user)
+        {:ok, updated_user}
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -2876,10 +2916,20 @@ defmodule Authify.Accounts do
       |> Map.put(:scim_created_at, now)
       |> Map.put(:scim_updated_at, now)
 
-    %Group{}
-    |> Group.changeset(attrs)
-    |> Group.apply_scim_timestamps(attrs)
-    |> Repo.insert()
+    result =
+      %Group{}
+      |> Group.changeset(attrs)
+      |> Group.apply_scim_timestamps(attrs)
+      |> Repo.insert()
+
+    case result do
+      {:ok, group} ->
+        broadcast_resource_event(group, :created, :group)
+        {:ok, group}
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -2890,10 +2940,20 @@ defmodule Authify.Accounts do
 
     attrs = Map.put(attrs, :scim_updated_at, now)
 
-    group
-    |> Group.changeset(attrs)
-    |> Group.apply_scim_timestamps(attrs)
-    |> Repo.update()
+    result =
+      group
+      |> Group.changeset(attrs)
+      |> Group.apply_scim_timestamps(attrs)
+      |> Repo.update()
+
+    case result do
+      {:ok, updated_group} ->
+        broadcast_resource_event(updated_group, :updated, :group)
+        {:ok, updated_group}
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -2924,5 +2984,22 @@ defmodule Authify.Accounts do
     |> String.graphemes()
     |> Enum.shuffle()
     |> Enum.join()
+  end
+
+  # Private helper function to broadcast resource events for SCIM provisioning
+  defp broadcast_resource_event(resource, event, resource_type)
+       when event in [:created, :updated, :deleted] and
+              resource_type in [:user, :group] do
+    org_id = resource.organization_id
+
+    Phoenix.PubSub.broadcast(
+      Authify.PubSub,
+      "scim_provisioning:org_#{org_id}",
+      {event, resource_type, resource}
+    )
+
+    :ok
+  rescue
+    _ -> :ok
   end
 end

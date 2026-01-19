@@ -15,7 +15,11 @@ defmodule Authify.Application do
          [Application.get_env(:libcluster, :topologies, []), [name: Authify.ClusterSupervisor]]},
         Authify.RateLimit,
         Authify.Configurations.Cache,
-        {Phoenix.PubSub, name: Authify.PubSub}
+        {Phoenix.PubSub, name: Authify.PubSub},
+        # SCIM Client infrastructure
+        {Task.Supervisor, name: Authify.TaskSupervisor},
+        Authify.SCIMClient.EventHandler,
+        Authify.SCIMClient.RetryScheduler
       ] ++
         prometheus_children() ++
         [
