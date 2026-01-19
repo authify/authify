@@ -43,24 +43,48 @@ defmodule AuthifyWeb.API.OpenAPI.Components.Security do
 
   defp scopes do
     %{
+      # OAuth/OIDC Scopes
+      "openid" => "OpenID Connect authentication",
+      "profile" => "Read user profile information (name, username, etc.)",
+      "email" => "Read user email address",
+      # Management API Scopes - Applications
       "applications:read" => "Read OAuth2 applications",
       "applications:write" => "Manage OAuth2 applications",
-      "certificates:read" => "Read certificates",
-      "certificates:write" => "Manage certificates",
-      "groups:read" => "Read groups and memberships",
-      "groups:write" => "Manage groups and memberships",
-      "invitations:read" => "Read invitations",
-      "invitations:write" => "Manage invitations",
+      "application_groups:read" => "Read application groups",
+      "application_groups:write" => "Manage application groups",
       "management_app:read" => "Read Management API applications",
       "management_app:write" => "Manage Management API applications",
-      "organizations:read" => "Read organization configuration",
-      "organizations:write" => "Manage organization configuration",
-      "profile:read" => "Read current user's profile",
-      "profile:write" => "Update current user's profile",
+      # Management API Scopes - Users & Groups
+      "users:read" => "Read users in organization",
+      "users:write" => "Manage users in organization",
+      "groups:read" => "Read groups and memberships",
+      "groups:write" => "Manage groups and memberships",
+      # Management API Scopes - Invitations
+      "invitations:read" => "Read invitations",
+      "invitations:write" => "Manage invitations",
+      # Management API Scopes - SAML
       "saml:read" => "Read SAML service providers",
       "saml:write" => "Manage SAML service providers",
-      "users:read" => "Read users",
-      "users:write" => "Manage users"
+      # Management API Scopes - Certificates
+      "certificates:read" => "Read certificates",
+      "certificates:write" => "Manage certificates",
+      # Management API Scopes - Organization
+      "organizations:read" => "Read organization configuration and settings",
+      "organizations:write" => "Manage organization configuration and settings",
+      # Management API Scopes - Audit
+      "audit_logs:read" => "Read audit logs for organization",
+      # Personal Access Token Scopes
+      "profile:read" => "Read your own profile information",
+      "profile:write" => "Update your own profile information",
+      # SCIM 2.0 Provisioning Scopes
+      "scim:read" => "Read all SCIM resources (users and groups)",
+      "scim:write" => "Manage all SCIM resources (users and groups)",
+      "scim:users:read" => "Read SCIM user resources",
+      "scim:users:write" => "Manage SCIM user resources",
+      "scim:groups:read" => "Read SCIM group resources",
+      "scim:groups:write" => "Manage SCIM group resources",
+      "scim:me" => "Read your own SCIM resource (self-service)",
+      "scim:me:write" => "Update your own SCIM resource (self-service)"
     }
   end
 end
