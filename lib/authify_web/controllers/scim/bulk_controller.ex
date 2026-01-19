@@ -10,7 +10,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
 
   alias Authify.Accounts
   alias Authify.SCIM.ResourceFormatter
-  alias AuthifyWeb.SCIM.PatchOperations
+  alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
 
   @bulk_request_schema "urn:ietf:params:scim:api:messages:2.0:BulkRequest"
   @bulk_response_schema "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
@@ -35,7 +35,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
              :ok <- validate_max_operations(operations),
              :ok <- validate_payload_size(conn) do
           # Get failOnErrors threshold (default: fail on first error)
-          fail_on_errors = parse_int(params["failOnErrors"], 1)
+          fail_on_errors = Helpers.parse_int(params["failOnErrors"], 1)
 
           # Process operations with error tracking
           {responses, _bulk_id_map, _error_count} =
@@ -177,12 +177,12 @@ defmodule AuthifyWeb.SCIM.BulkController do
   # Executes the operation based on method and resource type
   defp execute_operation("POST", :user, nil, data, bulk_id, organization, conn) do
     # Map SCIM data to user attributes
-    attrs = map_scim_to_user_attrs(data)
+    attrs = Mappers.map_user_attrs(data)
 
     case Accounts.create_user_scim(attrs, organization.id) do
       {:ok, user} ->
         user = Authify.Repo.preload(user, :groups)
-        base_url = build_base_url(conn)
+        base_url = Helpers.build_base_url(conn)
         resource = ResourceFormatter.format_user(user, base_url)
         location = "#{base_url}/Users/#{user.id}"
 
@@ -200,7 +200,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
         {:ok, response, bulk_id_map}
 
       {:error, changeset} ->
-        detail = format_changeset_errors(changeset)
+        detail = Helpers.format_changeset_errors(changeset)
 
         {:error, 400,
          build_error_response(%{"method" => "POST", "bulkId" => bulk_id}, 400, detail)}
@@ -208,12 +208,12 @@ defmodule AuthifyWeb.SCIM.BulkController do
   end
 
   defp execute_operation("POST", :group, nil, data, bulk_id, organization, conn) do
-    attrs = map_scim_to_group_attrs(data)
+    attrs = Mappers.map_group_attrs(data)
 
     case Accounts.create_group_scim(attrs, organization.id) do
       {:ok, group} ->
         group = Authify.Repo.preload(group, :users)
-        base_url = build_base_url(conn)
+        base_url = Helpers.build_base_url(conn)
         resource = ResourceFormatter.format_group(group, organization.id, base_url)
         location = "#{base_url}/Groups/#{group.id}"
 
@@ -230,7 +230,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
         {:ok, response, bulk_id_map}
 
       {:error, changeset} ->
-        detail = format_changeset_errors(changeset)
+        detail = Helpers.format_changeset_errors(changeset)
 
         {:error, 400,
          build_error_response(%{"method" => "POST", "bulkId" => bulk_id}, 400, detail)}
@@ -244,28 +244,34 @@ defmodule AuthifyWeb.SCIM.BulkController do
          build_error_response(%{"method" => "PUT", "bulkId" => bulk_id}, 404, "User not found")}
 
       user ->
-        if user.organization_id == organization.id do
-          attrs = map_scim_to_user_attrs(data)
+        case Helpers.validate_resource_organization(user, organization) do
+          :ok ->
+            attrs = Mappers.map_user_attrs(data)
 
-          case Accounts.update_user_scim(user, attrs) do
-            {:ok, _updated_user} ->
-              response = %{
-                method: "PUT",
-                bulkId: bulk_id,
-                status: "200"
-              }
+            case Accounts.update_user_scim(user, attrs) do
+              {:ok, _updated_user} ->
+                response = %{
+                  method: "PUT",
+                  bulkId: bulk_id,
+                  status: "200"
+                }
 
-              {:ok, response, %{}}
+                {:ok, response, %{}}
 
-            {:error, changeset} ->
-              detail = format_changeset_errors(changeset)
+              {:error, changeset} ->
+                detail = Helpers.format_changeset_errors(changeset)
 
-              {:error, 400,
-               build_error_response(%{"method" => "PUT", "bulkId" => bulk_id}, 400, detail)}
-          end
-        else
-          {:error, 404,
-           build_error_response(%{"method" => "PUT", "bulkId" => bulk_id}, 404, "User not found")}
+                {:error, 400,
+                 build_error_response(%{"method" => "PUT", "bulkId" => bulk_id}, 400, detail)}
+            end
+
+          {:error, :not_found} ->
+            {:error, 404,
+             build_error_response(
+               %{"method" => "PUT", "bulkId" => bulk_id},
+               404,
+               "User not found"
+             )}
         end
     end
   end
@@ -277,28 +283,34 @@ defmodule AuthifyWeb.SCIM.BulkController do
          build_error_response(%{"method" => "PUT", "bulkId" => bulk_id}, 404, "Group not found")}
 
       group ->
-        if group.organization_id == organization.id do
-          attrs = map_scim_to_group_attrs(data)
+        case Helpers.validate_resource_organization(group, organization) do
+          :ok ->
+            attrs = Mappers.map_group_attrs(data)
 
-          case Accounts.update_group_scim(group, attrs) do
-            {:ok, _updated_group} ->
-              response = %{
-                method: "PUT",
-                bulkId: bulk_id,
-                status: "200"
-              }
+            case Accounts.update_group_scim(group, attrs) do
+              {:ok, _updated_group} ->
+                response = %{
+                  method: "PUT",
+                  bulkId: bulk_id,
+                  status: "200"
+                }
 
-              {:ok, response, %{}}
+                {:ok, response, %{}}
 
-            {:error, changeset} ->
-              detail = format_changeset_errors(changeset)
+              {:error, changeset} ->
+                detail = Helpers.format_changeset_errors(changeset)
 
-              {:error, 400,
-               build_error_response(%{"method" => "PUT", "bulkId" => bulk_id}, 400, detail)}
-          end
-        else
-          {:error, 404,
-           build_error_response(%{"method" => "PUT", "bulkId" => bulk_id}, 404, "Group not found")}
+                {:error, 400,
+                 build_error_response(%{"method" => "PUT", "bulkId" => bulk_id}, 400, detail)}
+            end
+
+          {:error, :not_found} ->
+            {:error, 404,
+             build_error_response(
+               %{"method" => "PUT", "bulkId" => bulk_id},
+               404,
+               "Group not found"
+             )}
         end
     end
   end
@@ -311,32 +323,34 @@ defmodule AuthifyWeb.SCIM.BulkController do
          build_error_response(%{"method" => "DELETE", "bulkId" => bulk_id}, 404, "User not found")}
 
       user ->
-        if user.organization_id == organization.id do
-          case Accounts.update_user_scim(user, %{active: false}) do
-            {:ok, _user} ->
-              response = %{
-                method: "DELETE",
-                bulkId: bulk_id,
-                status: "204"
-              }
+        case Helpers.validate_resource_organization(user, organization) do
+          :ok ->
+            case Accounts.update_user_scim(user, %{active: false}) do
+              {:ok, _user} ->
+                response = %{
+                  method: "DELETE",
+                  bulkId: bulk_id,
+                  status: "204"
+                }
 
-              {:ok, response, %{}}
+                {:ok, response, %{}}
 
-            {:error, _} ->
-              {:error, 400,
-               build_error_response(
-                 %{"method" => "DELETE", "bulkId" => bulk_id},
-                 400,
-                 "Failed to delete user"
-               )}
-          end
-        else
-          {:error, 404,
-           build_error_response(
-             %{"method" => "DELETE", "bulkId" => bulk_id},
-             404,
-             "User not found"
-           )}
+              {:error, _} ->
+                {:error, 400,
+                 build_error_response(
+                   %{"method" => "DELETE", "bulkId" => bulk_id},
+                   400,
+                   "Failed to delete user"
+                 )}
+            end
+
+          {:error, :not_found} ->
+            {:error, 404,
+             build_error_response(
+               %{"method" => "DELETE", "bulkId" => bulk_id},
+               404,
+               "User not found"
+             )}
         end
     end
   end
@@ -353,32 +367,34 @@ defmodule AuthifyWeb.SCIM.BulkController do
          )}
 
       group ->
-        if group.organization_id == organization.id do
-          case Accounts.delete_group(group) do
-            {:ok, _group} ->
-              response = %{
-                method: "DELETE",
-                bulkId: bulk_id,
-                status: "204"
-              }
+        case Helpers.validate_resource_organization(group, organization) do
+          :ok ->
+            case Accounts.delete_group(group) do
+              {:ok, _group} ->
+                response = %{
+                  method: "DELETE",
+                  bulkId: bulk_id,
+                  status: "204"
+                }
 
-              {:ok, response, %{}}
+                {:ok, response, %{}}
 
-            {:error, _} ->
-              {:error, 400,
-               build_error_response(
-                 %{"method" => "DELETE", "bulkId" => bulk_id},
-                 400,
-                 "Failed to delete group"
-               )}
-          end
-        else
-          {:error, 404,
-           build_error_response(
-             %{"method" => "DELETE", "bulkId" => bulk_id},
-             404,
-             "Group not found"
-           )}
+              {:error, _} ->
+                {:error, 400,
+                 build_error_response(
+                   %{"method" => "DELETE", "bulkId" => bulk_id},
+                   400,
+                   "Failed to delete group"
+                 )}
+            end
+
+          {:error, :not_found} ->
+            {:error, 404,
+             build_error_response(
+               %{"method" => "DELETE", "bulkId" => bulk_id},
+               404,
+               "Group not found"
+             )}
         end
     end
   end
@@ -391,30 +407,32 @@ defmodule AuthifyWeb.SCIM.BulkController do
          build_error_response(%{"method" => "PATCH", "bulkId" => bulk_id}, 404, "User not found")}
 
       user ->
-        if user.organization_id == organization.id do
-          operations = data["Operations"] || []
+        case Helpers.validate_resource_organization(user, organization) do
+          :ok ->
+            operations = data["Operations"] || []
 
-          case PatchOperations.apply_user_patch_operations(user, operations) do
-            {:ok, _updated_user} ->
-              response = %{
-                method: "PATCH",
-                bulkId: bulk_id,
-                status: "200"
-              }
+            case PatchOperations.apply_user_patch_operations(user, operations) do
+              {:ok, _updated_user} ->
+                response = %{
+                  method: "PATCH",
+                  bulkId: bulk_id,
+                  status: "200"
+                }
 
-              {:ok, response, %{}}
+                {:ok, response, %{}}
 
-            {:error, reason} ->
-              {:error, 400,
-               build_error_response(%{"method" => "PATCH", "bulkId" => bulk_id}, 400, reason)}
-          end
-        else
-          {:error, 404,
-           build_error_response(
-             %{"method" => "PATCH", "bulkId" => bulk_id},
-             404,
-             "User not found"
-           )}
+              {:error, reason} ->
+                {:error, 400,
+                 build_error_response(%{"method" => "PATCH", "bulkId" => bulk_id}, 400, reason)}
+            end
+
+          {:error, :not_found} ->
+            {:error, 404,
+             build_error_response(
+               %{"method" => "PATCH", "bulkId" => bulk_id},
+               404,
+               "User not found"
+             )}
         end
     end
   end
@@ -427,30 +445,32 @@ defmodule AuthifyWeb.SCIM.BulkController do
          build_error_response(%{"method" => "PATCH", "bulkId" => bulk_id}, 404, "Group not found")}
 
       group ->
-        if group.organization_id == organization.id do
-          operations = data["Operations"] || []
+        case Helpers.validate_resource_organization(group, organization) do
+          :ok ->
+            operations = data["Operations"] || []
 
-          case PatchOperations.apply_group_patch_operations(group, operations, organization) do
-            {:ok, _updated_group} ->
-              response = %{
-                method: "PATCH",
-                bulkId: bulk_id,
-                status: "200"
-              }
+            case PatchOperations.apply_group_patch_operations(group, operations, organization) do
+              {:ok, _updated_group} ->
+                response = %{
+                  method: "PATCH",
+                  bulkId: bulk_id,
+                  status: "200"
+                }
 
-              {:ok, response, %{}}
+                {:ok, response, %{}}
 
-            {:error, reason} ->
-              {:error, 400,
-               build_error_response(%{"method" => "PATCH", "bulkId" => bulk_id}, 400, reason)}
-          end
-        else
-          {:error, 404,
-           build_error_response(
-             %{"method" => "PATCH", "bulkId" => bulk_id},
-             404,
-             "Group not found"
-           )}
+              {:error, reason} ->
+                {:error, 400,
+                 build_error_response(%{"method" => "PATCH", "bulkId" => bulk_id}, 400, reason)}
+            end
+
+          {:error, :not_found} ->
+            {:error, 404,
+             build_error_response(
+               %{"method" => "PATCH", "bulkId" => bulk_id},
+               404,
+               "Group not found"
+             )}
         end
     end
   end
@@ -505,114 +525,4 @@ defmodule AuthifyWeb.SCIM.BulkController do
     |> put_resp_content_type("application/scim+json")
     |> json(bulk_response)
   end
-
-  # Helper functions (similar to UsersController and GroupsController)
-
-  defp build_base_url(conn) do
-    org_slug = conn.assigns[:current_organization].slug
-    "#{AuthifyWeb.Endpoint.url()}/#{org_slug}/scim/v2"
-  end
-
-  defp parse_int(nil, default), do: default
-
-  defp parse_int(value, default) when is_binary(value) do
-    case Integer.parse(value) do
-      {int, _} -> int
-      :error -> default
-    end
-  end
-
-  defp parse_int(value, _default) when is_integer(value), do: value
-  defp parse_int(_, default), do: default
-
-  # Map SCIM user attributes (similar to UsersController)
-  defp map_scim_to_user_attrs(params) when is_map(params) do
-    {attrs, username_email} = map_username_field(params)
-
-    attrs
-    |> maybe_put(:external_id, params["externalId"])
-    |> maybe_put(:first_name, get_in(params, ["name", "givenName"]))
-    |> maybe_put(:last_name, get_in(params, ["name", "familyName"]))
-    |> maybe_put(:active, params["active"])
-    |> Map.put(:emails, build_email_list(params, username_email))
-  end
-
-  defp map_scim_to_user_attrs(_), do: %{}
-
-  defp map_username_field(params) do
-    case params["userName"] do
-      nil ->
-        {%{}, nil}
-
-      username when is_binary(username) ->
-        if String.contains?(username, "@") do
-          {%{}, username}
-        else
-          {%{username: username}, nil}
-        end
-    end
-  end
-
-  defp build_email_list(params, username_email) do
-    cond do
-      params["emails"] && is_list(params["emails"]) ->
-        params["emails"]
-        |> Enum.map(&convert_scim_email/1)
-        |> ensure_primary_email()
-
-      username_email ->
-        [%{"value" => username_email, "type" => "work", "primary" => true}]
-
-      true ->
-        []
-    end
-  end
-
-  defp convert_scim_email(email) do
-    %{
-      "value" => Map.get(email, "value"),
-      "type" => Map.get(email, "type", "work"),
-      "primary" => Map.get(email, "primary", false),
-      "display" => Map.get(email, "display")
-    }
-  end
-
-  defp ensure_primary_email(emails) do
-    if Enum.any?(emails, & &1["primary"]) do
-      emails
-    else
-      case emails do
-        [first | rest] -> [Map.put(first, "primary", true) | rest]
-        [] -> []
-      end
-    end
-  end
-
-  # Map SCIM group attributes
-  defp map_scim_to_group_attrs(params) when is_map(params) do
-    %{}
-    |> maybe_put(:name, params["displayName"])
-    |> maybe_put(:external_id, params["externalId"])
-  end
-
-  defp map_scim_to_group_attrs(_), do: %{}
-
-  defp maybe_put(attrs, _key, nil), do: attrs
-  defp maybe_put(attrs, key, value), do: Map.put(attrs, key, value)
-
-  defp format_changeset_errors(changeset) do
-    errors =
-      Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
-        end)
-      end)
-
-    Enum.map_join(errors, "; ", fn {field, messages} ->
-      "#{field}: #{format_messages(messages)}"
-    end)
-  end
-
-  defp format_messages(messages) when is_list(messages), do: Enum.join(messages, ", ")
-  defp format_messages(message), do: to_string(message)
 end

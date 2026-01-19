@@ -7,6 +7,8 @@ defmodule AuthifyWeb.SCIM.ResourceTypesController do
 
   use AuthifyWeb.SCIM.BaseController
 
+  alias AuthifyWeb.SCIM.Helpers
+
   @user_resource_type %{
     schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
     id: "User",
@@ -33,7 +35,7 @@ defmodule AuthifyWeb.SCIM.ResourceTypesController do
   Returns all available resource types.
   """
   def index(conn, _params) do
-    base_url = build_base_url(conn)
+    base_url = Helpers.build_base_url(conn)
 
     resources = [
       add_meta(@user_resource_type, "User", base_url),
@@ -49,7 +51,7 @@ defmodule AuthifyWeb.SCIM.ResourceTypesController do
   Returns a specific resource type (User or Group).
   """
   def show(conn, %{"id" => id}) do
-    base_url = build_base_url(conn)
+    base_url = Helpers.build_base_url(conn)
 
     resource =
       case id do
@@ -63,11 +65,6 @@ defmodule AuthifyWeb.SCIM.ResourceTypesController do
     else
       render_scim_error(conn, 404, :no_target, "ResourceType '#{id}' not found")
     end
-  end
-
-  defp build_base_url(conn) do
-    org_slug = conn.assigns[:current_organization].slug
-    "#{AuthifyWeb.Endpoint.url()}/#{org_slug}/scim/v2"
   end
 
   defp add_meta(resource, id, base_url) do

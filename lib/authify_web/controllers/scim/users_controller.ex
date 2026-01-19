@@ -9,7 +9,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
 
   alias Authify.Accounts
   alias Authify.SCIM.ResourceFormatter
-  alias AuthifyWeb.SCIM.PatchOperations
+  alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
 
   @doc """
   GET /scim/v2/Users
@@ -23,9 +23,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
     case ensure_scim_scope(conn, "scim:users:read") do
       {:ok, _conn} ->
         # Parse pagination params (SCIM uses 1-based indexing)
-        start_index = parse_int(params["startIndex"], 1)
-        count = min(parse_int(params["count"], 25), 100)
-        page = div(start_index - 1, count) + 1
+        {start_index, count, page} = Helpers.parse_pagination_params(params)
 
         # Build query options
         opts = [
@@ -41,7 +39,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
           {:ok, users} ->
             case Accounts.count_users_scim(organization.id, filter: params["filter"]) do
               {:ok, total} ->
-                base_url = build_base_url(conn)
+                base_url = Helpers.build_base_url(conn)
 
                 resources =
                   Enum.map(users, fn user ->
@@ -79,14 +77,16 @@ defmodule AuthifyWeb.SCIM.UsersController do
 
           user ->
             # Verify user belongs to organization (multi-tenant isolation)
-            if user.organization_id == organization.id do
-              # Preload emails and groups for SCIM response
-              user = Authify.Repo.preload(user, [:emails, :groups])
-              base_url = build_base_url(conn)
-              resource = ResourceFormatter.format_user(user, base_url)
-              render_scim_resource(conn, resource)
-            else
-              render_scim_error(conn, 404, :no_target, "User not found")
+            case Helpers.validate_resource_organization(user, organization) do
+              :ok ->
+                # Preload emails and groups for SCIM response
+                user = Authify.Repo.preload(user, [:emails, :groups])
+                base_url = Helpers.build_base_url(conn)
+                resource = ResourceFormatter.format_user(user, base_url)
+                render_scim_resource(conn, resource)
+
+              {:error, :not_found} ->
+                render_scim_error(conn, 404, :no_target, "User not found")
             end
         end
 
@@ -106,7 +106,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
     case ensure_scim_scope(conn, "scim:users:write") do
       {:ok, _conn} ->
         # Map SCIM attributes to Authify user attributes
-        attrs = map_scim_to_user_attrs(params)
+        attrs = Mappers.map_user_attrs(params)
 
         # Create user via SCIM-specific function
         case Accounts.create_user_scim(attrs, organization.id) do
@@ -127,7 +127,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
 
   defp render_created_user(conn, user) do
     user = Authify.Repo.preload(user, :groups)
-    base_url = build_base_url(conn)
+    base_url = Helpers.build_base_url(conn)
     resource = ResourceFormatter.format_user(user, base_url)
 
     conn
@@ -166,7 +166,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
         )
 
       true ->
-        detail = format_changeset_errors(changeset)
+        detail = Helpers.format_changeset_errors(changeset)
         render_scim_error(conn, 400, :invalid_value, detail)
     end
   end
@@ -209,22 +209,24 @@ defmodule AuthifyWeb.SCIM.UsersController do
             render_scim_error(conn, 404, :no_target, "User not found")
 
           user ->
-            if user.organization_id == organization.id do
-              # Parse PATCH operations
-              operations = params["Operations"] || []
+            case Helpers.validate_resource_organization(user, organization) do
+              :ok ->
+                # Parse PATCH operations
+                operations = params["Operations"] || []
 
-              case PatchOperations.apply_user_patch_operations(user, operations) do
-                {:ok, updated_user} ->
-                  updated_user = Authify.Repo.preload(updated_user, :groups)
-                  base_url = build_base_url(conn)
-                  resource = ResourceFormatter.format_user(updated_user, base_url)
-                  render_scim_resource(conn, resource)
+                case PatchOperations.apply_user_patch_operations(user, operations) do
+                  {:ok, updated_user} ->
+                    updated_user = Authify.Repo.preload(updated_user, :groups)
+                    base_url = Helpers.build_base_url(conn)
+                    resource = ResourceFormatter.format_user(updated_user, base_url)
+                    render_scim_resource(conn, resource)
 
-                {:error, reason} ->
-                  render_scim_error(conn, 400, :invalid_value, reason)
-              end
-            else
-              render_scim_error(conn, 404, :no_target, "User not found")
+                  {:error, reason} ->
+                    render_scim_error(conn, 400, :invalid_value, reason)
+                end
+
+              {:error, :not_found} ->
+                render_scim_error(conn, 404, :no_target, "User not found")
             end
         end
 
@@ -235,36 +237,40 @@ defmodule AuthifyWeb.SCIM.UsersController do
 
   # Private helper for update to reduce nesting
   defp do_update_user(conn, user, organization, params) do
-    if user.organization_id == organization.id do
-      # Map SCIM attributes to Authify user attributes
-      attrs = map_scim_to_user_attrs(params)
+    case Helpers.validate_resource_organization(user, organization) do
+      :ok ->
+        # Map SCIM attributes to Authify user attributes
+        attrs = Mappers.map_user_attrs(params)
 
-      # Validate immutable fields
-      if attrs[:external_id] && attrs[:external_id] != user.external_id do
-        render_scim_error(
-          conn,
-          400,
-          :mutability,
-          "Attribute 'externalId' is immutable and cannot be modified"
-        )
-      else
-        case Accounts.update_user_scim(user, attrs) do
-          {:ok, updated_user} ->
-            updated_user = Authify.Repo.preload(updated_user, :groups)
-            base_url = build_base_url(conn)
-            resource = ResourceFormatter.format_user(updated_user, base_url)
-            render_scim_resource(conn, resource)
+        # Validate immutable fields
+        case Helpers.validate_immutable_field(
+               attrs,
+               :external_id,
+               user.external_id,
+               "externalId"
+             ) do
+          :ok ->
+            case Accounts.update_user_scim(user, attrs) do
+              {:ok, updated_user} ->
+                updated_user = Authify.Repo.preload(updated_user, :groups)
+                base_url = Helpers.build_base_url(conn)
+                resource = ResourceFormatter.format_user(updated_user, base_url)
+                render_scim_resource(conn, resource)
 
-          {:error, %Ecto.Changeset{} = changeset} ->
-            detail = format_changeset_errors(changeset)
-            render_scim_error(conn, 400, :invalid_value, detail)
+              {:error, %Ecto.Changeset{} = changeset} ->
+                detail = Helpers.format_changeset_errors(changeset)
+                render_scim_error(conn, 400, :invalid_value, detail)
 
-          {:error, reason} ->
-            render_scim_error(conn, 400, :invalid_value, "Failed to update user: #{reason}")
+              {:error, reason} ->
+                render_scim_error(conn, 400, :invalid_value, "Failed to update user: #{reason}")
+            end
+
+          {:error, message} ->
+            render_scim_error(conn, 400, :mutability, message)
         end
-      end
-    else
-      render_scim_error(conn, 404, :no_target, "User not found")
+
+      {:error, :not_found} ->
+        render_scim_error(conn, 404, :no_target, "User not found")
     end
   end
 
@@ -283,16 +289,23 @@ defmodule AuthifyWeb.SCIM.UsersController do
             render_scim_error(conn, 404, :no_target, "User not found")
 
           user ->
-            if user.organization_id == organization.id do
-              case Accounts.update_user_scim(user, %{active: false}) do
-                {:ok, _user} ->
-                  send_resp(conn, 204, "")
+            case Helpers.validate_resource_organization(user, organization) do
+              :ok ->
+                case Accounts.update_user_scim(user, %{active: false}) do
+                  {:ok, _user} ->
+                    send_resp(conn, 204, "")
 
-                {:error, reason} ->
-                  render_scim_error(conn, 400, :invalid_value, "Failed to delete user: #{reason}")
-              end
-            else
-              render_scim_error(conn, 404, :no_target, "User not found")
+                  {:error, reason} ->
+                    render_scim_error(
+                      conn,
+                      400,
+                      :invalid_value,
+                      "Failed to delete user: #{reason}"
+                    )
+                end
+
+              {:error, :not_found} ->
+                render_scim_error(conn, 404, :no_target, "User not found")
             end
         end
 
@@ -302,146 +315,6 @@ defmodule AuthifyWeb.SCIM.UsersController do
   end
 
   # Private functions
-
-  defp build_base_url(conn) do
-    org_slug = conn.assigns[:current_organization].slug
-    "#{AuthifyWeb.Endpoint.url()}/#{org_slug}/scim/v2"
-  end
-
-  defp parse_int(nil, default), do: default
-
-  defp parse_int(value, default) when is_binary(value) do
-    case Integer.parse(value) do
-      {int, _} -> int
-      :error -> default
-    end
-  end
-
-  defp parse_int(value, _default) when is_integer(value), do: value
-
-  # Maps SCIM user attributes to Authify user attributes
-  defp map_scim_to_user_attrs(params) do
-    %{}
-    |> map_username_field(params)
-    |> map_external_id(params)
-    |> map_name_fields(params)
-    |> map_email_fields(params)
-    |> map_active_field(params)
-  end
-
-  defp map_username_field(attrs, params) do
-    case params["userName"] do
-      nil ->
-        {attrs, nil}
-
-      username when is_binary(username) ->
-        if String.contains?(username, "@") do
-          {attrs, username}
-        else
-          {Map.put(attrs, :username, username), nil}
-        end
-    end
-  end
-
-  defp map_external_id({attrs, username_email}, params) do
-    attrs =
-      if params["externalId"],
-        do: Map.put(attrs, :external_id, params["externalId"]),
-        else: attrs
-
-    {attrs, username_email}
-  end
-
-  defp map_name_fields({attrs, username_email}, params) do
-    attrs =
-      attrs
-      |> maybe_put(:first_name, get_in(params, ["name", "givenName"]))
-      |> maybe_put(:last_name, get_in(params, ["name", "familyName"]))
-
-    {attrs, username_email}
-  end
-
-  defp map_email_fields({attrs, username_email}, params) do
-    emails = build_email_list(params, username_email)
-    Map.put(attrs, :emails, emails)
-  end
-
-  defp map_active_field(attrs, params) do
-    if Map.has_key?(params, "active"),
-      do: Map.put(attrs, :active, params["active"]),
-      else: attrs
-  end
-
-  defp build_email_list(params, username_email) do
-    cond do
-      params["emails"] && is_list(params["emails"]) ->
-        params["emails"]
-        |> Enum.map(&convert_scim_email/1)
-        |> ensure_primary_email()
-
-      username_email ->
-        [%{"value" => username_email, "type" => "work", "primary" => true}]
-
-      true ->
-        []
-    end
-  end
-
-  defp convert_scim_email(email) do
-    %{
-      "value" => Map.get(email, "value"),
-      "type" => Map.get(email, "type", "work"),
-      "primary" => Map.get(email, "primary", false),
-      "display" => Map.get(email, "display")
-    }
-  end
-
-  defp ensure_primary_email(emails) do
-    if Enum.any?(emails, & &1["primary"]) do
-      emails
-    else
-      case emails do
-        [first | rest] -> [Map.put(first, "primary", true) | rest]
-        [] -> []
-      end
-    end
-  end
-
-  defp maybe_put(attrs, _key, nil), do: attrs
-  defp maybe_put(attrs, key, value), do: Map.put(attrs, key, value)
-
-  defp format_changeset_errors(changeset) do
-    errors =
-      Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
-        end)
-      end)
-
-    Enum.map_join(errors, "; ", fn {field, messages} ->
-      formatted_messages = format_error_messages(messages)
-      "#{field}: #{formatted_messages}"
-    end)
-  end
-
-  # Format error messages, handling both simple strings and nested errors from associations
-  defp format_error_messages(messages) when is_list(messages) do
-    messages
-    |> Enum.map_join(", ", &format_error_message/1)
-  end
-
-  defp format_error_messages(message), do: format_error_message(message)
-
-  defp format_error_message(msg) when is_binary(msg), do: msg
-
-  defp format_error_message(msg) when is_map(msg) do
-    # Nested error from association (e.g., emails)
-    Enum.map_join(msg, "; ", fn {field, messages} ->
-      "#{field}: #{format_error_messages(messages)}"
-    end)
-  end
-
-  defp format_error_message(msg), do: inspect(msg)
 
   # Check if changeset has a uniqueness error on any email
   defp has_email_uniqueness_error?(changeset) do

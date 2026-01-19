@@ -7,6 +7,8 @@ defmodule AuthifyWeb.SCIM.SchemasController do
 
   use AuthifyWeb.SCIM.BaseController
 
+  alias AuthifyWeb.SCIM.Helpers
+
   @user_schema %{
     id: "urn:ietf:params:scim:schemas:core:2.0:User",
     name: "User",
@@ -265,7 +267,7 @@ defmodule AuthifyWeb.SCIM.SchemasController do
   Returns all available schemas.
   """
   def index(conn, _params) do
-    base_url = build_base_url(conn)
+    base_url = Helpers.build_base_url(conn)
 
     schemas = [
       add_schema_meta(@user_schema, base_url),
@@ -281,7 +283,7 @@ defmodule AuthifyWeb.SCIM.SchemasController do
   Returns a specific schema (User or Group).
   """
   def show(conn, %{"id" => id}) do
-    base_url = build_base_url(conn)
+    base_url = Helpers.build_base_url(conn)
 
     schema =
       case id do
@@ -295,11 +297,6 @@ defmodule AuthifyWeb.SCIM.SchemasController do
     else
       render_scim_error(conn, 404, :no_target, "Schema '#{id}' not found")
     end
-  end
-
-  defp build_base_url(conn) do
-    org_slug = conn.assigns[:current_organization].slug
-    "#{AuthifyWeb.Endpoint.url()}/#{org_slug}/scim/v2"
   end
 
   defp add_schema_meta(schema, base_url) do
