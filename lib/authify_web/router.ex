@@ -251,6 +251,10 @@ defmodule AuthifyWeb.Router do
     delete "/groups/:id/users/:user_id", GroupController, :remove_user
     post "/groups/:id/applications", GroupController, :add_application
     delete "/groups/:id/applications/:member_id", GroupController, :remove_application
+
+    # SCIM Clients (outbound provisioning)
+    resources "/scim_clients", ScimClientsController
+    get "/scim_clients/:id/logs", ScimClientsController, :logs
   end
 
   # Super admin only routes - require global admin privileges

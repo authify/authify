@@ -192,6 +192,18 @@ defmodule AuthifyWeb.NavigationComponents do
                   <i class="bi bi-people-fill"></i> Groups
                 </a>
               </li>
+              <li class="nav-item">
+                <a
+                  class={[
+                    "nav-link",
+                    if(@current_page == "scim_clients", do: "active", else: "")
+                  ]}
+                  aria-current={if @current_page == "scim_clients", do: "page", else: false}
+                  href={"/#{@organization.slug}/scim_clients"}
+                >
+                  <i class="bi bi-arrow-left-right"></i> SCIM Clients
+                </a>
+              </li>
             <% end %>
             <li class="nav-item">
               <a

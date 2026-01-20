@@ -81,14 +81,24 @@ defmodule Authify.SCIMClient.ScimClient do
 
   defp validate_auth_requirements(changeset) do
     auth_type = get_field(changeset, :auth_type)
+    # Only validate auth_credential if it's being changed or this is a new record
+    is_new_record = changeset.data.__meta__.state == :built
+    credential_changed = get_change(changeset, :auth_credential) != nil
 
     case auth_type do
       "bearer" ->
-        validate_required(changeset, [:auth_credential])
+        if is_new_record or credential_changed do
+          validate_required(changeset, [:auth_credential])
+        else
+          changeset
+        end
 
       "basic" ->
-        changeset
-        |> validate_required([:auth_username, :auth_credential])
+        if is_new_record or credential_changed do
+          validate_required(changeset, [:auth_username, :auth_credential])
+        else
+          changeset
+        end
 
       _ ->
         changeset
