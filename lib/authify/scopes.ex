@@ -36,6 +36,9 @@ defmodule Authify.Scopes do
     # Certificate management
     "certificates:read",
     "certificates:write",
+    # SCIM client management (outbound provisioning)
+    "scim_clients:read",
+    "scim_clients:write",
     # Organization configuration
     "organizations:read",
     "organizations:write",
@@ -143,6 +146,10 @@ defmodule Authify.Scopes do
       "Certificates" => [
         {"certificates:read", "Read certificates in organization"},
         {"certificates:write", "Manage certificates in organization"}
+      ],
+      "SCIM Clients" => [
+        {"scim_clients:read", "Read SCIM client configurations for outbound provisioning"},
+        {"scim_clients:write", "Manage SCIM client configurations for outbound provisioning"}
       ],
       "Organizations" => [
         {"organizations:read", "Read organization configuration and settings"},

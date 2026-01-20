@@ -355,6 +355,15 @@ defmodule AuthifyWeb.Router do
     patch "/certificates/:id/deactivate", CertificatesController, :deactivate
     get "/certificates/:id/download/:type", CertificatesController, :download
 
+    # SCIM Client Management (Outbound Provisioning)
+    get "/scim-clients", ScimClientsController, :index
+    post "/scim-clients", ScimClientsController, :create
+    get "/scim-clients/:id", ScimClientsController, :show
+    put "/scim-clients/:id", ScimClientsController, :update
+    delete "/scim-clients/:id", ScimClientsController, :delete
+    post "/scim-clients/:scim_client_id/sync", ScimClientsController, :trigger_sync
+    get "/scim-clients/:scim_client_id/logs", ScimClientsController, :logs
+
     # Group Management
     get "/groups", GroupsController, :index
     post "/groups", GroupsController, :create
