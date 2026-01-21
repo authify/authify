@@ -84,7 +84,7 @@ defmodule AuthifyWeb.AuditLogsControllerTest do
       })
 
       # Filter by login_success
-      conn = get(conn, ~p"/#{organization.slug}/audit_logs?event_type=login_success")
+      conn = get(conn, ~p"/#{organization.slug}/audit_logs?event_filter=login_success")
       html = html_response(conn, 200)
       # Check we're showing only 1 event
       assert html =~ "Showing 1 events"

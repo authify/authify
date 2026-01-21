@@ -17,17 +17,41 @@
           <div class="row g-3">
             <!-- Event Type Filter -->
             <div class="col-md-3">
-              <label for="event_type" class="form-label">Event Type</label>
-              <select name="event_type" id="event_type" class="form-select">
+              <label for="event_filter" class="form-label">Event Type</label>
+              <select name="event_filter" id="event_filter" class="form-select">
                 <option value="">All Events</option>
-                <%= for event_type <- @event_types do %>
+
+                <optgroup label="Event Categories">
                   <option
-                    value={event_type}
-                    selected={@filters.event_type == to_string(event_type)}
+                    value="cat_auth"
+                    selected={@filters[:category] == "auth"}
                   >
-                    {format_event_type(to_string(event_type))}
+                    🔐 Authentication
                   </option>
-                <% end %>
+                  <option
+                    value="cat_user"
+                    selected={@filters[:category] == "user"}
+                  >
+                    👤 User Management
+                  </option>
+                  <option
+                    value="cat_scim"
+                    selected={@filters[:category] == "scim"}
+                  >
+                    📱 SCIM Activity
+                  </option>
+                </optgroup>
+
+                <optgroup label="Specific Events">
+                  <%= for event_type <- @event_types do %>
+                    <option
+                      value={event_type}
+                      selected={@filters.event_type == to_string(event_type)}
+                    >
+                      {format_event_type(to_string(event_type))}
+                    </option>
+                  <% end %>
+                </optgroup>
               </select>
             </div>
             

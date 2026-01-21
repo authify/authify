@@ -220,6 +220,7 @@ defmodule Authify.AuditLog do
     |> apply_organization_filter(opts[:organization_id])
     |> apply_actor_type_filter(opts[:actor_type])
     |> apply_actor_id_filter(opts[:actor_id])
+    |> apply_category_filter(opts[:category])
     |> apply_event_type_filter(opts[:event_type])
     |> apply_outcome_filter(opts[:outcome])
     |> apply_resource_type_filter(opts[:resource_type])
@@ -249,13 +250,41 @@ defmodule Authify.AuditLog do
     where(query, [e], e.actor_id == ^actor_id)
   end
 
+  defp apply_category_filter(query, nil), do: query
+  defp apply_category_filter(query, ""), do: query
+
+  defp apply_category_filter(query, "scim") do
+    where(query, [e], like(e.event_type, "scim_%"))
+  end
+
+  defp apply_category_filter(query, "auth") do
+    where(
+      query,
+      [e],
+      like(e.event_type, "%login%") or like(e.event_type, "%logout%") or
+        like(e.event_type, "%session%") or like(e.event_type, "%password%")
+    )
+  end
+
+  defp apply_category_filter(query, "user") do
+    where(
+      query,
+      [e],
+      like(e.event_type, "%user%") and not like(e.event_type, "scim_%")
+    )
+  end
+
+  defp apply_category_filter(query, _), do: query
+
   defp apply_event_type_filter(query, nil), do: query
+  defp apply_event_type_filter(query, ""), do: query
 
   defp apply_event_type_filter(query, event_type) do
     where(query, [e], e.event_type == ^event_type)
   end
 
   defp apply_outcome_filter(query, nil), do: query
+  defp apply_outcome_filter(query, ""), do: query
 
   defp apply_outcome_filter(query, outcome) do
     where(query, [e], e.outcome == ^outcome)
