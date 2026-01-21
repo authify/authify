@@ -11,6 +11,21 @@
       <h1 class="h2">{@scim_client.name}</h1>
       <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group me-2">
+          <.link
+            href={~p"/#{@current_organization.slug}/scim_clients/#{@scim_client}/test_connection"}
+            method="post"
+            class="btn btn-sm btn-outline-primary"
+          >
+            <i class="bi bi-plug"></i> Test Connection
+          </.link>
+          <.link
+            href={~p"/#{@current_organization.slug}/scim_clients/#{@scim_client}/sync"}
+            method="post"
+            data-confirm="This will sync all users and groups to the remote system. Continue?"
+            class="btn btn-sm btn-outline-primary"
+          >
+            <i class="bi bi-arrow-repeat"></i> Manual Sync
+          </.link>
           <a
             href={~p"/#{@current_organization.slug}/scim_clients/#{@scim_client}/edit"}
             class="btn btn-sm btn-outline-secondary"

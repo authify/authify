@@ -255,6 +255,8 @@ defmodule AuthifyWeb.Router do
     # SCIM Clients (outbound provisioning)
     resources "/scim_clients", ScimClientsController
     get "/scim_clients/:id/logs", ScimClientsController, :logs
+    post "/scim_clients/:id/test_connection", ScimClientsController, :test_connection
+    post "/scim_clients/:id/sync", ScimClientsController, :manual_sync
   end
 
   # Super admin only routes - require global admin privileges

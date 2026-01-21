@@ -2,7 +2,7 @@ defmodule AuthifyWeb.ScimClientsController do
   use AuthifyWeb, :controller
 
   alias Authify.AuditLog
-  alias Authify.SCIMClient.{Client, ScimClient}
+  alias Authify.SCIMClient.{Client, HTTPClient, Provisioner, ScimClient}
 
   def index(conn, _params) do
     organization = conn.assigns.current_organization
@@ -147,6 +147,58 @@ defmodule AuthifyWeb.ScimClientsController do
       page: page,
       per_page: 50
     )
+  end
+
+  def test_connection(conn, %{"id" => id}) do
+    organization = conn.assigns.current_organization
+    scim_client = Client.get_scim_client!(id, organization.id)
+
+    case HTTPClient.test_connection(scim_client) do
+      {:ok, message} ->
+        # Log successful connection test
+        log_scim_client_event(conn, :scim_client_connection_tested, scim_client, %{
+          result: "success",
+          message: message
+        })
+
+        conn
+        |> put_flash(:info, "Connection test successful: #{message}")
+        |> redirect(to: ~p"/#{organization.slug}/scim_clients/#{scim_client}")
+
+      {:error, error_message} ->
+        # Log failed connection test
+        log_scim_client_event(conn, :scim_client_connection_tested, scim_client, %{
+          result: "failure",
+          error: error_message
+        })
+
+        conn
+        |> put_flash(:error, "Connection test failed: #{error_message}")
+        |> redirect(to: ~p"/#{organization.slug}/scim_clients/#{scim_client}")
+    end
+  end
+
+  def manual_sync(conn, %{"id" => id}) do
+    organization = conn.assigns.current_organization
+    scim_client = Client.get_scim_client!(id, organization.id)
+
+    # Trigger async full sync
+    Task.Supervisor.start_child(Authify.TaskSupervisor, fn ->
+      Provisioner.full_sync(scim_client)
+    end)
+
+    # Log sync trigger
+    log_scim_client_event(conn, :scim_client_manual_sync_triggered, scim_client, %{
+      sync_users: scim_client.sync_users,
+      sync_groups: scim_client.sync_groups
+    })
+
+    conn
+    |> put_flash(
+      :info,
+      "Manual sync started. Check the sync logs to monitor progress."
+    )
+    |> redirect(to: ~p"/#{organization.slug}/scim_clients/#{scim_client}")
   end
 
   # Private helper functions

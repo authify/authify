@@ -43,6 +43,15 @@ Authify is a self-hosted, open-source identity provider built with Elixir and Ph
 - **Organization-specific SMTP** - Configure SMTP per organization with encrypted credentials
 - **Professional Templates** - HTML and plain text email templates for all notifications
 
+### **User Provisioning**
+- **SCIM 2.0 Outbound Provisioning** - Automatically provision users and groups to downstream applications
+- **Multi-provider Support** - Configure multiple SCIM clients per organization
+- **Flexible Attribute Mapping** - Customize how user data maps to each provider
+- **Sync Monitoring** - Track provisioning operations with detailed sync logs
+- **Connection Testing** - Validate SCIM endpoint connectivity before going live
+- **Manual Sync** - Trigger full synchronization of all users and groups
+- **Rate Limiting** - Configurable request throttling to respect provider limits
+
 ### **Security & Compliance**
 - **Multi-Factor Authentication (MFA)** - TOTP-based MFA with backup codes and trusted devices
 - **Secure by Default** - Strong password policies and validation

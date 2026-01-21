@@ -58,6 +58,15 @@ defmodule Authify.Configurations.Schemas.Organization do
           required: false,
           validation_fn: nil
         },
+        %{
+          name: :scim_client_request_delay_ms,
+          description:
+            "Minimum delay in milliseconds between consecutive SCIM outbound requests to the same provider. Higher values reduce load on downstream systems. Must be between 50ms and 5000ms.",
+          value_type: :integer,
+          default_value: 100,
+          required: false,
+          validation_fn: &validate_scim_request_delay/1
+        },
         # MFA (Multi-Factor Authentication) settings
         %{
           name: :require_mfa,
@@ -496,4 +505,17 @@ defmodule Authify.Configurations.Schemas.Organization do
   end
 
   defp validate_lockout_duration(_), do: {:error, "Must be an integer"}
+
+  defp validate_scim_request_delay(nil), do: {:ok, nil}
+
+  defp validate_scim_request_delay(value)
+       when is_integer(value) and value >= 50 and value <= 5000 do
+    {:ok, value}
+  end
+
+  defp validate_scim_request_delay(value) when is_integer(value) do
+    {:error, "Must be between 50 and 5000 milliseconds"}
+  end
+
+  defp validate_scim_request_delay(_), do: {:error, "Must be an integer"}
 end

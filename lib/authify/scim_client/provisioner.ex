@@ -6,10 +6,83 @@ defmodule Authify.SCIMClient.Provisioner do
 
   require Logger
 
+  alias Authify.Accounts
   alias Authify.Accounts.{Group, Organization, User}
   alias Authify.SCIMClient.{AttributeMapper, Client, DefaultMappings, HTTPClient}
 
   @max_retries 5
+
+  @doc """
+  Performs a full sync of all users and groups to a specific SCIM client.
+
+  This manually triggers provisioning of all resources, useful for:
+  - Initial setup of a new SCIM client
+  - Recovering from sync failures
+  - Reconciling state between Authify and the remote system
+  """
+  def full_sync(client) do
+    require Logger
+
+    Logger.info("Starting full sync for SCIM client #{client.id} (#{client.name})")
+
+    # Sync users if enabled
+    users_synced =
+      if client.sync_users do
+        users = Accounts.list_users(client.organization_id)
+        Logger.info("Syncing #{length(users)} users to SCIM client #{client.id}")
+
+        Enum.each(users, fn user ->
+          # Preload emails for user mapping
+          user = Authify.Repo.preload(user, :emails)
+
+          # Try to determine if this user already exists in the remote system
+          case Client.get_external_id(client.id, :user, user.id) do
+            {:ok, _external_id} ->
+              # User exists, update it
+              provision_to_client(:updated, :user, user, client)
+
+            _ ->
+              # User doesn't exist, create it
+              provision_to_client(:created, :user, user, client)
+          end
+        end)
+
+        length(users)
+      else
+        0
+      end
+
+    # Sync groups if enabled
+    groups_synced =
+      if client.sync_groups do
+        organization = Authify.Repo.get!(Organization, client.organization_id)
+        groups = Accounts.list_groups(organization)
+        Logger.info("Syncing #{length(groups)} groups to SCIM client #{client.id}")
+
+        Enum.each(groups, fn group ->
+          # Try to determine if this group already exists in the remote system
+          case Client.get_external_id(client.id, :group, group.id) do
+            {:ok, _external_id} ->
+              # Group exists, update it
+              provision_to_client(:updated, :group, group, client)
+
+            _ ->
+              # Group doesn't exist, create it
+              provision_to_client(:created, :group, group, client)
+          end
+        end)
+
+        length(groups)
+      else
+        0
+      end
+
+    Logger.info(
+      "Full sync completed for SCIM client #{client.id}: #{users_synced} users, #{groups_synced} groups"
+    )
+
+    {:ok, %{users_synced: users_synced, groups_synced: groups_synced}}
+  end
 
   @doc """
   Provisions a resource change to all active SCIM clients for the organization.
@@ -44,6 +117,8 @@ defmodule Authify.SCIMClient.Provisioner do
   Provisions a single resource change to a specific SCIM client.
   """
   def provision_to_client(event, resource_type, resource, client) do
+    start_time = System.monotonic_time()
+
     # DURABILITY: Write to database FIRST (survives restarts)
     {:ok, log} =
       Client.create_sync_log(%{
@@ -57,14 +132,47 @@ defmodule Authify.SCIMClient.Provisioner do
     # REAL-TIME: Process immediately via async task
     result = perform_operation(event, resource_type, resource, client)
 
+    duration = System.monotonic_time() - start_time
+
     case result do
       {:ok, response_body, http_status} ->
         external_id = extract_external_id(response_body)
         Client.update_sync_log_success(log, http_status, response_body, external_id)
 
+        # Emit success telemetry
+        :telemetry.execute(
+          [:authify, :scim_client, :provision],
+          %{duration: duration},
+          %{
+            result: :success,
+            event: event,
+            resource_type: resource_type,
+            scim_client_id: client.id,
+            http_status: http_status
+          }
+        )
+
       {:error, reason} ->
         next_retry = calculate_next_retry(0)
         Client.update_sync_log_failure(log, reason, next_retry)
+
+        # Emit failure telemetry
+        :telemetry.execute(
+          [:authify, :scim_client, :provision],
+          %{duration: duration},
+          %{
+            result: :error,
+            event: event,
+            resource_type: resource_type,
+            scim_client_id: client.id,
+            error: format_error(reason)
+          }
+        )
+
+        Logger.warning(
+          "SCIM provisioning failed for #{resource_type} #{resource.id} to client #{client.id}: #{format_error(reason)}"
+        )
+
         # RetryScheduler will pick this up later
     end
   end
@@ -230,5 +338,23 @@ defmodule Authify.SCIMClient.Provisioner do
 
   defp load_resource(:group, resource_id, organization_id) do
     Authify.Repo.get_by(Group, id: resource_id, organization_id: organization_id)
+  end
+
+  # Format error for logging and telemetry
+  defp format_error({:http_error, status, body}) when is_map(body) do
+    detail = Map.get(body, "detail", inspect(body))
+    "HTTP #{status}: #{detail}"
+  end
+
+  defp format_error({:http_error, status, body}) do
+    "HTTP #{status}: #{inspect(body)}"
+  end
+
+  defp format_error({:network_error, reason}) do
+    "Network error: #{inspect(reason)}"
+  end
+
+  defp format_error(:no_external_id) do
+    "No external ID found for resource"
   end
 end

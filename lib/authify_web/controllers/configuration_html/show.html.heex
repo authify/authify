@@ -247,6 +247,25 @@
                   </small>
                 </div>
 
+                <div class="mb-4">
+                  <label for="scim_client_request_delay_ms" class="form-label">
+                    <strong>SCIM Client Request Delay (milliseconds)</strong>
+                  </label>
+                  <input
+                    type="number"
+                    class="form-control"
+                    id="scim_client_request_delay_ms"
+                    name="settings[scim_client_request_delay_ms]"
+                    value={@settings[:scim_client_request_delay_ms] || 100}
+                    min="50"
+                    max="5000"
+                    step="50"
+                  />
+                  <small class="text-muted">
+                    Minimum delay between consecutive SCIM outbound requests to the same provider. Higher values reduce load on downstream systems. Range: 50-5000ms (default: 100ms).
+                  </small>
+                </div>
+
                 <%= if @is_super_admin and Map.has_key?(@settings, :quota_auth_rate_limit) do %>
                   <h6 class="border-bottom pb-2 mb-3 mt-4">
                     Rate Limit Quotas <span class="badge bg-danger ms-2">Super Admin Only</span>

@@ -1,7 +1,7 @@
 defmodule AuthifyWeb.API.ScimClientsController do
   use AuthifyWeb.API.BaseController
 
-  alias Authify.SCIMClient.Client
+  alias Authify.SCIMClient.{Client, Provisioner}
   alias AuthifyWeb.Helpers.AuditHelper
 
   @doc """
@@ -246,14 +246,27 @@ defmodule AuthifyWeb.API.ScimClientsController do
         organization = conn.assigns.current_organization
 
         try do
-          _scim_client = Client.get_scim_client!(id, organization.id)
+          scim_client = Client.get_scim_client!(id, organization.id)
 
-          # TODO: Implement full_sync/1 in Provisioner module
-          # For now, just acknowledge the request
-          # Task.Supervisor.start_child(
-          #   Authify.TaskSupervisor,
-          #   fn -> Authify.SCIMClient.Provisioner.full_sync(scim_client) end
-          # )
+          # Trigger async full sync
+          Task.Supervisor.start_child(
+            Authify.TaskSupervisor,
+            fn -> Provisioner.full_sync(scim_client) end
+          )
+
+          # Log audit event
+          AuditHelper.log_event_async(
+            conn,
+            :scim_client_manual_sync_triggered,
+            "scim_client",
+            scim_client.id,
+            "success",
+            %{
+              provider: scim_client.name,
+              sync_users: scim_client.sync_users,
+              sync_groups: scim_client.sync_groups
+            }
+          )
 
           json(conn, %{
             status: "sync_triggered",

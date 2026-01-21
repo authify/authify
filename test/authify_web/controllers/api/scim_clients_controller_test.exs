@@ -1,5 +1,5 @@
 defmodule AuthifyWeb.API.ScimClientsControllerTest do
-  use AuthifyWeb.ConnCase, async: true
+  use AuthifyWeb.ConnCase, async: false
 
   import Authify.AccountsFixtures
   import Authify.SCIMClientFixtures
