@@ -2,7 +2,7 @@
   <img src="priv/static/images/logo-readme.svg" alt="Authify Logo" width="400">
 </p>
 
-<p align="center"><strong>Multi-tenant OpenID Connect & SAML Identity Provider</strong></p>
+<p align="center"><strong>Multi-tenant Identity Provider with OIDC/OAuth 2.0, SAML 2.0, and SCIM 2.0</strong></p>
 
 <p align="center">
   <a href="https://github.com/authify/authify/releases"><img src="https://img.shields.io/github/v/release/authify/authify?display_name=tag&sort=semver" alt="Latest Release"></a>
@@ -10,14 +10,15 @@
   <a href="https://github.com/authify/authify/wiki"><img src="https://img.shields.io/badge/docs-wiki-blue" alt="Documentation"></a>
 </p>
 
-Authify is a self-hosted, open-source identity provider built with Elixir and Phoenix. It provides enterprise-grade authentication and authorization services with support for OAuth 2.0/OpenID Connect and SAML 2.0 protocols.
+Authify is a self-hosted, open-source identity provider built with Elixir and Phoenix. It provides enterprise-grade authentication and authorization services with support for OAuth 2.0/OpenID Connect, SAML 2.0, and SCIM 2.0 protocols, offering both authentication flows and bi-directional user provisioning.
 
 ## ✨ Features
 
 ### **Identity Protocols**
 - **OAuth 2.0 / OpenID Connect 1.0** - Full OIDC provider with authorization code flow
 - **SAML 2.0 Identity Provider** - Complete SAML IdP with SSO and SLO support
-- **Multi-protocol Support** - Use both OIDC and SAML simultaneously
+- **SCIM 2.0 Provisioning** - Bi-directional user/group provisioning (Service Provider + Client)
+- **Multi-protocol Support** - Use OIDC, SAML, and SCIM simultaneously
 
 ### **Multi-tenancy**
 - **Organization-scoped** - Complete isolation between organizations
@@ -43,14 +44,30 @@ Authify is a self-hosted, open-source identity provider built with Elixir and Ph
 - **Organization-specific SMTP** - Configure SMTP per organization with encrypted credentials
 - **Professional Templates** - HTML and plain text email templates for all notifications
 
-### **User Provisioning**
-- **SCIM 2.0 Outbound Provisioning** - Automatically provision users and groups to downstream applications
-- **Multi-provider Support** - Configure multiple SCIM clients per organization
+### **SCIM 2.0 Provisioning (Bi-directional)**
+
+**Service Provider (Inbound Provisioning):**
+- **RFC 7644 Compliant** - Full SCIM 2.0 Service Provider implementation
+- **Complete Resource Support** - Users and Groups with all CRUD operations
+- **Advanced Filtering** - Rich query support with RFC 7644 filter expressions
+- **Bulk Operations** - Efficient batch processing (up to 1000 operations)
+- **ETag Support** - Optimistic concurrency control for conflict prevention
+- **Self-Service Endpoint** - `/Me` endpoint for authenticated user operations
+- **Discovery Endpoints** - ServiceProviderConfig, ResourceTypes, and Schemas
+- **OAuth 2.0 Authentication** - Secure token-based access with granular scopes
+
+**Current Limitations:**
+- ⚠️ Search endpoint (`POST /.search`) not yet implemented (most clients use GET with filters)
+- ⚠️ Schema extensions not supported (only core User/Group schemas)
+
+**Client (Outbound Provisioning):**
+- **Automatic Provisioning** - Push users and groups to downstream applications (Slack, GitHub, AWS, etc.)
+- **Multi-provider Support** - Configure multiple SCIM targets per organization
 - **Flexible Attribute Mapping** - Customize how user data maps to each provider
 - **Sync Monitoring** - Track provisioning operations with detailed sync logs
 - **Connection Testing** - Validate SCIM endpoint connectivity before going live
 - **Manual Sync** - Trigger full synchronization of all users and groups
-- **Rate Limiting** - Configurable request throttling to respect provider limits
+- **Retry Logic** - Automatic retry with exponential backoff for failed operations
 
 ### **Security & Compliance**
 - **Multi-Factor Authentication (MFA)** - TOTP-based MFA with backup codes and trusted devices
