@@ -9,6 +9,7 @@ defmodule AuthifyWeb.SCIM.GroupsController do
 
   alias Authify.Accounts
   alias Authify.SCIM.ResourceFormatter
+  alias AuthifyWeb.Helpers.AuditHelper
   alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
 
   @doc """
@@ -119,6 +120,20 @@ defmodule AuthifyWeb.SCIM.GroupsController do
         # Create group via SCIM-specific function
         case Accounts.create_group_scim(attrs, organization.id) do
           {:ok, group} ->
+            AuditHelper.log_event_async(
+              conn,
+              :scim_group_provisioned,
+              "group",
+              group.id,
+              "success",
+              %{
+                "group_id" => group.id,
+                "name" => group.name,
+                "external_id" => group.external_id,
+                "organization_slug" => organization.slug
+              }
+            )
+
             render_created_group(conn, group, organization.id)
 
           {:error, %Ecto.Changeset{} = changeset} ->
@@ -220,6 +235,22 @@ defmodule AuthifyWeb.SCIM.GroupsController do
 
                 case PatchOperations.apply_group_patch_operations(group, operations, organization) do
                   {:ok, updated_group} ->
+                    AuditHelper.log_event_async(
+                      conn,
+                      :scim_group_updated,
+                      "group",
+                      updated_group.id,
+                      "success",
+                      %{
+                        "group_id" => updated_group.id,
+                        "name" => updated_group.name,
+                        "external_id" => updated_group.external_id,
+                        "organization_slug" => organization.slug,
+                        "operation" => "patch",
+                        "operations_count" => length(operations)
+                      }
+                    )
+
                     updated_group = Authify.Repo.preload(updated_group, :users)
                     base_url = Helpers.build_base_url(conn)
 
@@ -259,6 +290,21 @@ defmodule AuthifyWeb.SCIM.GroupsController do
           :ok ->
             case Accounts.update_group_scim(group, attrs) do
               {:ok, updated_group} ->
+                AuditHelper.log_event_async(
+                  conn,
+                  :scim_group_updated,
+                  "group",
+                  updated_group.id,
+                  "success",
+                  %{
+                    "group_id" => updated_group.id,
+                    "name" => updated_group.name,
+                    "external_id" => updated_group.external_id,
+                    "organization_slug" => organization.slug,
+                    "operation" => "update"
+                  }
+                )
+
                 updated_group = Authify.Repo.preload(updated_group, :users)
                 base_url = Helpers.build_base_url(conn)
 
@@ -302,7 +348,21 @@ defmodule AuthifyWeb.SCIM.GroupsController do
             case Helpers.validate_resource_organization(group, organization) do
               :ok ->
                 case Accounts.delete_group(group) do
-                  {:ok, _group} ->
+                  {:ok, deleted_group} ->
+                    AuditHelper.log_event_async(
+                      conn,
+                      :scim_group_deleted,
+                      "group",
+                      deleted_group.id,
+                      "success",
+                      %{
+                        "group_id" => deleted_group.id,
+                        "name" => deleted_group.name,
+                        "external_id" => deleted_group.external_id,
+                        "organization_slug" => organization.slug
+                      }
+                    )
+
                     send_resp(conn, 204, "")
 
                   {:error, reason} ->

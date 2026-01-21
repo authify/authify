@@ -10,6 +10,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
 
   alias Authify.Accounts
   alias Authify.SCIM.ResourceFormatter
+  alias AuthifyWeb.Helpers.AuditHelper
   alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
 
   @bulk_request_schema "urn:ietf:params:scim:api:messages:2.0:BulkRequest"
@@ -37,9 +38,15 @@ defmodule AuthifyWeb.SCIM.BulkController do
           # Get failOnErrors threshold (default: fail on first error)
           fail_on_errors = Helpers.parse_int(params["failOnErrors"], 1)
 
+          # Log bulk operation started
+          log_bulk_start(conn, organization, length(operations), fail_on_errors)
+
           # Process operations with error tracking
-          {responses, _bulk_id_map, _error_count} =
+          {responses, _bulk_id_map, error_count} =
             process_operations(operations, organization, fail_on_errors, conn)
+
+          # Log bulk operation completed
+          log_bulk_completion(conn, organization, responses, error_count)
 
           # Return bulk response
           render_bulk_response(conn, responses)
@@ -524,5 +531,40 @@ defmodule AuthifyWeb.SCIM.BulkController do
     conn
     |> put_resp_content_type("application/scim+json")
     |> json(bulk_response)
+  end
+
+  # Logs bulk operation start
+  defp log_bulk_start(conn, organization, operations_count, fail_on_errors) do
+    AuditHelper.log_event_async(
+      conn,
+      :scim_bulk_operation_started,
+      "bulk_operation",
+      nil,
+      "success",
+      %{
+        "organization_slug" => organization.slug,
+        "operations_count" => operations_count,
+        "fail_on_errors" => fail_on_errors
+      }
+    )
+  end
+
+  # Logs bulk operation completion
+  defp log_bulk_completion(conn, organization, responses, error_count) do
+    successful_count = length(responses) - error_count
+
+    AuditHelper.log_event_async(
+      conn,
+      :scim_bulk_operation_completed,
+      "bulk_operation",
+      nil,
+      if(error_count == 0, do: "success", else: "failure"),
+      %{
+        "organization_slug" => organization.slug,
+        "operations_count" => length(responses),
+        "successful_count" => successful_count,
+        "error_count" => error_count
+      }
+    )
   end
 end

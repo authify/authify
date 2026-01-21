@@ -14,6 +14,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       conn
       |> assign(:current_organization, organization)
       |> assign(:current_user, admin_user)
+      |> assign(:actor_type, :user)
       |> assign(:api_authenticated, true)
       |> assign(:current_scopes, ["scim:read", "scim:write"])
 
@@ -69,7 +70,8 @@ defmodule AuthifyWeb.SCIM.ETagTest do
 
     test "PUT /scim/v2/Users/:id returns updated ETag", %{
       conn: conn,
-      organization: organization
+      organization: organization,
+      admin_user: admin_user
     } do
       user = user_fixture(organization: organization, email: "test@example.com")
 
@@ -84,6 +86,8 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       # Update the user
       conn = build_conn()
       conn = assign(conn, :current_organization, organization)
+      conn = assign(conn, :current_user, admin_user)
+      conn = assign(conn, :actor_type, :user)
       conn = assign(conn, :api_authenticated, true)
       conn = assign(conn, :current_scopes, ["scim:write"])
 
@@ -133,7 +137,8 @@ defmodule AuthifyWeb.SCIM.ETagTest do
 
     test "If-None-Match returns 304 when ETag matches", %{
       conn: conn,
-      organization: organization
+      organization: organization,
+      admin_user: admin_user
     } do
       user = user_fixture(organization: organization, email: "test@example.com")
 
@@ -144,6 +149,8 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       # Make a new request with If-None-Match
       conn = build_conn()
       conn = assign(conn, :current_organization, organization)
+      conn = assign(conn, :current_user, admin_user)
+      conn = assign(conn, :actor_type, :user)
       conn = assign(conn, :api_authenticated, true)
       conn = assign(conn, :current_scopes, ["scim:read"])
 
@@ -177,7 +184,11 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       assert response["id"] == to_string(user.id)
     end
 
-    test "If-Match allows update when ETag matches", %{conn: conn, organization: organization} do
+    test "If-Match allows update when ETag matches", %{
+      conn: conn,
+      organization: organization,
+      admin_user: admin_user
+    } do
       user = user_fixture(organization: organization, email: "test@example.com")
 
       # Get current ETag
@@ -187,6 +198,8 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       # Update with matching If-Match
       conn = build_conn()
       conn = assign(conn, :current_organization, organization)
+      conn = assign(conn, :current_user, admin_user)
+      conn = assign(conn, :actor_type, :user)
       conn = assign(conn, :api_authenticated, true)
       conn = assign(conn, :current_scopes, ["scim:write"])
 
@@ -281,7 +294,11 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       assert response["scimType"] == "invalidVers"
     end
 
-    test "concurrent updates trigger 412 correctly", %{conn: conn, organization: organization} do
+    test "concurrent updates trigger 412 correctly", %{
+      conn: conn,
+      organization: organization,
+      admin_user: admin_user
+    } do
       user = user_fixture(organization: organization, email: "test@example.com")
 
       # Initialize scim_updated_at by doing an initial SCIM update
@@ -297,6 +314,8 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       # Second client gets the same resource (same ETag)
       conn2 = build_conn()
       conn2 = assign(conn2, :current_organization, organization)
+      conn2 = assign(conn2, :current_user, admin_user)
+      conn2 = assign(conn2, :actor_type, :user)
       conn2 = assign(conn2, :api_authenticated, true)
       conn2 = assign(conn2, :current_scopes, ["scim:read"])
       conn2 = get(conn2, "/#{organization.slug}/scim/v2/Users/#{user.id}")
@@ -307,6 +326,8 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       # First client updates successfully
       conn1 = build_conn()
       conn1 = assign(conn1, :current_organization, organization)
+      conn1 = assign(conn1, :current_user, admin_user)
+      conn1 = assign(conn1, :actor_type, :user)
       conn1 = assign(conn1, :api_authenticated, true)
       conn1 = assign(conn1, :current_scopes, ["scim:write"])
 
@@ -330,6 +351,8 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       # Second client tries to update with stale ETag
       conn2 = build_conn()
       conn2 = assign(conn2, :current_organization, organization)
+      conn2 = assign(conn2, :current_user, admin_user)
+      conn2 = assign(conn2, :actor_type, :user)
       conn2 = assign(conn2, :api_authenticated, true)
       conn2 = assign(conn2, :current_scopes, ["scim:write"])
 
@@ -351,7 +374,8 @@ defmodule AuthifyWeb.SCIM.ETagTest do
 
     test "version changes after resource modification", %{
       conn: conn,
-      organization: organization
+      organization: organization,
+      admin_user: admin_user
     } do
       user = user_fixture(organization: organization, email: "test@example.com")
 
@@ -370,6 +394,8 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       # Get new version
       conn = build_conn()
       conn = assign(conn, :current_organization, organization)
+      conn = assign(conn, :current_user, admin_user)
+      conn = assign(conn, :actor_type, :user)
       conn = assign(conn, :api_authenticated, true)
       conn = assign(conn, :current_scopes, ["scim:read"])
 
@@ -424,7 +450,11 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       assert response["meta"]["version"] != nil
     end
 
-    test "If-Match works for Group updates", %{conn: conn, organization: organization} do
+    test "If-Match works for Group updates", %{
+      conn: conn,
+      organization: organization,
+      admin_user: admin_user
+    } do
       group = group_fixture(organization: organization, name: "Test Group")
 
       # Get ETag
@@ -434,6 +464,8 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       # Update with matching ETag
       conn = build_conn()
       conn = assign(conn, :current_organization, organization)
+      conn = assign(conn, :current_user, admin_user)
+      conn = assign(conn, :actor_type, :user)
       conn = assign(conn, :api_authenticated, true)
       conn = assign(conn, :current_scopes, ["scim:write"])
 

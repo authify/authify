@@ -9,6 +9,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
 
   alias Authify.Accounts
   alias Authify.SCIM.ResourceFormatter
+  alias AuthifyWeb.Helpers.AuditHelper
   alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
 
   @doc """
@@ -119,6 +120,20 @@ defmodule AuthifyWeb.SCIM.UsersController do
         # Create user via SCIM-specific function
         case Accounts.create_user_scim(attrs, organization.id) do
           {:ok, user} ->
+            AuditHelper.log_event_async(
+              conn,
+              :scim_user_provisioned,
+              "user",
+              user.id,
+              "success",
+              %{
+                "user_id" => user.id,
+                "username" => user.username,
+                "external_id" => user.external_id,
+                "organization_slug" => organization.slug
+              }
+            )
+
             render_created_user(conn, user)
 
           {:error, %Ecto.Changeset{} = changeset} ->
@@ -224,6 +239,22 @@ defmodule AuthifyWeb.SCIM.UsersController do
 
                 case PatchOperations.apply_user_patch_operations(user, operations) do
                   {:ok, updated_user} ->
+                    AuditHelper.log_event_async(
+                      conn,
+                      :scim_user_updated,
+                      "user",
+                      updated_user.id,
+                      "success",
+                      %{
+                        "user_id" => updated_user.id,
+                        "username" => updated_user.username,
+                        "external_id" => updated_user.external_id,
+                        "organization_slug" => organization.slug,
+                        "operation" => "patch",
+                        "operations_count" => length(operations)
+                      }
+                    )
+
                     updated_user = Authify.Repo.preload(updated_user, :groups)
                     base_url = Helpers.build_base_url(conn)
                     resource = ResourceFormatter.format_user(updated_user, base_url)
@@ -260,6 +291,21 @@ defmodule AuthifyWeb.SCIM.UsersController do
           :ok ->
             case Accounts.update_user_scim(user, attrs) do
               {:ok, updated_user} ->
+                AuditHelper.log_event_async(
+                  conn,
+                  :scim_user_updated,
+                  "user",
+                  updated_user.id,
+                  "success",
+                  %{
+                    "user_id" => updated_user.id,
+                    "username" => updated_user.username,
+                    "external_id" => updated_user.external_id,
+                    "organization_slug" => organization.slug,
+                    "operation" => "update"
+                  }
+                )
+
                 updated_user = Authify.Repo.preload(updated_user, :groups)
                 base_url = Helpers.build_base_url(conn)
                 resource = ResourceFormatter.format_user(updated_user, base_url)
@@ -300,7 +346,21 @@ defmodule AuthifyWeb.SCIM.UsersController do
             case Helpers.validate_resource_organization(user, organization) do
               :ok ->
                 case Accounts.update_user_scim(user, %{active: false}) do
-                  {:ok, _user} ->
+                  {:ok, deleted_user} ->
+                    AuditHelper.log_event_async(
+                      conn,
+                      :scim_user_deleted,
+                      "user",
+                      deleted_user.id,
+                      "success",
+                      %{
+                        "user_id" => deleted_user.id,
+                        "username" => deleted_user.username,
+                        "external_id" => deleted_user.external_id,
+                        "organization_slug" => organization.slug
+                      }
+                    )
+
                     send_resp(conn, 204, "")
 
                   {:error, reason} ->

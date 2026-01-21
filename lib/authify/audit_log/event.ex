@@ -27,6 +27,9 @@ defmodule Authify.AuditLog.Event do
     saml_sp_created saml_sp_updated saml_sp_deleted
     scim_client_created scim_client_updated scim_client_deleted
     scim_client_connection_tested scim_client_manual_sync_triggered
+    scim_user_provisioned scim_user_updated scim_user_deleted
+    scim_group_provisioned scim_group_updated scim_group_deleted
+    scim_bulk_operation_started scim_bulk_operation_completed
     application_group_created application_group_updated application_group_deleted
     organization_created organization_updated organization_deleted
     certificate_created certificate_activated certificate_deactivated certificate_deleted
