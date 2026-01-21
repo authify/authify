@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-01-21
+
+### Added
+
+- **SCIM 2.0 Service Provider (Inbound Provisioning)**
+  - RFC 7644 compliant SCIM 2.0 Service Provider implementation
+  - Full CRUD operations for Users and Groups resources
+  - Advanced filtering with RFC 7644 filter expressions (logical operators, attribute paths, multi-valued attributes)
+  - Bulk operations endpoint supporting up to 1000 operations per request with atomic transactions
+  - ETag support for optimistic concurrency control (If-Match/If-None-Match headers)
+  - Self-service `/scim/Me` endpoint for authenticated user operations
+  - Discovery endpoints: ServiceProviderConfig, ResourceTypes, and Schemas
+  - OAuth 2.0 authentication with granular scopes (scim:read, scim:write, scim:users:*, scim:groups:*, scim:me:*)
+  - Multi-email support for users with primary email designation
+  - Organization-scoped operations with multi-tenant isolation
+  - Per-organization feature toggle
+
+- **SCIM 2.0 Client (Outbound Provisioning)**
+  - Automatic provisioning of users and groups to downstream applications (Slack, GitHub, AWS, etc.)
+  - Multi-provider support with configurable attribute mapping per provider
+  - Event-driven provisioning using Phoenix.PubSub and Task.Supervisor
+  - Retry logic with exponential backoff (up to 5 attempts: 5min, 15min, 45min, 2h, 6h)
+  - Detailed sync logging with status tracking and error capture
+  - External ID mapping for tracking remote system IDs
+  - Connection testing and manual sync capabilities
+  - Web UI and Management API for SCIM client configuration
+  - OAuth 2.0 scopes for client management (scim_clients:read, scim_clients:write)
+
+- **Audit Logging Enhancements**
+  - SCIM-related audit events (user/group created/updated/deleted, bulk operations)
+  - Event category filtering in audit log UI (Authentication, User Management, OAuth, SAML, SCIM, etc.)
+  - Server-side category filtering without JavaScript dependency
+
+- **Dynamic Scope Selection**
+  - Scope selection UIs now use `Authify.Scopes.scopes_by_category()` for dynamic generation
+  - New scopes automatically appear when added to Scopes module
+  - Consistent categorization across Management API and Personal Access Token UIs
+  - Select All / Deselect All functionality
+
+### Changed
+
+- User schema enhanced to support multiple email addresses
+- Audit log filtering improved with event category support
+- Scope selection in all UIs now dynamically generated from central source
+
+### Security
+
+- SCIM endpoints protected with OAuth 2.0 token authentication
+- Granular scope-based authorization for SCIM operations
+- SCIM client credentials encrypted at rest using AES-256-GCM
+- Rate limiting applies to all SCIM endpoints
+- Multi-tenant isolation for SCIM data
+- ETag support prevents concurrent modification conflicts
+- Comprehensive audit trail for all SCIM operations
+
+### Technical
+
+- Database migrations for emails, scim_clients, scim_sync_logs, and scim_external_ids tables
+- New SCIM modules: Service Provider context, Resource formatters, Filter parser, Client provisioner
+- SCIM controllers for Users, Groups, Me, Bulk, and discovery endpoints
+- SCIM client controllers for admin UI and Management API
+- 1187 tests passing with comprehensive SCIM coverage
+- Updated OpenAPI documentation with all SCIM endpoints
+- README.md updated with bi-directional SCIM 2.0 capabilities
+
+### Current Limitations
+
+- SCIM search endpoint (`POST /.search`) not yet implemented (most clients use GET with filters)
+- SCIM schema extensions not supported (only core User and Group schemas)
+
 ## [0.10.1] - 2026-01-11
 
 ### Changed
@@ -544,7 +614,10 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/authify/authify/compare/v0.10.1...v0.11.0
+[0.10.1]: https://github.com/authify/authify/compare/v0.10.0...v0.10.1
+[0.10.0]: https://github.com/authify/authify/compare/v0.8.1...v0.10.0
 [0.8.1]: https://github.com/authify/authify/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/authify/authify/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/authify/authify/compare/v0.7.0...v0.7.1
