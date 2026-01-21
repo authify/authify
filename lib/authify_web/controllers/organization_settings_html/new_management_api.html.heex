@@ -72,267 +72,32 @@
                     </div>
                   </div>
 
-                  <div class="col-md-6">
-                    <h6 class="text-muted small">Resource Management</h6>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_application_groups_read"
-                        name="scopes[]"
-                        value="application_groups:read"
-                      />
-                      <label class="form-check-label" for="scope_application_groups_read">
-                        <strong>application_groups:read</strong>
-                        <br />
-                        <small class="text-muted">Read application groups</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_application_groups_write"
-                        name="scopes[]"
-                        value="application_groups:write"
-                      />
-                      <label class="form-check-label" for="scope_application_groups_write">
-                        <strong>application_groups:write</strong>
-                        <br />
-                        <small class="text-muted">Manage application groups</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_applications_read"
-                        name="scopes[]"
-                        value="applications:read"
-                      />
-                      <label class="form-check-label" for="scope_applications_read">
-                        <strong>applications:read</strong>
-                        <br />
-                        <small class="text-muted">Read OAuth applications</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_applications_write"
-                        name="scopes[]"
-                        value="applications:write"
-                      />
-                      <label class="form-check-label" for="scope_applications_write">
-                        <strong>applications:write</strong>
-                        <br />
-                        <small class="text-muted">Manage OAuth applications</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_certificates_read"
-                        name="scopes[]"
-                        value="certificates:read"
-                      />
-                      <label class="form-check-label" for="scope_certificates_read">
-                        <strong>certificates:read</strong>
-                        <br />
-                        <small class="text-muted">Read IdP certificates</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_certificates_write"
-                        name="scopes[]"
-                        value="certificates:write"
-                      />
-                      <label class="form-check-label" for="scope_certificates_write">
-                        <strong>certificates:write</strong>
-                        <br />
-                        <small class="text-muted">Manage IdP certificates</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_invitations_read"
-                        name="scopes[]"
-                        value="invitations:read"
-                      />
-                      <label class="form-check-label" for="scope_invitations_read">
-                        <strong>invitations:read</strong>
-                        <br />
-                        <small class="text-muted">Read invitations</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_invitations_write"
-                        name="scopes[]"
-                        value="invitations:write"
-                      />
-                      <label class="form-check-label" for="scope_invitations_write">
-                        <strong>invitations:write</strong>
-                        <br />
-                        <small class="text-muted">Manage invitations</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_saml_read"
-                        name="scopes[]"
-                        value="saml:read"
-                      />
-                      <label class="form-check-label" for="scope_saml_read">
-                        <strong>saml:read</strong>
-                        <br />
-                        <small class="text-muted">Read SAML configs</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_saml_write"
-                        name="scopes[]"
-                        value="saml:write"
-                      />
-                      <label class="form-check-label" for="scope_saml_write">
-                        <strong>saml:write</strong>
-                        <br />
-                        <small class="text-muted">Manage SAML configs</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_users_read"
-                        name="scopes[]"
-                        value="users:read"
-                      />
-                      <label class="form-check-label" for="scope_users_read">
-                        <strong>users:read</strong>
-                        <br />
-                        <small class="text-muted">Read user information</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_users_write"
-                        name="scopes[]"
-                        value="users:write"
-                      />
-                      <label class="form-check-label" for="scope_users_write">
-                        <strong>users:write</strong>
-                        <br />
-                        <small class="text-muted">Manage users</small>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div class="col-md-6">
-                    <h6 class="text-muted small">Organization & Wildcard</h6>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_organizations_read"
-                        name="scopes[]"
-                        value="organizations:read"
-                      />
-                      <label class="form-check-label" for="scope_organizations_read">
-                        <strong>organizations:read</strong>
-                        <br />
-                        <small class="text-muted">Read organization info</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_organizations_write"
-                        name="scopes[]"
-                        value="organizations:write"
-                      />
-                      <label class="form-check-label" for="scope_organizations_write">
-                        <strong>organizations:write</strong>
-                        <br />
-                        <small class="text-muted">Manage organization</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_audit_logs_read"
-                        name="scopes[]"
-                        value="audit_logs:read"
-                      />
-                      <label class="form-check-label" for="scope_audit_logs_read">
-                        <strong>audit_logs:read</strong>
-                        <br />
-                        <small class="text-muted">Read audit logs for organization</small>
-                      </label>
-                    </div>
-
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_management_read"
-                        name="scopes[]"
-                        value="management_app:read"
-                      />
-                      <label class="form-check-label" for="scope_management_read">
-                        <strong>management_app:read</strong>
-                        <br />
-                        <small class="text-muted">Read/list Management API OAuth2 Apps</small>
-                      </label>
-                    </div>
-                    <div class="form-check mb-2">
-                      <input
-                        class="form-check-input create-scope"
-                        type="checkbox"
-                        id="scope_management_write"
-                        name="scopes[]"
-                        value="management_app:write"
-                      />
-                      <label class="form-check-label" for="scope_management_write">
-                        <strong>management_app:write</strong>
-                        <br />
-                        <small class="text-muted">Manipulate Management API OAuth2 Apps</small>
-                      </label>
-                    </div>
-                  </div>
+                  <%= for {category, scopes} <- Authify.Scopes.scopes_by_category() do %>
+                    <%= if category not in ["OAuth/OIDC", "Profile"] do %>
+                      <div class="col-md-6 mb-3">
+                        <h6 class="text-muted small fw-bold">{category}</h6>
+                        <%= for {scope, description} <- scopes do %>
+                          <div class="form-check mb-2">
+                            <input
+                              class="form-check-input create-scope"
+                              type="checkbox"
+                              id={"scope_#{String.replace(scope, ":", "_")}"}
+                              name="scopes[]"
+                              value={scope}
+                            />
+                            <label
+                              class="form-check-label"
+                              for={"scope_#{String.replace(scope, ":", "_")}"}
+                            >
+                              <strong>{scope}</strong>
+                              <br />
+                              <small class="text-muted">{description}</small>
+                            </label>
+                          </div>
+                        <% end %>
+                      </div>
+                    <% end %>
+                  <% end %>
                 </div>
               </div>
 

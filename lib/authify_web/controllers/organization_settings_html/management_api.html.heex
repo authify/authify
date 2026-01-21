@@ -42,22 +42,13 @@
           <hr />
           <p class="mb-0">
             <strong>Available Scopes:</strong>
-            <span class="badge bg-secondary ms-1">application_groups:read</span>
-            <span class="badge bg-secondary ms-1">application_groups:write</span>
-            <span class="badge bg-secondary ms-1">applications:read</span>
-            <span class="badge bg-secondary ms-1">applications:write</span>
-            <span class="badge bg-secondary ms-1">certificates:read</span>
-            <span class="badge bg-secondary ms-1">certificates:write</span>
-            <span class="badge bg-secondary ms-1">invitations:read</span>
-            <span class="badge bg-secondary ms-1">invitations:write</span>
-            <span class="badge bg-secondary ms-1">management_app:read</span>
-            <span class="badge bg-secondary ms-1">management_app:write</span>
-            <span class="badge bg-secondary ms-1">organizations:read</span>
-            <span class="badge bg-secondary ms-1">organizations:write</span>
-            <span class="badge bg-secondary ms-1">saml:read</span>
-            <span class="badge bg-secondary ms-1">saml:write</span>
-            <span class="badge bg-secondary ms-1">users:read</span>
-            <span class="badge bg-secondary ms-1">users:write</span>
+            <%= for {category, scopes} <- Authify.Scopes.scopes_by_category() do %>
+              <%= if category not in ["OAuth/OIDC", "Profile"] do %>
+                <%= for {scope, _description} <- scopes do %>
+                  <span class="badge bg-secondary ms-1">{scope}</span>
+                <% end %>
+              <% end %>
+            <% end %>
           </p>
         </div>
       </div>
@@ -242,340 +233,37 @@
                         </label>
                       </div>
                     </div>
-                    <div class="col-6">
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_application_groups_read_#{app.id}"}
-                          name="scopes[]"
-                          value="application_groups:read"
-                          checked={
-                            if "application_groups:read" in Authify.OAuth.Application.scopes_list(
-                                 app
-                               ),
-                               do: true,
-                               else: false
-                          }
-                        />
-                        <label
-                          class="form-check-label"
-                          for={"edit_scope_application_groups_read_#{app.id}"}
-                        >
-                          <strong>application_groups:read</strong> <br />
-                          <small class="text-muted">Read application groups</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_application_groups_write_#{app.id}"}
-                          name="scopes[]"
-                          value="application_groups:write"
-                          checked={
-                            if "application_groups:write" in Authify.OAuth.Application.scopes_list(
-                                 app
-                               ),
-                               do: true,
-                               else: false
-                          }
-                        />
-                        <label
-                          class="form-check-label"
-                          for={"edit_scope_application_groups_write_#{app.id}"}
-                        >
-                          <strong>application_groups:write</strong> <br />
-                          <small class="text-muted">Manage application groups</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_applications_read_#{app.id}"}
-                          name="scopes[]"
-                          value="applications:read"
-                          checked={
-                            if "applications:read" in Authify.OAuth.Application.scopes_list(app),
-                              do: true,
-                              else: false
-                          }
-                        />
-                        <label
-                          class="form-check-label"
-                          for={"edit_scope_applications_read_#{app.id}"}
-                        >
-                          <strong>applications:read</strong> <br />
-                          <small class="text-muted">Read OAuth applications</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_applications_write_#{app.id}"}
-                          name="scopes[]"
-                          value="applications:write"
-                          checked={
-                            if "applications:write" in Authify.OAuth.Application.scopes_list(app),
-                              do: true,
-                              else: false
-                          }
-                        />
-                        <label
-                          class="form-check-label"
-                          for={"edit_scope_applications_write_#{app.id}"}
-                        >
-                          <strong>applications:write</strong> <br />
-                          <small class="text-muted">Manage OAuth applications</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_certificates_read_#{app.id}"}
-                          name="scopes[]"
-                          value="certificates:read"
-                          checked={
-                            if "certificates:read" in Authify.OAuth.Application.scopes_list(app),
-                              do: true,
-                              else: false
-                          }
-                        />
-                        <label
-                          class="form-check-label"
-                          for={"edit_scope_certificates_read_#{app.id}"}
-                        >
-                          <strong>certificates:read</strong> <br />
-                          <small class="text-muted">Read IdP certificates</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_certificates_write_#{app.id}"}
-                          name="scopes[]"
-                          value="certificates:write"
-                          checked={
-                            if "certificates:write" in Authify.OAuth.Application.scopes_list(app),
-                              do: true,
-                              else: false
-                          }
-                        />
-                        <label
-                          class="form-check-label"
-                          for={"edit_scope_certificates_write_#{app.id}"}
-                        >
-                          <strong>certificates:write</strong> <br />
-                          <small class="text-muted">Manage IdP certificates</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_invitations_read_#{app.id}"}
-                          name="scopes[]"
-                          value="invitations:read"
-                          checked={
-                            if "invitations:read" in Authify.OAuth.Application.scopes_list(app),
-                              do: true,
-                              else: false
-                          }
-                        />
-                        <label
-                          class="form-check-label"
-                          for={"edit_scope_invitations_read_#{app.id}"}
-                        >
-                          <strong>invitations:read</strong> <br />
-                          <small class="text-muted">Read invitations</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_invitations_write_#{app.id}"}
-                          name="scopes[]"
-                          value="invitations:write"
-                          checked={
-                            if "invitations:write" in Authify.OAuth.Application.scopes_list(app),
-                              do: true,
-                              else: false
-                          }
-                        />
-                        <label
-                          class="form-check-label"
-                          for={"edit_scope_invitations_write_#{app.id}"}
-                        >
-                          <strong>invitations:write</strong> <br />
-                          <small class="text-muted">Manage invitations</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_management_read_#{app.id}"}
-                          name="scopes[]"
-                          value="management_app:read"
-                          checked={
-                            if "management_app:read" in Authify.OAuth.Application.scopes_list(app),
-                              do: true,
-                              else: false
-                          }
-                        />
-                        <label
-                          class="form-check-label"
-                          for={"edit_scope_management_read_#{app.id}"}
-                        >
-                          <strong>management_app:read</strong> <br />
-                          <small class="text-muted">Read all management data</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_management_write_#{app.id}"}
-                          name="scopes[]"
-                          value="management_app:write"
-                          checked={
-                            if "management_app:write" in Authify.OAuth.Application.scopes_list(
-                                 app
-                               ),
-                               do: true,
-                               else: false
-                          }
-                        />
-                        <label
-                          class="form-check-label"
-                          for={"edit_scope_management_write_#{app.id}"}
-                        >
-                          <strong>management_app:write</strong> <br />
-                          <small class="text-muted">Full management access</small>
-                        </label>
-                      </div>
-                    </div>
-                    <div class="col-6">
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_organizations_read_#{app.id}"}
-                          name="scopes[]"
-                          value="organizations:read"
-                          checked={
-                            if "organizations:read" in Authify.OAuth.Application.scopes_list(app),
-                              do: true,
-                              else: false
-                          }
-                        />
-                        <label
-                          class="form-check-label"
-                          for={"edit_scope_organizations_read_#{app.id}"}
-                        >
-                          <strong>organizations:read</strong> <br />
-                          <small class="text-muted">Read organization info</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_organizations_write_#{app.id}"}
-                          name="scopes[]"
-                          value="organizations:write"
-                          checked={
-                            if "organizations:write" in Authify.OAuth.Application.scopes_list(app),
-                              do: true,
-                              else: false
-                          }
-                        />
-                        <label
-                          class="form-check-label"
-                          for={"edit_scope_organizations_write_#{app.id}"}
-                        >
-                          <strong>organizations:write</strong> <br />
-                          <small class="text-muted">Manage organization</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_saml_read_#{app.id}"}
-                          name="scopes[]"
-                          value="saml:read"
-                          checked={
-                            if "saml:read" in Authify.OAuth.Application.scopes_list(app),
-                              do: true,
-                              else: false
-                          }
-                        />
-                        <label class="form-check-label" for={"edit_scope_saml_read_#{app.id}"}>
-                          <strong>saml:read</strong> <br />
-                          <small class="text-muted">Read SAML configs</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_saml_write_#{app.id}"}
-                          name="scopes[]"
-                          value="saml:write"
-                          checked={
-                            if "saml:write" in Authify.OAuth.Application.scopes_list(app),
-                              do: true,
-                              else: false
-                          }
-                        />
-                        <label class="form-check-label" for={"edit_scope_saml_write_#{app.id}"}>
-                          <strong>saml:write</strong> <br />
-                          <small class="text-muted">Manage SAML configs</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_users_read_#{app.id}"}
-                          name="scopes[]"
-                          value="users:read"
-                          checked={
-                            if "users:read" in Authify.OAuth.Application.scopes_list(app),
-                              do: true,
-                              else: false
-                          }
-                        />
-                        <label class="form-check-label" for={"edit_scope_users_read_#{app.id}"}>
-                          <strong>users:read</strong> <br />
-                          <small class="text-muted">Read user information</small>
-                        </label>
-                      </div>
-                      <div class="form-check">
-                        <input
-                          class={"form-check-input edit-scope-#{app.id}"}
-                          type="checkbox"
-                          id={"edit_scope_users_write_#{app.id}"}
-                          name="scopes[]"
-                          value="users:write"
-                          checked={
-                            if "users:write" in Authify.OAuth.Application.scopes_list(app),
-                              do: true,
-                              else: false
-                          }
-                        />
-                        <label class="form-check-label" for={"edit_scope_users_write_#{app.id}"}>
-                          <strong>users:write</strong> <br />
-                          <small class="text-muted">Manage users</small>
-                        </label>
-                      </div>
-                    </div>
+                    <%= for {category, scopes} <- Authify.Scopes.scopes_by_category() do %>
+                      <%= if category not in ["OAuth/OIDC", "Profile"] do %>
+                        <div class="col-md-6 mb-3">
+                          <h6 class="text-muted small fw-bold">{category}</h6>
+                          <%= for {scope, description} <- scopes do %>
+                            <div class="form-check mb-2">
+                              <input
+                                class={"form-check-input edit-scope-#{app.id}"}
+                                type="checkbox"
+                                id={"edit_scope_#{String.replace(scope, ":", "_")}_#{app.id}"}
+                                name="scopes[]"
+                                value={scope}
+                                checked={
+                                  if scope in Authify.OAuth.Application.scopes_list(app),
+                                    do: true,
+                                    else: false
+                                }
+                              />
+                              <label
+                                class="form-check-label"
+                                for={"edit_scope_#{String.replace(scope, ":", "_")}_#{app.id}"}
+                              >
+                                <strong>{scope}</strong>
+                                <br />
+                                <small class="text-muted">{description}</small>
+                              </label>
+                            </div>
+                          <% end %>
+                        </div>
+                      <% end %>
+                    <% end %>
                   </div>
                   <div class="form-text">Select the permissions this application needs</div>
                 </div>
