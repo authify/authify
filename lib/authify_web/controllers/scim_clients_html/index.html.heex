@@ -23,6 +23,21 @@
       Configure outbound SCIM provisioning to automatically sync users and groups to downstream applications (Slack, GitHub, AWS SSO, etc.).
     </p>
 
+    <%= if @provisioning_enabled == false do %>
+      <div class="alert alert-warning" role="alert">
+        <i class="bi bi-exclamation-triangle"></i>
+        <strong>SCIM Outbound Provisioning Disabled</strong>
+        <p class="mb-0">
+          You can configure SCIM clients, but automatic provisioning will not occur until you enable SCIM outbound provisioning in <a
+            href={~p"/#{@current_organization.slug}/settings/configuration"}
+            class="alert-link"
+          >
+            organization settings
+          </a>.
+        </p>
+      </div>
+    <% end %>
+
     <%= if @scim_clients == [] do %>
       <div class="card">
         <div class="card-body text-center py-5">

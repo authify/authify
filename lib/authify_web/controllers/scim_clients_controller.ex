@@ -8,7 +8,16 @@ defmodule AuthifyWeb.ScimClientsController do
     organization = conn.assigns.current_organization
     scim_clients = Client.list_scim_clients(organization.id)
 
-    render(conn, :index, scim_clients: scim_clients)
+    provisioning_enabled =
+      Authify.Configurations.get_organization_setting(
+        organization,
+        :scim_outbound_provisioning_enabled
+      )
+
+    render(conn, :index,
+      scim_clients: scim_clients,
+      provisioning_enabled: provisioning_enabled
+    )
   end
 
   def show(conn, %{"id" => id}) do
@@ -18,10 +27,17 @@ defmodule AuthifyWeb.ScimClientsController do
     # Get recent sync logs for this client
     {logs, _total} = Client.list_sync_logs(scim_client.id, page: 1, per_page: 10)
 
+    provisioning_enabled =
+      Authify.Configurations.get_organization_setting(
+        organization,
+        :scim_outbound_provisioning_enabled
+      )
+
     render(conn, :show,
       scim_client: scim_client,
       sync_logs: logs,
-      organization: organization
+      organization: organization,
+      provisioning_enabled: provisioning_enabled
     )
   end
 

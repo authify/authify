@@ -227,6 +227,26 @@
                   </small>
                 </div>
 
+                <div class="mb-4">
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      id="scim_outbound_provisioning_enabled"
+                      name="settings[scim_outbound_provisioning_enabled]"
+                      value="true"
+                      checked={@settings[:scim_outbound_provisioning_enabled] == true}
+                    />
+                    <label class="form-check-label" for="scim_outbound_provisioning_enabled">
+                      <strong>Enable SCIM 2.0 Outbound Provisioning</strong>
+                    </label>
+                  </div>
+                  <small class="text-muted ms-4">
+                    Automatically provision users and groups to configured SCIM clients when changes occur. Requires active SCIM client configurations.
+                  </small>
+                </div>
+
                 <%= if @is_super_admin and Map.has_key?(@settings, :quota_auth_rate_limit) do %>
                   <h6 class="border-bottom pb-2 mb-3 mt-4">
                     Rate Limit Quotas <span class="badge bg-danger ms-2">Super Admin Only</span>

@@ -6,21 +6,38 @@ defmodule Authify.SCIMClient.Provisioner do
 
   require Logger
 
-  alias Authify.Accounts.{Group, User}
+  alias Authify.Accounts.{Group, Organization, User}
   alias Authify.SCIMClient.{AttributeMapper, Client, DefaultMappings, HTTPClient}
 
   @max_retries 5
 
   @doc """
   Provisions a resource change to all active SCIM clients for the organization.
+
+  Checks if SCIM outbound provisioning is enabled for the organization before proceeding.
   """
   def provision(event, resource_type, resource) when event in [:created, :updated, :deleted] do
-    # Get all active SCIM clients for this organization
-    clients = Client.list_active_scim_clients(resource.organization_id, resource_type)
+    # Check if SCIM outbound provisioning is enabled for this organization
+    organization = Authify.Repo.get!(Organization, resource.organization_id)
 
-    Enum.each(clients, fn client ->
-      provision_to_client(event, resource_type, resource, client)
-    end)
+    enabled =
+      Authify.Configurations.get_organization_setting(
+        organization,
+        :scim_outbound_provisioning_enabled
+      )
+
+    if enabled do
+      # Get all active SCIM clients for this organization
+      clients = Client.list_active_scim_clients(resource.organization_id, resource_type)
+
+      Enum.each(clients, fn client ->
+        provision_to_client(event, resource_type, resource, client)
+      end)
+    else
+      Logger.debug(
+        "SCIM outbound provisioning disabled for organization #{organization.id}, skipping provisioning"
+      )
+    end
   end
 
   @doc """

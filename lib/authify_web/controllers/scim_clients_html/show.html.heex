@@ -35,6 +35,20 @@
       </div>
     </div>
 
+    <%= if @provisioning_enabled == false do %>
+      <div class="alert alert-warning" role="alert">
+        <i class="bi bi-exclamation-triangle"></i>
+        <strong>SCIM Outbound Provisioning Disabled</strong>
+        <p class="mb-0">
+          This SCIM client is configured, but automatic provisioning is disabled. Enable it in
+          <a href={~p"/#{@current_organization.slug}/settings/configuration"} class="alert-link">
+            organization settings
+          </a>
+          to start provisioning users and groups.
+        </p>
+      </div>
+    <% end %>
+
     <div class="row">
       <div class="col-md-6">
         <div class="card mb-4">

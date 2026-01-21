@@ -49,6 +49,15 @@ defmodule Authify.Configurations.Schemas.Organization do
           required: false,
           validation_fn: nil
         },
+        %{
+          name: :scim_outbound_provisioning_enabled,
+          description:
+            "Enable SCIM 2.0 outbound provisioning - automatically provision users and groups to configured SCIM clients (downstream applications)",
+          value_type: :boolean,
+          default_value: false,
+          required: false,
+          validation_fn: nil
+        },
         # MFA (Multi-Factor Authentication) settings
         %{
           name: :require_mfa,
