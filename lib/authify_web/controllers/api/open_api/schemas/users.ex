@@ -27,11 +27,18 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Users do
           id: "456",
           type: "user",
           attributes: %{
-            email: "john@acme.com",
+            primary_email: "john@acme.com",
+            emails: [
+              %{
+                value: "john@acme.com",
+                type: "work",
+                primary: true,
+                verified_at: "2024-01-01T00:00:00Z"
+              }
+            ],
             first_name: "John",
             last_name: "Doe",
             active: true,
-            email_confirmed_at: "2024-01-01T00:00:00Z",
             inserted_at: "2024-01-01T00:00:00Z",
             updated_at: "2024-01-01T00:00:00Z"
           },
@@ -58,16 +65,29 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Users do
     %{
       type: "object",
       properties: %{
-        email: %{type: "string", format: "email", description: "User email address"},
+        primary_email: %{type: "string", format: "email", description: "Primary email address"},
+        emails: %{
+          type: "array",
+          description: "List of user email addresses",
+          items: %{
+            type: "object",
+            properties: %{
+              value: %{type: "string", format: "email"},
+              type: %{type: "string", nullable: true, description: "Email type (work, home, etc)"},
+              primary: %{type: "boolean", description: "Whether this is the primary email"},
+              verified_at: %{
+                type: "string",
+                format: "date-time",
+                nullable: true,
+                description: "Timestamp when this email was verified"
+              }
+            },
+            required: ["value"]
+          }
+        },
         first_name: %{type: "string", nullable: true, description: "User first name"},
         last_name: %{type: "string", nullable: true, description: "User last name"},
         active: %{type: "boolean", description: "Whether the user is active"},
-        email_confirmed_at: %{
-          type: "string",
-          format: "date-time",
-          nullable: true,
-          description: "Email confirmation timestamp"
-        },
         inserted_at: %{type: "string", format: "date-time", description: "Creation timestamp"},
         updated_at: %{type: "string", format: "date-time", description: "Last update timestamp"}
       }
@@ -117,7 +137,20 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Users do
         user: %{
           type: "object",
           properties: %{
-            email: %{type: "string", format: "email"},
+            emails: %{
+              type: "array",
+              minItems: 1,
+              items: %{
+                type: "object",
+                properties: %{
+                  value: %{type: "string", format: "email"},
+                  type: %{type: "string", nullable: true},
+                  primary: %{type: "boolean", default: true}
+                },
+                required: ["value"],
+                description: "Email entries follow SCIM 2.0 format"
+              }
+            },
             first_name: %{type: "string"},
             last_name: %{type: "string"},
             password: %{
@@ -127,7 +160,7 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Users do
             },
             password_confirmation: %{type: "string", description: "Must match password"}
           },
-          required: ["email", "password", "password_confirmation"]
+          required: ["emails", "password", "password_confirmation"]
         }
       },
       required: ["user"]

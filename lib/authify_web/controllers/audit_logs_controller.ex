@@ -11,7 +11,7 @@ defmodule AuthifyWeb.AuditLogsController do
     # Only allow admins and super admins to view audit logs
     if Accounts.User.admin?(user, organization.id) || Accounts.User.super_admin?(user) do
       # Parse filtering params
-      event_type = params["event_type"]
+      {event_type, category} = parse_event_filter(params["event_filter"])
       user_id = params["user_id"]
       actor_name = params["actor_name"]
       outcome = params["outcome"]
@@ -21,6 +21,7 @@ defmodule AuthifyWeb.AuditLogsController do
       # Build filter options
       filter_opts = [
         event_type: event_type,
+        category: category,
         user_id: user_id,
         actor_name: actor_name,
         outcome: outcome,
@@ -54,6 +55,7 @@ defmodule AuthifyWeb.AuditLogsController do
         users: users,
         filters: %{
           event_type: event_type,
+          category: category,
           user_id: user_id,
           actor_name: actor_name,
           outcome: outcome,
@@ -109,5 +111,20 @@ defmodule AuthifyWeb.AuditLogsController do
       {:ok, date} -> date
       {:error, _} -> nil
     end
+  end
+
+  # Parse the event_filter parameter which can be either:
+  # - A category like "cat_scim", "cat_auth", "cat_user"
+  # - A specific event type
+  # - nil/empty
+  defp parse_event_filter(nil), do: {nil, nil}
+  defp parse_event_filter(""), do: {nil, nil}
+
+  defp parse_event_filter("cat_" <> category) do
+    {nil, category}
+  end
+
+  defp parse_event_filter(event_type) do
+    {event_type, nil}
   end
 end

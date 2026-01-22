@@ -36,6 +36,9 @@ defmodule Authify.Scopes do
     # Certificate management
     "certificates:read",
     "certificates:write",
+    # SCIM client management (outbound provisioning)
+    "scim_clients:read",
+    "scim_clients:write",
     # Organization configuration
     "organizations:read",
     "organizations:write",
@@ -47,6 +50,21 @@ defmodule Authify.Scopes do
   @pat_only_scopes [
     "profile:read",
     "profile:write"
+  ]
+
+  # SCIM 2.0 provisioning scopes
+  @scim_scopes [
+    # Broad SCIM scopes
+    "scim:read",
+    "scim:write",
+    # Resource-specific scopes
+    "scim:users:read",
+    "scim:users:write",
+    "scim:groups:read",
+    "scim:groups:write",
+    # Self-service scopes
+    "scim:me",
+    "scim:me:write"
   ]
 
   @doc """
@@ -65,14 +83,20 @@ defmodule Authify.Scopes do
   def pat_only_scopes, do: @pat_only_scopes
 
   @doc """
-  Returns all valid scopes for Personal Access Tokens (Management API + PAT-only).
+  Returns all SCIM 2.0 scopes.
   """
-  def pat_scopes, do: @management_api_scopes ++ @pat_only_scopes
+  def scim_scopes, do: @scim_scopes
 
   @doc """
-  Returns all valid scopes (OAuth + Management API + PAT-only).
+  Returns all valid scopes for Personal Access Tokens (Management API + PAT-only + SCIM).
   """
-  def all_valid_scopes, do: @oauth_scopes ++ @management_api_scopes ++ @pat_only_scopes
+  def pat_scopes, do: @management_api_scopes ++ @pat_only_scopes ++ @scim_scopes
+
+  @doc """
+  Returns all valid scopes (OAuth + Management API + PAT-only + SCIM).
+  """
+  def all_valid_scopes,
+    do: @oauth_scopes ++ @management_api_scopes ++ @pat_only_scopes ++ @scim_scopes
 
   @doc """
   Checks if a scope is a valid OAuth scope.
@@ -123,6 +147,10 @@ defmodule Authify.Scopes do
         {"certificates:read", "Read certificates in organization"},
         {"certificates:write", "Manage certificates in organization"}
       ],
+      "SCIM Clients" => [
+        {"scim_clients:read", "Read SCIM client configurations for outbound provisioning"},
+        {"scim_clients:write", "Manage SCIM client configurations for outbound provisioning"}
+      ],
       "Organizations" => [
         {"organizations:read", "Read organization configuration and settings"},
         {"organizations:write", "Manage organization configuration and settings"}
@@ -137,6 +165,16 @@ defmodule Authify.Scopes do
       "Management API" => [
         {"management_app:read", "Read Management API OAuth apps"},
         {"management_app:write", "Manage Management API OAuth apps"}
+      ],
+      "SCIM 2.0 Provisioning" => [
+        {"scim:read", "Read all SCIM resources (users, groups)"},
+        {"scim:write", "Manage all SCIM resources (users, groups)"},
+        {"scim:users:read", "Read SCIM user resources"},
+        {"scim:users:write", "Manage SCIM user resources"},
+        {"scim:groups:read", "Read SCIM group resources"},
+        {"scim:groups:write", "Manage SCIM group resources"},
+        {"scim:me", "Read your own SCIM resource (self-service)"},
+        {"scim:me:write", "Update your own SCIM resource (self-service)"}
       ]
     }
   end

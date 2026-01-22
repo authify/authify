@@ -16,7 +16,7 @@ defmodule Authify.AuditLog.Event do
     login_success login_failure
     logout session_expired
     password_reset_requested password_reset_completed password_changed
-    email_verification_resent
+    email_verification_resent email_added email_deleted primary_email_changed
     oauth_authorization_requested oauth_authorization_granted oauth_authorization_denied
     oauth_consent_given oauth_token_granted oauth_token_denied oauth_token_refreshed
     saml_sso_requested saml_assertion_issued saml_slo_requested saml_slo_completed
@@ -25,6 +25,11 @@ defmodule Authify.AuditLog.Event do
     role_assigned role_revoked
     oauth_client_created oauth_client_updated oauth_client_deleted oauth_client_secret_regenerated
     saml_sp_created saml_sp_updated saml_sp_deleted
+    scim_client_created scim_client_updated scim_client_deleted
+    scim_client_connection_tested scim_client_manual_sync_triggered
+    scim_user_provisioned scim_user_updated scim_user_deleted
+    scim_group_provisioned scim_group_updated scim_group_deleted
+    scim_bulk_operation_started scim_bulk_operation_completed
     application_group_created application_group_updated application_group_deleted
     organization_created organization_updated organization_deleted
     certificate_created certificate_activated certificate_deactivated certificate_deleted

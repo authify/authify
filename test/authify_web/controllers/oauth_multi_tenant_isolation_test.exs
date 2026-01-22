@@ -13,6 +13,8 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
   import Authify.AccountsFixtures
   import Authify.OAuthFixtures
 
+  alias Authify.Accounts.User
+
   describe "OAuth application isolation" do
     setup do
       # Create two separate organizations with users and apps
@@ -332,7 +334,7 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
 
       response = json_response(conn, 200)
       assert response["sub"] == to_string(user_a.id)
-      assert response["email"] == user_a.email
+      assert response["email"] == User.get_primary_email_value(user_a)
     end
 
     test "access token from org B returns org B user info only", %{
@@ -348,7 +350,7 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
 
       response = json_response(conn, 200)
       assert response["sub"] == to_string(user_b.id)
-      assert response["email"] == user_b.email
+      assert response["email"] == User.get_primary_email_value(user_b)
     end
 
     test "tokens cannot be used across organization endpoints", %{

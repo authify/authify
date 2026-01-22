@@ -557,14 +557,14 @@ defmodule Authify.OAuth do
       "name" => full_name,
       "given_name" => user.first_name,
       "family_name" => user.last_name,
-      "preferred_username" => user.email,
+      "preferred_username" => User.get_primary_email_value(user),
       "updated_at" => DateTime.to_unix(user.updated_at)
     })
   end
 
   defp add_scope_claims("email", claims, user) do
     Map.merge(claims, %{
-      "email" => user.email,
+      "email" => User.get_primary_email_value(user),
       "email_verified" => true
     })
   end

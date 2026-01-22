@@ -84,7 +84,7 @@ defmodule Authify.AccountsTest do
     end
 
     @valid_user_attrs %{
-      "email" => "test@example.com",
+      "emails" => [%{"value" => "test@example.com", "type" => "work", "primary" => true}],
       "first_name" => "John",
       "last_name" => "Doe",
       "password" => "SecureP@ssw0rd!",
@@ -92,7 +92,7 @@ defmodule Authify.AccountsTest do
     }
 
     @invalid_user_attrs %{
-      "email" => "invalid",
+      "emails" => [%{"value" => "invalid", "type" => "work", "primary" => true}],
       "password" => "123",
       "password_confirmation" => "456"
     }
@@ -102,14 +102,19 @@ defmodule Authify.AccountsTest do
 
       [found_user] = Accounts.list_users(org.id)
       assert found_user.id == user.id
-      assert found_user.email == user.email
+
+      assert Authify.Accounts.User.get_primary_email_value(found_user) ==
+               Authify.Accounts.User.get_primary_email_value(user)
     end
 
     test "get_user!/1 returns the user with given id", %{organization: _org} do
       {:ok, user} = Accounts.create_user(@valid_user_attrs)
       found_user = Accounts.get_user!(user.id)
       assert found_user.id == user.id
-      assert found_user.email == user.email
+
+      assert Authify.Accounts.User.get_primary_email_value(found_user) ==
+               Authify.Accounts.User.get_primary_email_value(user)
+
       assert found_user.first_name == user.first_name
     end
 
@@ -118,12 +123,14 @@ defmodule Authify.AccountsTest do
 
       found_user = Accounts.get_user_by_email_and_organization("test@example.com", org.id)
       assert found_user.id == user.id
-      assert found_user.email == user.email
+
+      assert Authify.Accounts.User.get_primary_email_value(found_user) ==
+               Authify.Accounts.User.get_primary_email_value(user)
     end
 
     test "create_user/1 with valid data creates a user", %{organization: _org} do
       assert {:ok, %User{} = user} = Accounts.create_user(@valid_user_attrs)
-      assert user.email == "test@example.com"
+      assert Authify.Accounts.User.get_primary_email_value(user) == "test@example.com"
       assert user.first_name == "John"
       assert user.last_name == "Doe"
       assert User.valid_password?(user, "SecureP@ssw0rd!")
@@ -140,7 +147,7 @@ defmodule Authify.AccountsTest do
       assert {:ok, {org, user}} = Accounts.create_organization_with_admin(org_attrs, user_attrs)
 
       assert org.name == "Admin Test Org"
-      assert user.email == "test@example.com"
+      assert Authify.Accounts.User.get_primary_email_value(user) == "test@example.com"
       # Check that user has admin role in the organization
       assert User.admin?(user, org.id) == true
     end
@@ -180,18 +187,38 @@ defmodule Authify.AccountsTest do
     test "update_user/2 clears email verification when email changes", %{organization: org} do
       # Create a user with verified email
       {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
-      verified_time = DateTime.utc_now() |> DateTime.truncate(:second)
-      {:ok, verified_user} = Accounts.update_user(user, %{"email_confirmed_at" => verified_time})
 
-      assert verified_user.email_confirmed_at != nil
+      # Verify the primary email directly
+      user_with_emails = Authify.Repo.preload(user, :emails)
+      primary_email = Authify.Accounts.User.get_primary_email(user_with_emails)
+      {:ok, _verified_email} = Accounts.verify_email(primary_email.id)
 
-      # Update email address
-      {:ok, updated_user} =
-        Accounts.update_user(verified_user, %{"email" => "newemail@example.com"})
+      # Reload user with verified email
+      verified_user =
+        Authify.Repo.get!(Authify.Accounts.User, user.id)
+        |> Authify.Repo.preload(:emails)
 
-      # Email verification should be cleared
-      assert updated_user.email == "newemail@example.com"
-      assert updated_user.email_confirmed_at == nil
+      # Check primary email is verified
+      primary_email = Authify.Accounts.User.get_primary_email(verified_user)
+      assert primary_email.verified_at != nil
+
+      # Update email address using the proper email management API
+      {:ok, new_email} =
+        Accounts.add_email_to_user(verified_user, %{value: "newemail@example.com", type: "work"})
+
+      {:ok, _primary_email} = Accounts.set_primary_email(verified_user, new_email.id)
+
+      # Reload user to get updated emails
+      updated_user =
+        Authify.Repo.get!(Authify.Accounts.User, verified_user.id)
+        |> Authify.Repo.preload(:emails, force: true)
+
+      assert Authify.Accounts.User.get_primary_email_value(updated_user) ==
+               "newemail@example.com"
+
+      # New email starts unverified
+      primary_email = Authify.Accounts.User.get_primary_email(updated_user)
+      assert primary_email.verified_at == nil
     end
 
     test "update_user/2 preserves email verification when email doesn't change", %{
@@ -199,17 +226,30 @@ defmodule Authify.AccountsTest do
     } do
       # Create a user with verified email
       {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
-      verified_time = DateTime.utc_now() |> DateTime.truncate(:second)
-      {:ok, verified_user} = Accounts.update_user(user, %{"email_confirmed_at" => verified_time})
 
-      assert verified_user.email_confirmed_at != nil
+      # Verify the primary email directly
+      user_with_emails = Authify.Repo.preload(user, :emails)
+      primary_email = Authify.Accounts.User.get_primary_email(user_with_emails)
+      {:ok, _verified_email} = Accounts.verify_email(primary_email.id)
+
+      # Reload user with verified email
+      verified_user =
+        Authify.Repo.get!(Authify.Accounts.User, user.id)
+        |> Authify.Repo.preload(:emails)
+
+      # Check primary email is verified
+      primary_email = Authify.Accounts.User.get_primary_email(verified_user)
+      assert primary_email.verified_at != nil
 
       # Update other fields but not email
       {:ok, updated_user} = Accounts.update_user(verified_user, %{"first_name" => "Jane"})
 
       # Email verification should be preserved
       assert updated_user.first_name == "Jane"
-      assert updated_user.email_confirmed_at != nil
+      # Email should still be verified
+      updated_user_with_emails = Authify.Repo.preload(updated_user, :emails, force: true)
+      primary_email = Authify.Accounts.User.get_primary_email(updated_user_with_emails)
+      assert primary_email.verified_at != nil
     end
 
     test "update_user_profile/2 clears email verification when email changes", %{
@@ -217,18 +257,41 @@ defmodule Authify.AccountsTest do
     } do
       # Create a user with verified email
       {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
-      verified_time = DateTime.utc_now() |> DateTime.truncate(:second)
-      {:ok, verified_user} = Accounts.update_user(user, %{"email_confirmed_at" => verified_time})
 
-      assert verified_user.email_confirmed_at != nil
+      # Verify the primary email directly
+      user_with_emails = Authify.Repo.preload(user, :emails)
+      primary_email = Authify.Accounts.User.get_primary_email(user_with_emails)
+      {:ok, _verified_email} = Accounts.verify_email(primary_email.id)
 
-      # Update email via profile update
-      {:ok, updated_user} =
-        Accounts.update_user_profile(verified_user, %{"email" => "profilechange@example.com"})
+      # Reload user with verified email
+      verified_user =
+        Authify.Repo.get!(Authify.Accounts.User, user.id)
+        |> Authify.Repo.preload(:emails)
 
-      # Email verification should be cleared
-      assert updated_user.email == "profilechange@example.com"
-      assert updated_user.email_confirmed_at == nil
+      # Check primary email is verified
+      primary_email = Authify.Accounts.User.get_primary_email(verified_user)
+      assert primary_email.verified_at != nil
+
+      # Update email using the proper email management API
+      {:ok, new_email} =
+        Accounts.add_email_to_user(verified_user, %{
+          value: "profilechange@example.com",
+          type: "work"
+        })
+
+      {:ok, _primary_email} = Accounts.set_primary_email(verified_user, new_email.id)
+
+      # Reload user to get updated emails
+      updated_user =
+        Authify.Repo.get!(Authify.Accounts.User, verified_user.id)
+        |> Authify.Repo.preload(:emails, force: true)
+
+      assert Authify.Accounts.User.get_primary_email_value(updated_user) ==
+               "profilechange@example.com"
+
+      # New email starts unverified
+      primary_email = Authify.Accounts.User.get_primary_email(updated_user)
+      assert primary_email.verified_at == nil
     end
 
     test "update_user_profile/2 preserves email verification when email doesn't change", %{
@@ -236,10 +299,20 @@ defmodule Authify.AccountsTest do
     } do
       # Create a user with verified email
       {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
-      verified_time = DateTime.utc_now() |> DateTime.truncate(:second)
-      {:ok, verified_user} = Accounts.update_user(user, %{"email_confirmed_at" => verified_time})
 
-      assert verified_user.email_confirmed_at != nil
+      # Verify the primary email directly
+      user_with_emails = Authify.Repo.preload(user, :emails)
+      primary_email = Authify.Accounts.User.get_primary_email(user_with_emails)
+      {:ok, _verified_email} = Accounts.verify_email(primary_email.id)
+
+      # Reload user with verified email
+      verified_user =
+        Authify.Repo.get!(Authify.Accounts.User, user.id)
+        |> Authify.Repo.preload(:emails)
+
+      # Check primary email is verified
+      primary_email = Authify.Accounts.User.get_primary_email(verified_user)
+      assert primary_email.verified_at != nil
 
       # Update username but not email
       {:ok, updated_user} =
@@ -247,7 +320,10 @@ defmodule Authify.AccountsTest do
 
       # Email verification should be preserved
       assert updated_user.username == "newusername"
-      assert updated_user.email_confirmed_at != nil
+      # Email should still be verified
+      updated_user_with_emails = Authify.Repo.preload(updated_user, :emails, force: true)
+      primary_email = Authify.Accounts.User.get_primary_email(updated_user_with_emails)
+      assert primary_email.verified_at != nil
     end
   end
 
@@ -468,7 +544,7 @@ defmodule Authify.AccountsTest do
       assert {:ok, %User{} = user} = Accounts.accept_invitation(invitation, user_attrs)
 
       # Check user was created correctly
-      assert user.email == invitation.email
+      assert User.get_primary_email_value(user) == invitation.email
       assert user.first_name == "John"
       assert user.last_name == "Doe"
       # Check that user has the correct role in the organization
@@ -651,7 +727,9 @@ defmodule Authify.AccountsTest do
       user_attrs = %{
         "first_name" => "John",
         "last_name" => "Doe",
-        "email" => "john.doe@example.com",
+        "emails" => [
+          %{"value" => "john.doe@example.com", "type" => "work", "primary" => true}
+        ],
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -659,7 +737,7 @@ defmodule Authify.AccountsTest do
       assert {:ok, user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
 
       # Check user was created correctly
-      assert user.email == "john.doe@example.com"
+      assert Authify.Accounts.User.get_primary_email_value(user) == "john.doe@example.com"
       assert user.first_name == "John"
       assert user.last_name == "Doe"
       assert user.active
@@ -675,7 +753,9 @@ defmodule Authify.AccountsTest do
       admin_attrs = %{
         "first_name" => "Jane",
         "last_name" => "Admin",
-        "email" => "jane.admin@example.com",
+        "emails" => [
+          %{"value" => "jane.admin@example.com", "type" => "work", "primary" => true}
+        ],
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -694,7 +774,9 @@ defmodule Authify.AccountsTest do
       user_attrs = %{
         "first_name" => "Default",
         "last_name" => "Role",
-        "email" => "default.role@example.com",
+        "emails" => [
+          %{"value" => "default.role@example.com", "type" => "work", "primary" => true}
+        ],
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -711,7 +793,9 @@ defmodule Authify.AccountsTest do
     } do
       invalid_attrs = %{
         "first_name" => "",
-        "email" => "invalid-email",
+        "emails" => [
+          %{"value" => "invalid-email", "type" => "work", "primary" => true}
+        ],
         "password" => "weak",
         "password_confirmation" => "different"
       }
@@ -726,12 +810,13 @@ defmodule Authify.AccountsTest do
       user_attrs = %{
         "first_name" => "First",
         "last_name" => "User",
-        "email" => "duplicate@example.com",
+        "emails" => [
+          %{"value" => "duplicate@example.com", "type" => "work", "primary" => true}
+        ],
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
 
-      # Create first user successfully
       assert {:ok, _user} = Accounts.create_user_with_role(user_attrs, organization.id)
 
       # Try to create second user with same email
@@ -746,7 +831,12 @@ defmodule Authify.AccountsTest do
       assert {:error, changeset} =
                Accounts.create_user_with_role(duplicate_attrs, organization.id)
 
-      assert changeset.errors != []
+      # Check for email uniqueness error in nested emails association
+      assert changeset.errors != [] or
+               (changeset.changes[:emails] &&
+                  Enum.any?(changeset.changes[:emails], fn email_changeset ->
+                    Keyword.has_key?(email_changeset.errors, :value)
+                  end))
     end
 
     test "create_user_with_role/3 rollbacks transaction on failure", %{
@@ -805,7 +895,9 @@ defmodule Authify.AccountsTest do
 
       found_user = Accounts.get_user_by_password_reset_token(token)
       assert found_user.id == user.id
-      assert found_user.email == user.email
+
+      assert Authify.Accounts.User.get_primary_email_value(found_user) ==
+               Authify.Accounts.User.get_primary_email_value(user)
     end
 
     test "get_user_by_password_reset_token/1 returns nil for invalid token" do

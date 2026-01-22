@@ -4,6 +4,7 @@ defmodule AuthifyWeb.UsersController do
   import Ecto.Query
 
   alias Authify.Accounts
+  alias Authify.Accounts.User
   alias Authify.AuditLog
 
   # Safely convert string to atom, only for known valid values
@@ -36,7 +37,7 @@ defmodule AuthifyWeb.UsersController do
 
     if organization.slug == "authify-global" do
       # Global organization - show all global admins
-      users = Accounts.list_global_admins()
+      users = Accounts.list_global_admins() |> Authify.Repo.preload(:emails)
 
       render(conn, :index,
         user: user,
@@ -52,7 +53,9 @@ defmodule AuthifyWeb.UsersController do
       )
     else
       # Regular organization - show organization users with filtering
-      users = Accounts.list_users_filtered(organization.id, filter_opts)
+      users =
+        Accounts.list_users_filtered(organization.id, filter_opts)
+        |> Authify.Repo.preload(:emails)
 
       render(conn, :index,
         user: user,
@@ -102,10 +105,16 @@ defmodule AuthifyWeb.UsersController do
     # Load MFA data for admin view
     mfa_assigns = load_mfa_data(target_user)
 
+    # Preload emails for target_user
+    target_user = Authify.Repo.preload(target_user, :emails)
+    primary_email = User.get_primary_email(target_user)
+
     render(conn, :show,
       user: user,
       organization: organization,
       target_user: target_user,
+      target_user_email: primary_email.value,
+      target_user_email_verified: primary_email.verified_at != nil,
       invitations: invitations,
       is_global_view: is_global_view,
       backup_codes_count: mfa_assigns.backup_codes_count,
@@ -253,7 +262,7 @@ defmodule AuthifyWeb.UsersController do
       {:ok, updated_user} ->
         # Log role change
         log_audit_event(conn, :role_assigned, updated_user, %{
-          target_user_email: target_user.email,
+          target_user_email: User.get_primary_email_value(target_user),
           old_role: target_user.role,
           new_role: new_role
         })
@@ -343,7 +352,7 @@ defmodule AuthifyWeb.UsersController do
       {:ok, disabled_user} ->
         # Log user disable
         log_audit_event(conn, :user_disabled, disabled_user, %{
-          target_user_email: target_user.email
+          target_user_email: User.get_primary_email_value(target_user)
         })
 
         conn
@@ -367,7 +376,7 @@ defmodule AuthifyWeb.UsersController do
         {:ok, enabled_user} ->
           # Log user enable
           log_audit_event(conn, :user_enabled, enabled_user, %{
-            target_user_email: target_user.email
+            target_user_email: User.get_primary_email_value(target_user)
           })
 
           conn
@@ -387,7 +396,7 @@ defmodule AuthifyWeb.UsersController do
           {:ok, enabled_user} ->
             # Log user enable
             log_audit_event(conn, :user_enabled, enabled_user, %{
-              target_user_email: user.email
+              target_user_email: User.get_primary_email_value(user)
             })
 
             conn
@@ -497,7 +506,7 @@ defmodule AuthifyWeb.UsersController do
         {:ok, user} ->
           # Log user update
           log_audit_event(conn, :user_updated, user, %{
-            updated_user_email: user.email,
+            updated_user_email: User.get_primary_email_value(user),
             updated_fields: Map.keys(user_params)
           })
 
@@ -539,6 +548,19 @@ defmodule AuthifyWeb.UsersController do
     })
   end
 
+  # Helper to normalize email params: convert "email" => value to "emails" => [...]
+  defp normalize_email_params(params) do
+    case params do
+      %{"email" => email_value} = p when is_binary(email_value) ->
+        p
+        |> Map.delete("email")
+        |> Map.put("emails", [%{"value" => email_value, "type" => "work", "primary" => true}])
+
+      p ->
+        p
+    end
+  end
+
   def create(conn, %{"user" => user_params}) do
     organization = conn.assigns.current_organization
     current_user = conn.assigns.current_user
@@ -549,13 +571,13 @@ defmodule AuthifyWeb.UsersController do
       # Allow user creation in any organization, including global
       # Extract role from params, default to "user"
       role = Map.get(user_params, "role", "user")
-      user_attrs = Map.delete(user_params, "role")
+      user_attrs = user_params |> Map.delete("role") |> normalize_email_params()
 
       case Accounts.create_user_with_role(user_attrs, organization.id, role) do
         {:ok, user} ->
           # Log user creation
           log_audit_event(conn, :user_created, user, %{
-            created_user_email: user.email,
+            created_user_email: User.get_primary_email_value(user),
             created_user_role: role
           })
 
@@ -588,7 +610,7 @@ defmodule AuthifyWeb.UsersController do
 
         # Log MFA unlock
         log_audit_event(conn, :mfa_unlocked, target_user, %{
-          target_user_email: target_user.email
+          target_user_email: User.get_primary_email_value(target_user)
         })
 
         conn
@@ -610,7 +632,7 @@ defmodule AuthifyWeb.UsersController do
 
         # Log MFA reset
         log_audit_event(conn, :mfa_reset, target_user, %{
-          target_user_email: target_user.email
+          target_user_email: User.get_primary_email_value(target_user)
         })
 
         conn

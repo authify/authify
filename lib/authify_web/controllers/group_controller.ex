@@ -116,7 +116,7 @@ defmodule AuthifyWeb.GroupController do
     organization = conn.assigns.current_organization
     group = get_group_with_details!(id, organization)
 
-    users = Accounts.list_users(organization.id)
+    users = Accounts.list_users(organization.id) |> Authify.Repo.preload(:emails)
     oauth_apps = OAuth.list_oauth_applications(organization)
     saml_providers = SAML.list_service_providers(organization)
 
@@ -212,10 +212,10 @@ defmodule AuthifyWeb.GroupController do
   defp get_group_with_details!(id, organization) do
     group = get_group!(id, organization)
 
-    Authify.Repo.preload(group, [
-      :users,
+    Authify.Repo.preload(group,
+      users: :emails,
       group_applications: [:group]
-    ])
+    )
   end
 
   defp format_errors(changeset) do

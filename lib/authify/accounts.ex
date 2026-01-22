@@ -15,8 +15,11 @@ defmodule Authify.Accounts do
     Invitation,
     Organization,
     PersonalAccessToken,
-    User
+    User,
+    UserEmail
   }
+
+  alias Authify.SCIM.{AttributeMapper, FilterParser, QueryFilter}
 
   ## Organizations
 
@@ -221,24 +224,54 @@ defmodule Authify.Accounts do
   defp apply_user_search(query, search_term) when is_binary(search_term) do
     search_pattern = "%#{search_term}%"
 
-    where(
-      query,
-      [u],
-      like(u.email, ^search_pattern) or
+    # Search across user emails and names
+    query
+    |> join(:left, [u], ue in UserEmail, on: ue.user_id == u.id)
+    |> where(
+      [u, ue],
+      like(ue.value, ^search_pattern) or
         like(fragment("CONCAT(?, ' ', ?)", u.first_name, u.last_name), ^search_pattern)
     )
+    |> distinct([u], u.id)
   end
 
-  defp apply_user_sorting(query, nil, _), do: order_by(query, [u], asc: u.email)
-  defp apply_user_sorting(query, "", _), do: order_by(query, [u], asc: u.email)
+  defp apply_user_sorting(query, nil, _) do
+    # Default sort by primary email
+    query
+    |> join(:left, [u], ue in UserEmail, on: ue.user_id == u.id and ue.primary == true)
+    |> order_by([u, ue], asc: ue.value)
+  end
+
+  defp apply_user_sorting(query, "", _) do
+    # Default sort by primary email
+    query
+    |> join(:left, [u], ue in UserEmail, on: ue.user_id == u.id and ue.primary == true)
+    |> order_by([u, ue], asc: ue.value)
+  end
 
   defp apply_user_sorting(query, sort_field, order)
        when sort_field in [:email, :first_name, :last_name, :role, :inserted_at] do
     order_atom = if order == :desc or order == "desc", do: :desc, else: :asc
-    order_by(query, [u], ^[{order_atom, sort_field}])
+
+    case sort_field do
+      :email ->
+        # Sort by primary email value
+        query
+        |> join(:left, [u], ue in UserEmail, on: ue.user_id == u.id and ue.primary == true)
+        |> order_by([u, ue], [{^order_atom, ue.value}])
+
+      _ ->
+        # Sort by user field
+        order_by(query, [u], ^[{order_atom, sort_field}])
+    end
   end
 
-  defp apply_user_sorting(query, _sort_field, _order), do: order_by(query, [u], asc: u.email)
+  defp apply_user_sorting(query, _sort_field, _order) do
+    # Default sort by primary email
+    query
+    |> join(:left, [u], ue in UserEmail, on: ue.user_id == u.id and ue.primary == true)
+    |> order_by([u, ue], asc: ue.value)
+  end
 
   @doc """
   Gets a single user.
@@ -270,22 +303,17 @@ defmodule Authify.Accounts do
   end
 
   @doc """
-  Gets a user by email and organization.
-  """
-  def get_user_by_email_and_organization(email, organization_id) do
-    from(u in User,
-      where: u.email == ^email and u.organization_id == ^organization_id and u.active == true,
-      preload: [:organization]
-    )
-    |> Repo.one()
-  end
-
-  @doc """
   Creates a user.
   """
   def create_user(attrs \\ %{}) do
+    normalized_attrs =
+      normalize_user_email_attrs(attrs, Map.get(attrs, "email"),
+        default_type: "work",
+        default_primary: true
+      )
+
     %User{}
-    |> User.registration_changeset(attrs)
+    |> User.registration_changeset(normalized_attrs)
     |> Repo.insert()
   end
 
@@ -293,18 +321,16 @@ defmodule Authify.Accounts do
   Creates an organization with an admin user.
   """
   def create_organization_with_admin(org_attrs, user_attrs) do
+    normalized_user_attrs =
+      normalize_user_email_attrs(user_attrs, Map.get(user_attrs, "email"),
+        default_type: "work",
+        default_primary: true
+      )
+
     Repo.transaction(fn ->
       with {:ok, organization} <- create_organization(org_attrs),
-           # Generate unique username based on preferred username
-           preferred_username = Map.get(user_attrs, "username", "admin"),
-           unique_username =
-             User.generate_unique_username(preferred_username, organization.id, Repo),
-           user_attrs_with_org =
-             user_attrs
-             |> Map.put("organization_id", organization.id)
-             |> Map.put("role", "admin")
-             |> Map.put("username", unique_username),
-           {:ok, user} <- create_user(user_attrs_with_org) do
+           {:ok, {organization, user}} <-
+             create_admin_user_for_organization(organization, normalized_user_attrs) do
         {organization, user}
       else
         {:error, changeset} -> Repo.rollback(changeset)
@@ -314,26 +340,37 @@ defmodule Authify.Accounts do
 
   @doc """
   Updates a user.
+
+  Note: Email management is now done through the user_emails association.
+  Use add_email_to_user/2, set_primary_email/2, or verify_email/1 for email operations.
   """
   def update_user(%User{} = user, attrs) do
-    changeset = User.changeset(user, attrs)
+    normalized_attrs =
+      normalize_user_email_attrs(attrs, Map.get(attrs, "email"),
+        default_type: "work",
+        default_primary: true
+      )
 
-    # If email is being changed, clear email verification
-    changeset =
-      if Ecto.Changeset.get_change(changeset, :email) do
-        Ecto.Changeset.put_change(changeset, :email_confirmed_at, nil)
-      else
-        changeset
-      end
-
-    Repo.update(changeset)
+    user
+    |> Repo.preload(:emails, force: true)
+    |> User.changeset(normalized_attrs)
+    |> Repo.update()
   end
 
   @doc """
   Deletes a user.
   """
   def delete_user(%User{} = user) do
-    Repo.delete(user)
+    result = Repo.delete(user)
+
+    case result do
+      {:ok, deleted_user} ->
+        broadcast_resource_event(deleted_user, :deleted, :user)
+        {:ok, deleted_user}
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -354,11 +391,12 @@ defmodule Authify.Accounts do
   Returns an `%Ecto.Changeset{}` for user forms without validations.
   This is used for initial form rendering to avoid showing validation errors
   before the user has attempted to submit the form.
+
+  Note: Email management is now done through the user_emails association.
   """
   def change_user_form(%User{} = user, attrs \\ %{}) do
     user
     |> Ecto.Changeset.cast(attrs, [
-      :email,
       :first_name,
       :last_name,
       :username,
@@ -368,20 +406,22 @@ defmodule Authify.Accounts do
   end
 
   @doc """
-  Updates a user's profile information (name, email, username).
+  Updates a user's profile information (name, username).
+
+  Note: Email management is now done through the user_emails association.
+  Use add_email_to_user/2, set_primary_email/2, or verify_email/1 for email operations.
   """
   def update_user_profile(%User{} = user, attrs) do
-    changeset = User.changeset(user, attrs)
+    normalized_attrs =
+      normalize_user_email_attrs(attrs, Map.get(attrs, "email"),
+        default_type: "work",
+        default_primary: true
+      )
 
-    # If email is being changed, clear email verification
-    changeset =
-      if Ecto.Changeset.get_change(changeset, :email) do
-        Ecto.Changeset.put_change(changeset, :email_confirmed_at, nil)
-      else
-        changeset
-      end
-
-    Repo.update(changeset)
+    user
+    |> Repo.preload(:emails)
+    |> User.changeset(normalized_attrs)
+    |> Repo.update()
   end
 
   @doc """
@@ -465,7 +505,16 @@ defmodule Authify.Accounts do
       |> Map.put("role", role)
       |> Map.put("username", unique_username)
 
-    create_user(user_attrs_with_org)
+    user_attrs_with_emails =
+      normalize_user_email_attrs(user_attrs_with_org, Map.get(user_attrs, "email"),
+        default_type: "work",
+        default_primary: true
+      )
+
+    case create_user(user_attrs_with_emails) do
+      {:ok, user} -> {:ok, Repo.preload(user, :emails)}
+      {:error, changeset} -> {:error, changeset}
+    end
   end
 
   @doc """
@@ -474,6 +523,174 @@ defmodule Authify.Accounts do
   def create_user_with_role(user_attrs, organization_id) do
     create_user_with_role(user_attrs, organization_id, "user")
   end
+
+  defp normalize_user_email_attrs(attrs, fallback_email, opts) do
+    default_type = Keyword.get(opts, :default_type, "work")
+    default_primary = Keyword.get(opts, :default_primary, true)
+    verified_at = Keyword.get(opts, :verified_at)
+
+    {existing_emails, attrs_without_emails} = pop_email_entries(attrs)
+
+    normalized_emails =
+      existing_emails
+      |> to_email_list()
+      |> Enum.map(&normalize_email_entry(&1, default_type, verified_at))
+      |> Enum.reject(&is_nil/1)
+
+    normalized_emails =
+      case normalized_emails do
+        [] ->
+          fallback_email
+          |> build_email_from_value(
+            type: default_type,
+            primary: default_primary,
+            verified_at: verified_at
+          )
+          |> List.wrap()
+
+        emails ->
+          emails
+      end
+
+    normalized_emails = ensure_primary_email(normalized_emails)
+
+    attrs_without_emails
+    |> drop_email_key()
+    |> maybe_put_emails(normalized_emails)
+  end
+
+  defp pop_email_entries(attrs) do
+    case Map.pop(attrs, "emails") do
+      {nil, attrs_without_string_key} ->
+        case Map.pop(attrs_without_string_key, :emails) do
+          {nil, attrs_without_atom_key} -> {nil, attrs_without_atom_key}
+          {emails, attrs_without_atom_key} -> {emails, attrs_without_atom_key}
+        end
+
+      {emails, attrs_without_string_key} ->
+        {emails, attrs_without_string_key}
+    end
+  end
+
+  defp drop_email_key(attrs) do
+    attrs
+    |> Map.delete("email")
+    |> Map.delete(:email)
+  end
+
+  defp maybe_put_emails(attrs, []), do: attrs
+  defp maybe_put_emails(attrs, emails), do: Map.put(attrs, "emails", emails)
+
+  defp to_email_list(nil), do: []
+
+  defp to_email_list(emails) when is_list(emails) do
+    emails
+  end
+
+  defp to_email_list(emails) when is_map(emails) do
+    emails
+    |> Enum.sort_by(fn {key, _} -> to_string(key) end)
+    |> Enum.map(fn {_key, value} -> value end)
+  end
+
+  defp to_email_list(_), do: []
+
+  defp normalize_email_entry(email, default_type, verified_at) when is_map(email) do
+    email = stringify_keys(email)
+
+    case normalize_email_value(Map.get(email, "value")) do
+      nil ->
+        nil
+
+      value ->
+        %{}
+        |> Map.put("value", value)
+        |> Map.put("type", Map.get(email, "type") || default_type)
+        |> Map.put("primary", normalize_primary_flag(Map.get(email, "primary")))
+        |> maybe_put_non_nil("display", blank_to_nil(Map.get(email, "display")))
+        |> maybe_put_non_nil("verified_at", Map.get(email, "verified_at") || verified_at)
+    end
+  end
+
+  defp normalize_email_entry(value, default_type, verified_at) when is_binary(value) do
+    build_email_from_value(value, type: default_type, primary: false, verified_at: verified_at)
+  end
+
+  defp normalize_email_entry(_, _, _), do: nil
+
+  defp build_email_from_value(value, opts) do
+    case normalize_email_value(value) do
+      nil ->
+        nil
+
+      normalized ->
+        %{}
+        |> Map.put("value", normalized)
+        |> Map.put("type", Keyword.get(opts, :type, "work"))
+        |> Map.put("primary", Keyword.get(opts, :primary, true))
+        |> maybe_put_non_nil("verified_at", Keyword.get(opts, :verified_at))
+    end
+  end
+
+  defp normalize_email_value(nil), do: nil
+
+  defp normalize_email_value(value) when is_binary(value) do
+    value = String.trim(value)
+
+    if value == "" do
+      nil
+    else
+      value
+    end
+  end
+
+  defp normalize_email_value(value) when is_atom(value),
+    do: value |> Atom.to_string() |> normalize_email_value()
+
+  defp normalize_email_value(_), do: nil
+
+  defp normalize_primary_flag(value) when value in [true, "true", "1", 1], do: true
+  defp normalize_primary_flag(_), do: false
+
+  defp ensure_primary_email([]), do: []
+
+  defp ensure_primary_email(emails) do
+    primary_index =
+      emails
+      |> Enum.find_index(fn email -> Map.get(email, "primary") == true end)
+      |> case do
+        nil -> 0
+        index -> index
+      end
+
+    emails
+    |> Enum.with_index()
+    |> Enum.map(fn {email, index} ->
+      Map.put(email, "primary", index == primary_index)
+    end)
+  end
+
+  defp stringify_keys(map) do
+    map
+    |> Enum.map(fn
+      {key, value} when is_atom(key) -> {Atom.to_string(key), value}
+      {key, value} when is_binary(key) -> {key, value}
+      {key, value} -> {to_string(key), value}
+    end)
+    |> Enum.into(%{})
+  end
+
+  defp blank_to_nil(nil), do: nil
+
+  defp blank_to_nil(value) when is_binary(value) do
+    value = String.trim(value)
+    if value == "", do: nil, else: value
+  end
+
+  defp blank_to_nil(value), do: value
+
+  defp maybe_put_non_nil(map, _key, nil), do: map
+  defp maybe_put_non_nil(map, key, value), do: Map.put(map, key, value)
 
   @doc """
   Creates a user and sends email verification.
@@ -484,20 +701,17 @@ defmodule Authify.Accounts do
   def create_user_and_send_verification(user_attrs, organization_id, role \\ "user") do
     case create_user_with_role(user_attrs, organization_id, role) do
       {:ok, user} ->
-        # Preload organization for email
-        user = Repo.preload(user, :organization)
+        user = Repo.preload(user, [:organization, :emails])
 
-        # Generate verification token
         case generate_email_verification_token(user) do
-          {:ok, updated_user, plaintext_token} ->
-            # Build the verification URL
-            verification_url = build_email_verification_url(user.organization, plaintext_token)
+          {:ok, email, plaintext_token} ->
+            verification_url =
+              build_email_verification_url(user.organization, plaintext_token)
 
-            # Send verification email
-            case Authify.Email.send_email_verification_email(updated_user, verification_url) do
+            case Authify.Email.send_email_verification_email(user, verification_url) do
               {:ok, _metadata} ->
                 require Logger
-                Logger.info("Email verification sent to #{user.email}")
+                Logger.info("Email verification sent to #{email.value}")
 
               {:error, :smtp_not_configured} ->
                 require Logger
@@ -511,7 +725,7 @@ defmodule Authify.Accounts do
                 Logger.error("Failed to send verification email: #{inspect(reason)}")
             end
 
-            {:ok, updated_user}
+            {:ok, user}
 
           {:error, changeset} ->
             {:error, changeset}
@@ -588,13 +802,251 @@ defmodule Authify.Accounts do
     end
   end
 
+  ## User Email Management
+
+  @doc """
+  Gets a user by email address (searches across all user emails).
+  Returns the first user found with this email, preloaded with organization.
+  """
+  def get_user_by_email(email) when is_binary(email) do
+    from(ue in UserEmail,
+      where: ue.value == ^email,
+      join: u in User,
+      on: ue.user_id == u.id,
+      where: u.active == true,
+      preload: [user: :organization],
+      limit: 1
+    )
+    |> Repo.one()
+    |> case do
+      nil -> nil
+      user_email -> user_email.user
+    end
+  end
+
+  def get_user_by_email(_), do: nil
+
+  @doc """
+  Gets a user by primary email address.
+  This is the main function used for login authentication.
+  """
+  def get_user_by_primary_email(email) when is_binary(email) do
+    from(ue in UserEmail,
+      where: ue.value == ^email and ue.primary == true,
+      join: u in User,
+      on: ue.user_id == u.id,
+      where: u.active == true,
+      preload: [user: :organization],
+      limit: 1
+    )
+    |> Repo.one()
+    |> case do
+      nil -> nil
+      user_email -> user_email.user
+    end
+  end
+
+  def get_user_by_primary_email(_), do: nil
+
+  @doc """
+  Gets a user by email and organization.
+  Searches across all user emails within the specified organization.
+  """
+  def get_user_by_email_and_organization(email, organization_id)
+      when is_binary(email) and is_integer(organization_id) do
+    from(ue in UserEmail,
+      where: ue.value == ^email,
+      join: u in User,
+      on: ue.user_id == u.id,
+      where: u.organization_id == ^organization_id and u.active == true,
+      preload: [user: :organization],
+      limit: 1
+    )
+    |> Repo.one()
+    |> case do
+      nil -> nil
+      user_email -> user_email.user
+    end
+  end
+
+  def get_user_by_email_and_organization(_, _), do: nil
+
+  @doc """
+  Adds an additional email address to a user.
+
+  ## Parameters
+    * `user` - User struct
+    * `email_attrs` - Map with :value, :type (optional), :primary (optional), :display (optional)
+
+  ## Examples
+      iex> add_email_to_user(user, %{value: "new@example.com", type: "work"})
+      {:ok, %UserEmail{}}
+
+      iex> add_email_to_user(user, %{value: "duplicate@example.com"})
+      {:error, %Ecto.Changeset{}}
+  """
+  def add_email_to_user(%User{} = user, email_attrs) when is_map(email_attrs) do
+    # Normalize to string keys for consistency with changeset
+    attrs =
+      email_attrs
+      |> Enum.map(fn {k, v} -> {to_string(k), v} end)
+      |> Map.new()
+      |> Map.put("user_id", user.id)
+      |> Map.put_new("type", "work")
+      |> Map.put_new("primary", false)
+
+    %UserEmail{}
+    |> UserEmail.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Sets a specific email as the primary email for a user.
+  Automatically demotes the current primary email.
+
+  ## Parameters
+    * `user` - User struct
+    * `email_id` - ID of the email to set as primary
+
+  ## Returns
+    * `{:ok, user_email}` - Successfully updated
+    * `{:error, :email_not_found}` - Email doesn't exist or doesn't belong to user
+    * `{:error, changeset}` - Validation failed
+  """
+  def set_primary_email(%User{} = user, email_id) when is_integer(email_id) do
+    Repo.transaction(fn ->
+      # Get the email to promote
+      email_to_promote = Repo.get_by(UserEmail, id: email_id, user_id: user.id)
+
+      unless email_to_promote do
+        Repo.rollback(:email_not_found)
+      end
+
+      # Demote current primary email
+      from(ue in UserEmail,
+        where: ue.user_id == ^user.id and ue.primary == true
+      )
+      |> Repo.update_all(set: [primary: false])
+
+      # Promote new primary email
+      email_to_promote
+      |> Ecto.Changeset.change(%{primary: true})
+      |> Repo.update!()
+    end)
+  end
+
+  @doc """
+  Deletes an email address from a user's account.
+
+  Cannot delete the primary email address - user must first set another email as primary.
+
+  ## Parameters
+    * `user` - User struct
+    * `email_id` - ID of the email to delete
+
+  ## Returns
+    * `{:ok, user_email}` - Successfully deleted
+    * `{:error, :email_not_found}` - Email doesn't exist or doesn't belong to user
+    * `{:error, :cannot_delete_primary}` - Cannot delete primary email
+  """
+  def delete_email(%User{} = user, email_id) when is_integer(email_id) do
+    case Repo.get_by(UserEmail, id: email_id, user_id: user.id) do
+      nil ->
+        {:error, :email_not_found}
+
+      %UserEmail{primary: true} ->
+        {:error, :cannot_delete_primary}
+
+      email ->
+        Repo.delete(email)
+    end
+  end
+
+  @doc """
+  Marks an email as verified.
+
+  ## Parameters
+    * `email_id` - ID of the email to verify
+
+  ## Returns
+    * `{:ok, user_email}` - Successfully verified
+    * `{:error, :email_not_found}` - Email doesn't exist
+    * `{:error, changeset}` - Verification failed
+  """
+  def verify_email(email_id) when is_integer(email_id) do
+    case Repo.get(UserEmail, email_id) do
+      nil ->
+        {:error, :email_not_found}
+
+      email ->
+        email
+        |> UserEmail.verify_changeset()
+        |> Repo.update()
+    end
+  end
+
+  @doc """
+  Generates and sends an email verification token to a specific email address.
+
+  ## Parameters
+    * `user` - User struct (must have organization preloaded)
+    * `email` - UserEmail struct to verify
+
+  ## Returns
+    * `{:ok, user_email}` - Token generated and email sent
+    * `{:error, changeset}` - Token generation failed
+  """
+  def send_email_verification(%User{} = user, %UserEmail{} = email) do
+    # Generate verification token using the shared function
+    case generate_email_verification_token(email) do
+      {:ok, updated_email, token} ->
+        # Build verification URL
+        verification_url = build_email_verification_url(user.organization, token)
+
+        # Send verification email
+        case Authify.Email.send_email_verification_email(user, verification_url) do
+          {:ok, _metadata} ->
+            require Logger
+            Logger.info("Email verification sent to #{email.value}")
+
+          {:error, :smtp_not_configured} ->
+            require Logger
+
+            Logger.warning(
+              "SMTP not configured for organization #{user.organization.slug}, verification email not sent"
+            )
+
+          {:error, reason} ->
+            require Logger
+            Logger.error("Failed to send verification email: #{inspect(reason)}")
+        end
+
+        {:ok, updated_email}
+
+      {:error, changeset} ->
+        {:error, changeset}
+    end
+  end
+
   ## Authentication
 
   @doc """
   Authenticates a user with email and password within an organization.
+  Uses primary email for authentication.
   """
   def authenticate_user(email, password, organization_id) do
-    user = get_user_by_email_and_organization(email, organization_id)
+    # Query using the optimized covering index on user_emails
+    user =
+      from(u in User,
+        join: ue in UserEmail,
+        on: ue.user_id == u.id,
+        where:
+          ue.value == ^email and ue.primary == true and
+            u.organization_id == ^organization_id and u.active == true,
+        preload: [:organization, :emails],
+        limit: 1
+      )
+      |> Repo.one()
 
     cond do
       user && User.valid_password?(user, password) -> {:ok, user}
@@ -666,12 +1118,14 @@ defmodule Authify.Accounts do
                User.generate_unique_username(preferred_username, invitation.organization_id, Repo),
              user_attrs_with_org =
                user_attrs
-               |> Map.put("email", invitation.email)
                |> Map.put("organization_id", invitation.organization_id)
                |> Map.put("role", invitation.role)
                |> Map.put("username", unique_username)
-               # Email is verified since they clicked the link we sent to that email
-               |> Map.put("email_confirmed_at", accepted_at),
+               |> normalize_user_email_attrs(invitation.email,
+                 default_type: "work",
+                 default_primary: true,
+                 verified_at: accepted_at
+               ),
              {:ok, user} <- create_user(user_attrs_with_org) do
           user
         else
@@ -680,6 +1134,29 @@ defmodule Authify.Accounts do
       end)
     else
       {:error, :invitation_invalid}
+    end
+  end
+
+  defp create_admin_user_for_organization(organization, user_attrs) do
+    # Generate unique username based on preferred username
+    preferred_username = Map.get(user_attrs, "username", "admin")
+    unique_username = User.generate_unique_username(preferred_username, organization.id, Repo)
+
+    normalized_user_attrs =
+      normalize_user_email_attrs(user_attrs, Map.get(user_attrs, "email"),
+        default_type: "work",
+        default_primary: true
+      )
+
+    user_attrs_with_org =
+      normalized_user_attrs
+      |> Map.put("organization_id", organization.id)
+      |> Map.put("role", "admin")
+      |> Map.put("username", unique_username)
+
+    case create_user(user_attrs_with_org) do
+      {:ok, user} -> {:ok, {organization, user}}
+      {:error, changeset} -> {:error, changeset}
     end
   end
 
@@ -1207,17 +1684,6 @@ defmodule Authify.Accounts do
   end
 
   @doc """
-  Gets user by email globally.
-  """
-  def get_user_by_email(email) do
-    from(u in User,
-      where: u.email == ^email and u.active == true,
-      preload: [:organization]
-    )
-    |> Repo.one()
-  end
-
-  @doc """
   Creates a super admin user (placeholder).
   """
   def create_super_admin(attrs) do
@@ -1335,69 +1801,121 @@ defmodule Authify.Accounts do
 
   @doc """
   Generates email verification token.
+
+  ## Overloads
+
+  ### With UserEmail
+  Generates token for a specific email address.
+
+  Parameters:
+    * `email` - UserEmail struct to generate verification token for
+
+  Returns:
+    * `{:ok, user_email, plaintext_token}` - Token generated successfully
+    * `{:error, changeset}` - Token generation failed
+
+  ### With User
+  Generates token for user's primary email (convenience function).
+
+  Parameters:
+    * `user` - User struct (will be preloaded with emails if needed)
+
+  Returns:
+    * `{:ok, user_email, plaintext_token}` - Token generated successfully
+    * `{:error, changeset}` - Token generation failed
   """
-  def generate_email_verification_token(user) do
-    changeset = User.email_verification_changeset(user)
+  def generate_email_verification_token(arg)
+
+  def generate_email_verification_token(%UserEmail{} = email) do
+    # Generate random token
+    token = :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
+
+    # Update email with verification token
+    changeset = UserEmail.verification_token_changeset(email, token)
 
     case Repo.update(changeset) do
-      {:ok, updated_user} ->
-        # Return the plaintext token (virtual field) instead of the hash
-        {:ok, updated_user, updated_user.plaintext_verification_token}
+      {:ok, updated_email} ->
+        {:ok, updated_email, token}
 
       {:error, changeset} ->
         {:error, changeset}
     end
   end
 
+  def generate_email_verification_token(user) when is_struct(user, User) do
+    # Preload emails if not already loaded
+    user = Repo.preload(user, :emails)
+
+    # Get primary email
+    primary_email = User.get_primary_email(user)
+
+    # Call the UserEmail version
+    generate_email_verification_token(primary_email)
+  end
+
   @doc """
   Gets user by email verification token.
-  Hashes the provided token and looks up by hash.
+  Hashes the provided token and looks up in user_emails table.
   """
   def get_user_by_email_verification_token(nil), do: nil
 
   def get_user_by_email_verification_token(token) do
-    token_hash = User.hash_email_verification_token(token)
+    # Hash the token for lookup
+    token_hash = :crypto.hash(:sha256, token) |> Base.encode16(case: :lower)
 
-    from(u in User,
+    from(ue in UserEmail,
       where:
-        u.email_verification_token == ^token_hash and
-          u.email_verification_expires_at > ^DateTime.utc_now(),
-      preload: [:organization]
+        ue.verification_token == ^token_hash and
+          ue.verification_expires_at > ^DateTime.utc_now(),
+      join: u in User,
+      on: ue.user_id == u.id,
+      preload: [user: :organization],
+      limit: 1
     )
     |> Repo.one()
+    |> case do
+      nil -> nil
+      user_email -> user_email.user
+    end
   end
 
   @doc """
   Verifies email with token.
-  Hashes the provided token and looks up by hash.
+  Hashes the provided token and looks up in user_emails table.
+  Marks the email as verified and returns the user.
   """
   def verify_email_with_token(token) do
     # Hash the incoming token to look up in database
-    token_hash = User.hash_email_verification_token(token)
+    token_hash = :crypto.hash(:sha256, token) |> Base.encode16(case: :lower)
 
-    # First check if user exists with this token (regardless of expiration)
-    user_with_token =
-      from(u in User,
-        where: u.email_verification_token == ^token_hash,
-        preload: [:organization]
+    # First check if email exists with this token (regardless of expiration)
+    email_with_token =
+      from(ue in UserEmail,
+        where: ue.verification_token == ^token_hash,
+        preload: [:user]
       )
       |> Repo.one()
 
-    case user_with_token do
+    case email_with_token do
       nil ->
         {:error, :token_not_found}
 
-      user ->
+      email ->
         # Check if token is expired
-        if user.email_verification_expires_at &&
-             DateTime.compare(user.email_verification_expires_at, DateTime.utc_now()) == :lt do
+        if email.verification_expires_at &&
+             DateTime.compare(email.verification_expires_at, DateTime.utc_now()) == :lt do
           {:error, :token_expired}
         else
-          changeset = User.email_verification_completion_changeset(user)
+          changeset = UserEmail.verify_changeset(email)
 
           case Repo.update(changeset) do
-            {:ok, updated_user} -> {:ok, updated_user}
-            {:error, changeset} -> {:error, changeset}
+            {:ok, updated_email} ->
+              # Return the user with updated email preloaded
+              user = Repo.preload(updated_email.user, [:organization, :emails], force: true)
+              {:ok, user}
+
+            {:error, changeset} ->
+              {:error, changeset}
           end
         end
     end
@@ -1407,12 +1925,12 @@ defmodule Authify.Accounts do
   Cleanup expired email verification tokens.
   """
   def cleanup_expired_email_verification_tokens do
-    from(u in User,
+    from(ue in UserEmail,
       where:
-        not is_nil(u.email_verification_token) and
-          u.email_verification_expires_at < ^DateTime.utc_now()
+        not is_nil(ue.verification_token) and
+          ue.verification_expires_at < ^DateTime.utc_now()
     )
-    |> Repo.update_all(set: [email_verification_token: nil, email_verification_expires_at: nil])
+    |> Repo.update_all(set: [verification_token: nil, verification_expires_at: nil])
   end
 
   @doc """
@@ -1948,11 +2466,31 @@ defmodule Authify.Accounts do
   end
 
   @doc """
+  Gets a single group by ID (without organization scoping).
+  Returns nil if the group does not exist.
+  """
+  def get_group(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int_id, ""} -> get_group(int_id)
+      _ -> nil
+    end
+  end
+
+  def get_group(id) when is_integer(id) do
+    from(g in Group,
+      where: g.id == ^id,
+      preload: [:users]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
   Creates a group.
   """
   def create_group(attrs \\ %{}) do
     %Group{}
     |> Group.changeset(attrs)
+    |> Group.apply_scim_timestamps(attrs)
     |> Repo.insert()
   end
 
@@ -1962,6 +2500,7 @@ defmodule Authify.Accounts do
   def update_group(%Group{} = group, attrs) do
     group
     |> Group.changeset(attrs)
+    |> Group.apply_scim_timestamps(attrs)
     |> Repo.update()
   end
 
@@ -1969,7 +2508,16 @@ defmodule Authify.Accounts do
   Deletes a group.
   """
   def delete_group(%Group{} = group) do
-    Repo.delete(group)
+    result = Repo.delete(group)
+
+    case result do
+      {:ok, deleted_group} ->
+        broadcast_resource_event(deleted_group, :deleted, :group)
+        {:ok, deleted_group}
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -2024,5 +2572,434 @@ defmodule Authify.Accounts do
       where: ga.id == ^member_id and ga.group_id == ^group_id
     )
     |> Repo.delete_all()
+  end
+
+  ## SCIM Provisioning Functions
+
+  @doc """
+  Gets a user by external_id within an organization.
+
+  Returns nil if user not found or external_id doesn't match organization.
+  """
+  def get_user_by_external_id(external_id, organization_id)
+      when is_binary(external_id) and is_integer(organization_id) do
+    Repo.get_by(User, external_id: external_id, organization_id: organization_id)
+    |> Repo.preload(:organization)
+  end
+
+  def get_user_by_external_id(_external_id, _organization_id), do: nil
+
+  @doc """
+  Gets a group by external_id within an organization.
+
+  Returns nil if group not found or external_id doesn't match organization.
+  """
+  def get_group_by_external_id(external_id, organization_id)
+      when is_binary(external_id) and is_integer(organization_id) do
+    Repo.get_by(Group, external_id: external_id, organization_id: organization_id)
+  end
+
+  def get_group_by_external_id(_external_id, _organization_id), do: nil
+
+  @doc """
+  Lists users for SCIM with optional filter and pagination.
+
+  ## Options
+    * `:page` - Page number (default: 1)
+    * `:per_page` - Results per page (default: 25, max: 100)
+    * `:filter` - SCIM filter query string
+    * `:sort_by` - SCIM attribute to sort by (e.g., "userName", "meta.created")
+    * `:sort_order` - Sort direction, "ascending" or "descending" (default: "ascending")
+
+  ## Examples
+
+      iex> list_users_scim(org_id, filter: "userName eq \\"jsmith\\"")
+      [%User{username: "jsmith"}]
+
+      iex> list_users_scim(org_id, filter: "active eq true and userName sw \\"j\\"")
+      [%User{username: "jsmith", active: true}, ...]
+
+  Returns `{:ok, users}` on success or `{:error, reason}` if filter is invalid.
+  """
+  def list_users_scim(organization_id, opts \\ []) do
+    page = Keyword.get(opts, :page, 1)
+    per_page = min(Keyword.get(opts, :per_page, 25), 100)
+    offset = (page - 1) * per_page
+
+    # Base query - returns all users (active and inactive for SCIM)
+    base_query =
+      from(u in User,
+        where: u.organization_id == ^organization_id,
+        preload: [:organization, :groups]
+      )
+
+    # Apply SCIM filter if provided
+    query_result =
+      case Keyword.get(opts, :filter) do
+        nil ->
+          {:ok, base_query}
+
+        filter_string ->
+          with {:ok, ast} <- FilterParser.parse(filter_string),
+               {:ok, filtered_query} <- QueryFilter.apply_filter(base_query, ast, :user) do
+            {:ok, filtered_query}
+          else
+            {:error, reason} -> {:error, reason}
+          end
+      end
+
+    case query_result do
+      {:ok, query} ->
+        # Apply sorting
+        query = apply_scim_sort(query, opts[:sort_by], opts[:sort_order])
+
+        # Apply pagination
+        users =
+          query
+          |> limit(^per_page)
+          |> offset(^offset)
+          |> Repo.all()
+
+        {:ok, users}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
+  Lists groups for SCIM with optional filter and pagination.
+
+  ## Options
+    * `:page` - Page number (default: 1)
+    * `:per_page` - Results per page (default: 25, max: 100)
+    * `:filter` - SCIM filter query string
+    * `:sort_by` - SCIM attribute to sort by (e.g., "displayName")
+    * `:sort_order` - Sort direction, "ascending" or "descending" (default: "ascending")
+
+  ## Examples
+
+      iex> list_groups_scim(org_id, filter: "displayName eq \\"Engineering\\"")
+      {:ok, [%Group{name: "Engineering"}]}
+
+  Returns `{:ok, groups}` on success or `{:error, reason}` if filter is invalid.
+  """
+  def list_groups_scim(organization_id, opts \\ []) do
+    page = Keyword.get(opts, :page, 1)
+    per_page = min(Keyword.get(opts, :per_page, 25), 100)
+    offset = (page - 1) * per_page
+
+    # Base query
+    base_query =
+      from(g in Group,
+        where: g.organization_id == ^organization_id,
+        preload: [:users]
+      )
+
+    # Apply SCIM filter if provided
+    query_result =
+      case Keyword.get(opts, :filter) do
+        nil ->
+          {:ok, base_query}
+
+        filter_string ->
+          with {:ok, ast} <- FilterParser.parse(filter_string),
+               {:ok, filtered_query} <- QueryFilter.apply_filter(base_query, ast, :group) do
+            {:ok, filtered_query}
+          else
+            {:error, reason} -> {:error, reason}
+          end
+      end
+
+    case query_result do
+      {:ok, query} ->
+        # Apply sorting
+        query = apply_scim_sort(query, opts[:sort_by], opts[:sort_order])
+
+        # Apply pagination
+        groups =
+          query
+          |> limit(^per_page)
+          |> offset(^offset)
+          |> Repo.all()
+
+        {:ok, groups}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
+  Counts users for SCIM pagination (includes inactive users).
+
+  ## Options
+    * `:filter` - SCIM filter query string
+
+  Returns `{:ok, count}` on success or `{:error, reason}` if filter is invalid.
+  """
+  def count_users_scim(organization_id, opts \\ []) do
+    base_query =
+      from(u in User,
+        where: u.organization_id == ^organization_id
+      )
+
+    # Apply SCIM filter if provided
+    query_result =
+      case Keyword.get(opts, :filter) do
+        nil ->
+          {:ok, base_query}
+
+        filter_string ->
+          with {:ok, ast} <- FilterParser.parse(filter_string),
+               {:ok, filtered_query} <- QueryFilter.apply_filter(base_query, ast, :user) do
+            {:ok, filtered_query}
+          else
+            {:error, reason} -> {:error, reason}
+          end
+      end
+
+    case query_result do
+      {:ok, query} ->
+        count = Repo.aggregate(query, :count, :id)
+        {:ok, count}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
+  Counts groups for SCIM pagination.
+
+  ## Options
+    * `:filter` - SCIM filter query string
+
+  Returns `{:ok, count}` on success or `{:error, reason}` if filter is invalid.
+  """
+  def count_groups_scim(organization_id, opts \\ []) do
+    base_query =
+      from(g in Group,
+        where: g.organization_id == ^organization_id
+      )
+
+    # Apply SCIM filter if provided
+    query_result =
+      case Keyword.get(opts, :filter) do
+        nil ->
+          {:ok, base_query}
+
+        filter_string ->
+          with {:ok, ast} <- FilterParser.parse(filter_string),
+               {:ok, filtered_query} <- QueryFilter.apply_filter(base_query, ast, :group) do
+            {:ok, filtered_query}
+          else
+            {:error, reason} -> {:error, reason}
+          end
+      end
+
+    case query_result do
+      {:ok, query} ->
+        count = Repo.aggregate(query, :count, :id)
+        {:ok, count}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  # Helper function to apply SCIM sorting
+  defp apply_scim_sort(query, nil, _sort_order), do: query
+
+  defp apply_scim_sort(query, sort_by, sort_order) when is_binary(sort_by) do
+    # Determine resource type from query
+    resource_type =
+      case query.from do
+        %{source: {"users", _}} -> :user
+        %{source: {"groups", _}} -> :group
+        _ -> nil
+      end
+
+    if resource_type do
+      # Map SCIM attribute to Ecto field
+      case AttributeMapper.scim_to_ecto_field(sort_by, resource_type) do
+        {:ok, field_atom} ->
+          direction =
+            case sort_order do
+              "descending" -> :desc
+              _ -> :asc
+            end
+
+          from(r in query, order_by: [{^direction, field(r, ^field_atom)}])
+
+        {:error, _} ->
+          # Invalid sort attribute, ignore sorting
+          query
+      end
+    else
+      query
+    end
+  end
+
+  @doc """
+  Creates a user via SCIM provisioning.
+
+  Sets scim_created_at and scim_updated_at timestamps.
+  Generates a random password if not provided.
+  """
+  def create_user_scim(attrs, organization_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    password = generate_random_password()
+
+    attrs =
+      attrs
+      |> Map.put(:organization_id, organization_id)
+      |> Map.put(:scim_created_at, now)
+      |> Map.put(:scim_updated_at, now)
+      |> Map.put(:password, password)
+      |> Map.put(:password_confirmation, password)
+
+    result =
+      %User{}
+      |> User.registration_changeset(attrs)
+      |> User.apply_scim_timestamps(attrs)
+      |> Repo.insert()
+
+    case result do
+      {:ok, user} ->
+        broadcast_resource_event(user, :created, :user)
+        {:ok, user}
+
+      error ->
+        error
+    end
+  end
+
+  @doc """
+  Updates a user via SCIM provisioning.
+
+  Updates scim_updated_at timestamp.
+  """
+  def update_user_scim(%User{} = user, attrs) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    attrs = Map.put(attrs, :scim_updated_at, now)
+
+    result =
+      user
+      |> User.changeset(attrs)
+      |> User.apply_scim_timestamps(attrs)
+      |> Repo.update()
+
+    case result do
+      {:ok, updated_user} ->
+        # Preload emails for SCIM provisioning
+        user_with_emails = Repo.preload(updated_user, :emails, force: true)
+        broadcast_resource_event(user_with_emails, :updated, :user)
+        {:ok, updated_user}
+
+      error ->
+        error
+    end
+  end
+
+  @doc """
+  Creates a group via SCIM provisioning.
+  """
+  def create_group_scim(attrs, organization_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    attrs =
+      attrs
+      |> Map.put(:organization_id, organization_id)
+      |> Map.put(:scim_created_at, now)
+      |> Map.put(:scim_updated_at, now)
+
+    result =
+      %Group{}
+      |> Group.changeset(attrs)
+      |> Group.apply_scim_timestamps(attrs)
+      |> Repo.insert()
+
+    case result do
+      {:ok, group} ->
+        broadcast_resource_event(group, :created, :group)
+        {:ok, group}
+
+      error ->
+        error
+    end
+  end
+
+  @doc """
+  Updates a group via SCIM provisioning.
+  """
+  def update_group_scim(%Group{} = group, attrs) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    attrs = Map.put(attrs, :scim_updated_at, now)
+
+    result =
+      group
+      |> Group.changeset(attrs)
+      |> Group.apply_scim_timestamps(attrs)
+      |> Repo.update()
+
+    case result do
+      {:ok, updated_group} ->
+        broadcast_resource_event(updated_group, :updated, :group)
+        {:ok, updated_group}
+
+      error ->
+        error
+    end
+  end
+
+  @doc """
+  Applies SCIM PATCH operations to a group.
+
+  This is a placeholder for Phase 6 implementation.
+  SCIM PATCH operations for groups (especially members array management)
+  will be implemented when the SCIM Groups controller is built.
+
+  ## Parameters
+    * `group` - The group to patch
+    * `patch_ops` - List of SCIM patch operations
+  """
+  def patch_group_scim(%Group{} = _group, _patch_ops) do
+    {:error, :not_implemented}
+  end
+
+  # Private helper function to generate secure random password
+  defp generate_random_password do
+    # Generate a 24-character random password that meets complexity requirements
+    # Includes uppercase, lowercase, digits, and special characters
+    upper = Enum.take_random(?A..?Z, 6) |> List.to_string()
+    lower = Enum.take_random(?a..?z, 6) |> List.to_string()
+    digits = Enum.take_random(?0..?9, 6) |> List.to_string()
+    special = Enum.take_random(~c"!@#$%^&*", 6) |> List.to_string()
+
+    (upper <> lower <> digits <> special)
+    |> String.graphemes()
+    |> Enum.shuffle()
+    |> Enum.join()
+  end
+
+  # Private helper function to broadcast resource events for SCIM provisioning
+  defp broadcast_resource_event(resource, event, resource_type)
+       when event in [:created, :updated, :deleted] and
+              resource_type in [:user, :group] do
+    org_id = resource.organization_id
+
+    Phoenix.PubSub.broadcast(
+      Authify.PubSub,
+      "scim_provisioning:org_#{org_id}",
+      {event, resource_type, resource}
+    )
+
+    :ok
+  rescue
+    _ -> :ok
   end
 end

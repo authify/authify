@@ -47,6 +47,14 @@ defmodule AuthifyWeb.Router do
     plug AuthifyWeb.Auth.APIAuth
   end
 
+  pipeline :scim do
+    plug :accepts, ["json", "scim+json"]
+    plug AuthifyWeb.Plugs.RateLimiter, :scim_rate_limit
+    plug AuthifyWeb.Auth.APIAuth
+    plug AuthifyWeb.Plugs.ScimFeatureToggle
+    plug AuthifyWeb.Plugs.SCIMETagValidation
+  end
+
   pipeline :oauth do
     plug :accepts, ["html", "json"]
     plug :fetch_session
@@ -160,6 +168,13 @@ defmodule AuthifyWeb.Router do
     post "/profile/personal-access-tokens", ProfileController, :create_personal_access_token
     delete "/profile/personal-access-tokens/:id", ProfileController, :delete_personal_access_token
 
+    # Email management
+    get "/profile/emails", ProfileController, :emails
+    post "/profile/emails", ProfileController, :add_email
+    delete "/profile/emails/:id", ProfileController, :delete_email
+    post "/profile/emails/:id/set-primary", ProfileController, :set_primary_email
+    post "/profile/emails/:id/resend-verification", ProfileController, :resend_email_verification
+
     # MFA setup and management
     get "/profile/mfa", MfaController, :show
     get "/profile/mfa/setup", MfaController, :setup
@@ -236,6 +251,12 @@ defmodule AuthifyWeb.Router do
     delete "/groups/:id/users/:user_id", GroupController, :remove_user
     post "/groups/:id/applications", GroupController, :add_application
     delete "/groups/:id/applications/:member_id", GroupController, :remove_application
+
+    # SCIM Clients (outbound provisioning)
+    resources "/scim_clients", ScimClientsController
+    get "/scim_clients/:id/logs", ScimClientsController, :logs
+    post "/scim_clients/:id/test_connection", ScimClientsController, :test_connection
+    post "/scim_clients/:id/sync", ScimClientsController, :manual_sync
   end
 
   # Super admin only routes - require global admin privileges
@@ -336,6 +357,15 @@ defmodule AuthifyWeb.Router do
     patch "/certificates/:id/deactivate", CertificatesController, :deactivate
     get "/certificates/:id/download/:type", CertificatesController, :download
 
+    # SCIM Client Management (Outbound Provisioning)
+    get "/scim-clients", ScimClientsController, :index
+    post "/scim-clients", ScimClientsController, :create
+    get "/scim-clients/:id", ScimClientsController, :show
+    put "/scim-clients/:id", ScimClientsController, :update
+    delete "/scim-clients/:id", ScimClientsController, :delete
+    post "/scim-clients/:scim_client_id/sync", ScimClientsController, :trigger_sync
+    get "/scim-clients/:scim_client_id/logs", ScimClientsController, :logs
+
     # Group Management
     get "/groups", GroupsController, :index
     post "/groups", GroupsController, :create
@@ -355,6 +385,43 @@ defmodule AuthifyWeb.Router do
     # Audit Logs (read-only)
     get "/audit-logs", AuditLogsController, :index
     get "/audit-logs/:id", AuditLogsController, :show
+  end
+
+  # SCIM 2.0 endpoints for user provisioning (organization-scoped, RFC 7644)
+  scope "/:org_slug/scim/v2", AuthifyWeb.SCIM do
+    pipe_through [:organization, :scim]
+
+    # Discovery endpoints
+    get "/ServiceProviderConfig", ServiceProviderConfigController, :show
+    get "/ResourceTypes", ResourceTypesController, :index
+    get "/ResourceTypes/:id", ResourceTypesController, :show
+    get "/Schemas", SchemasController, :index
+    get "/Schemas/:id", SchemasController, :show
+
+    # Bulk operations endpoint (RFC 7644 Section 3.7)
+    post "/Bulk", BulkController, :create
+
+    # /Me endpoint for authenticated user self-service (RFC 7644 Section 3.11)
+    # Note: DELETE not supported - users cannot self-deactivate per security policy
+    get "/Me", MeController, :show
+    put "/Me", MeController, :update
+    patch "/Me", MeController, :patch
+
+    # Users resource endpoints (Phase 5)
+    get "/Users", UsersController, :index
+    post "/Users", UsersController, :create
+    get "/Users/:id", UsersController, :show
+    put "/Users/:id", UsersController, :update
+    patch "/Users/:id", UsersController, :patch
+    delete "/Users/:id", UsersController, :delete
+
+    # Groups resource endpoints
+    get "/Groups", GroupsController, :index
+    post "/Groups", GroupsController, :create
+    get "/Groups/:id", GroupsController, :show
+    put "/Groups/:id", GroupsController, :update
+    patch "/Groups/:id", GroupsController, :patch
+    delete "/Groups/:id", GroupsController, :delete
   end
 
   # OIDC Discovery endpoint (organization-scoped, RFC-compliant)

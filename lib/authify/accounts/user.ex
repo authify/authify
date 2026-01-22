@@ -11,7 +11,8 @@ defmodule Authify.Accounts.User do
   alias Authify.Accounts.{
     Group,
     GroupMembership,
-    Organization
+    Organization,
+    UserEmail
   }
 
   @derive {Jason.Encoder,
@@ -19,21 +20,21 @@ defmodule Authify.Accounts.User do
              :organization,
              :group_memberships,
              :groups,
+             :emails,
              :hashed_password,
              :password_reset_token,
              :password_reset_expires_at,
-             :email_verification_token,
-             :email_verification_expires_at,
              :password,
              :password_confirmation,
              :totp_secret,
              :totp_backup_codes,
+             :scim_created_at,
+             :scim_updated_at,
              :__meta__
            ]}
 
   @type t :: %__MODULE__{
           id: integer(),
-          email: String.t(),
           hashed_password: String.t(),
           first_name: String.t() | nil,
           last_name: String.t() | nil,
@@ -41,24 +42,19 @@ defmodule Authify.Accounts.User do
           organization_id: integer() | nil,
           role: String.t(),
           active: boolean(),
-          email_confirmed_at: DateTime.t() | nil,
           organization: Organization.t(),
+          emails: [UserEmail.t()],
           inserted_at: DateTime.t(),
           updated_at: DateTime.t()
         }
 
   schema "users" do
-    field :email, :string
     field :hashed_password, :string
     field :first_name, :string
     field :last_name, :string
     field :username, :string
     field :role, :string, default: "user"
     field :active, :boolean, default: true
-    field :email_confirmed_at, :utc_datetime
-    field :email_verification_token, :string
-    field :plaintext_verification_token, :string, virtual: true
-    field :email_verification_expires_at, :utc_datetime
     field :password_reset_token, :string
     field :plaintext_reset_token, :string, virtual: true
     field :password_reset_expires_at, :utc_datetime
@@ -72,15 +68,20 @@ defmodule Authify.Accounts.User do
     field :totp_backup_codes, :string
     field :totp_backup_codes_generated_at, :utc_datetime
 
+    # SCIM provisioning fields
+    field :external_id, :string
+    field :scim_created_at, :utc_datetime
+    field :scim_updated_at, :utc_datetime
+
     belongs_to :organization, Organization
 
+    has_many :emails, UserEmail, on_delete: :delete_all
     has_many :group_memberships, GroupMembership, on_delete: :delete_all
     many_to_many :groups, Group, join_through: GroupMembership
 
     timestamps(type: :utc_datetime)
   end
 
-  @required_fields [:email]
   @optional_fields [
     :first_name,
     :last_name,
@@ -88,30 +89,48 @@ defmodule Authify.Accounts.User do
     :organization_id,
     :role,
     :active,
-    :email_confirmed_at,
-    :theme_preference
+    :theme_preference,
+    :external_id
   ]
   @password_fields [:password, :password_confirmation]
 
   @doc false
   def changeset(user, attrs) do
     user
-    |> cast(attrs, @required_fields ++ @optional_fields ++ @password_fields)
-    |> validate_required(@required_fields)
-    |> validate_email()
+    |> cast(attrs, @optional_fields ++ @password_fields)
     |> validate_username()
     |> validate_role()
     |> validate_password()
     |> validate_theme_preference()
+    |> validate_external_id()
     |> foreign_key_constraint(:organization_id, name: "users_organization_id_fkey")
   end
 
-  @doc false
+  @doc """
+  Changeset for user registration with email.
+
+  Requires at least one email address with primary=true.
+  """
   def registration_changeset(user, attrs) do
     user
     |> changeset(attrs)
+    |> cast_assoc(:emails, required: true, with: &UserEmail.nested_changeset/2)
+    |> validate_has_primary_email()
     |> validate_required([:password])
     |> put_password_hash()
+  end
+
+  @doc """
+  Changeset for updating user emails.
+
+  Ensures user always has exactly one primary email.
+  """
+  def email_changeset(user, attrs) do
+    user
+    |> cast(attrs, [])
+    |> cast_assoc(:emails, with: &UserEmail.nested_changeset/2)
+    |> validate_has_primary_email()
+    |> validate_has_at_least_one_email()
   end
 
   @doc false
@@ -122,11 +141,114 @@ defmodule Authify.Accounts.User do
     |> put_password_hash()
   end
 
-  defp validate_email(changeset) do
-    changeset
-    |> validate_format(:email, ~r/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)
-    |> validate_length(:email, max: 255)
-    |> unique_constraint(:email, message: "email already exists")
+  @doc """
+  Returns the primary email for a user.
+
+  Raises if user has no primary email (should never happen with proper validation).
+  Automatically preloads emails if not already loaded.
+  """
+  def get_primary_email(%__MODULE__{emails: emails}) when is_list(emails) do
+    case Enum.find(emails, & &1.primary) do
+      nil -> raise "User has no primary email"
+      email -> email
+    end
+  end
+
+  def get_primary_email(%__MODULE__{} = user) do
+    # Emails not loaded, we need to query directly
+    import Ecto.Query
+
+    case Authify.Repo.one(
+           from e in UserEmail,
+             where: e.user_id == ^user.id and e.primary == true
+         ) do
+      nil -> raise "User has no primary email"
+      email -> email
+    end
+  end
+
+  @doc """
+  Returns the primary email value (string) for a user.
+  """
+  def get_primary_email_value(user) do
+    get_primary_email(user).value
+  end
+
+  @doc """
+  Checks if a user's primary email is verified.
+  """
+  def primary_email_verified?(%__MODULE__{} = user) do
+    primary = get_primary_email(user)
+    not is_nil(primary.verified_at)
+  end
+
+  # Validates that user has at least one email marked as primary
+  defp validate_has_primary_email(changeset) do
+    case get_change(changeset, :emails) do
+      nil ->
+        # No changes to emails, check existing
+        case changeset.data do
+          %{emails: %Ecto.Association.NotLoaded{}} ->
+            # Emails not loaded, can't validate
+            changeset
+
+          %{emails: emails} when is_list(emails) ->
+            if Enum.any?(emails, & &1.primary) do
+              changeset
+            else
+              add_error(changeset, :emails, "must have exactly one primary email")
+            end
+
+          _ ->
+            changeset
+        end
+
+      emails ->
+        # Changes to emails, validate changesets
+        primary_count =
+          Enum.count(emails, fn email_changeset ->
+            case email_changeset do
+              %Ecto.Changeset{} -> get_field(email_changeset, :primary) == true
+              %UserEmail{} -> email_changeset.primary == true
+              _ -> false
+            end
+          end)
+
+        cond do
+          primary_count == 0 ->
+            add_error(changeset, :emails, "must have exactly one primary email")
+
+          primary_count > 1 ->
+            add_error(changeset, :emails, "can only have one primary email")
+
+          true ->
+            changeset
+        end
+    end
+  end
+
+  # Validates that user has at least one email
+  defp validate_has_at_least_one_email(changeset) do
+    case get_change(changeset, :emails) do
+      nil ->
+        changeset
+
+      emails ->
+        # Filter out emails marked for deletion
+        active_emails =
+          Enum.reject(emails, fn email_changeset ->
+            case email_changeset do
+              %Ecto.Changeset{} -> get_change(email_changeset, :action) == :delete
+              _ -> false
+            end
+          end)
+
+        if Enum.empty?(active_emails) do
+          add_error(changeset, :emails, "must have at least one email address")
+        else
+          changeset
+        end
+    end
   end
 
   defp validate_username(changeset) do
@@ -147,6 +269,38 @@ defmodule Authify.Accounts.User do
 
   defp validate_theme_preference(changeset) do
     validate_inclusion(changeset, :theme_preference, ["auto", "light", "dark"])
+  end
+
+  defp validate_external_id(changeset) do
+    changeset
+    |> validate_length(:external_id, max: 255)
+    |> validate_format(:external_id, ~r/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/,
+      message:
+        "must start with alphanumeric character and can contain letters, numbers, dots, hyphens, and underscores"
+    )
+    |> validate_external_id_immutability()
+    |> unique_constraint([:external_id, :organization_id],
+      message: "external_id already exists in this organization"
+    )
+  end
+
+  # Ensure external_id cannot be changed once set
+  defp validate_external_id_immutability(changeset) do
+    case {get_field(changeset, :id), get_change(changeset, :external_id)} do
+      {id, new_external_id} when not is_nil(id) and not is_nil(new_external_id) ->
+        # This is an update (user has an id)
+        old_external_id = changeset.data.external_id
+
+        if old_external_id && old_external_id != new_external_id do
+          add_error(changeset, :external_id, "cannot be changed once set")
+        else
+          changeset
+        end
+
+      _ ->
+        # This is a new user or external_id is not being changed
+        changeset
+    end
   end
 
   defp validate_password(%Ecto.Changeset{valid?: false} = changeset), do: changeset
@@ -260,6 +414,18 @@ defmodule Authify.Accounts.User do
   end
 
   defp put_password_hash(changeset), do: changeset
+
+  def apply_scim_timestamps(changeset, attrs \\ %{}) do
+    changeset
+    |> allow_scim_field(:scim_created_at, Map.get(attrs, :scim_created_at))
+    |> allow_scim_field(:scim_updated_at, Map.get(attrs, :scim_updated_at))
+  end
+
+  defp allow_scim_field(changeset, _field, nil), do: changeset
+
+  defp allow_scim_field(changeset, field, value) do
+    Ecto.Changeset.put_change(changeset, field, value)
+  end
 
   @doc """
   Verifies the password.
@@ -476,73 +642,6 @@ defmodule Authify.Accounts.User do
   end
 
   def verify_password_reset_token(_, _), do: false
-
-  @doc """
-  Generates a secure email verification token.
-  """
-  def generate_email_verification_token do
-    :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
-  end
-
-  @doc """
-  Returns a changeset for email verification token generation.
-  """
-  def email_verification_changeset(%__MODULE__{} = user) do
-    plaintext_token = generate_email_verification_token()
-    token_hash = hash_email_verification_token(plaintext_token)
-    # 24 hours
-    expires_at =
-      DateTime.utc_now() |> DateTime.add(24 * 60 * 60, :second) |> DateTime.truncate(:second)
-
-    user
-    |> Ecto.Changeset.change(%{
-      email_verification_token: token_hash,
-      plaintext_verification_token: plaintext_token,
-      email_verification_expires_at: expires_at
-    })
-  end
-
-  @doc """
-  Returns a changeset for email verification completion.
-  """
-  def email_verification_completion_changeset(%__MODULE__{} = user) do
-    user
-    |> Ecto.Changeset.change(%{
-      email_verification_token: nil,
-      email_verification_expires_at: nil,
-      email_confirmed_at: DateTime.utc_now() |> DateTime.truncate(:second)
-    })
-  end
-
-  @doc """
-  Checks if an email verification token is valid and not expired.
-  """
-  def valid_email_verification_token?(%__MODULE__{} = user) do
-    user.email_verification_token != nil and
-      user.email_verification_expires_at != nil and
-      DateTime.compare(DateTime.utc_now(), user.email_verification_expires_at) == :lt
-  end
-
-  @doc """
-  Hashes an email verification token for secure storage.
-  Uses SHA-256 for fast hashing (tokens are already random and long).
-  """
-  def hash_email_verification_token(token) when is_binary(token) do
-    :crypto.hash(:sha256, token)
-    |> Base.encode64()
-  end
-
-  @doc """
-  Verifies a plaintext verification token against a stored hash.
-  Returns true if the token matches, false otherwise.
-  """
-  def verify_email_verification_token(plaintext_token, token_hash)
-      when is_binary(plaintext_token) and is_binary(token_hash) do
-    computed_hash = hash_email_verification_token(plaintext_token)
-    Plug.Crypto.secure_compare(computed_hash, token_hash)
-  end
-
-  def verify_email_verification_token(_, _), do: false
 
   # TOTP MFA Helper Functions
 

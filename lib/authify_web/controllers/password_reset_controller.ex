@@ -23,7 +23,8 @@ defmodule AuthifyWeb.PasswordResetController do
             case Authify.Email.send_password_reset_email(user_with_org, reset_url) do
               {:ok, _metadata} ->
                 require Logger
-                Logger.info("Password reset email sent to #{user.email}")
+                primary_email = Authify.Accounts.User.get_primary_email_value(user_with_org)
+                Logger.info("Password reset email sent to #{primary_email}")
 
               {:error, :smtp_not_configured} ->
                 require Logger

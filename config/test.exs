@@ -55,3 +55,6 @@ config :authify, :rate_limiting_enabled, false
 
 # Disable metrics in test environment
 config :authify, :metrics_enabled, false
+
+# Run SCIM provisioning synchronously in tests to avoid race conditions and sleeps
+config :authify, :sync_provisioning_in_tests, true

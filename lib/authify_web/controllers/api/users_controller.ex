@@ -2,6 +2,7 @@ defmodule AuthifyWeb.API.UsersController do
   use AuthifyWeb.API.BaseController
 
   alias Authify.Accounts
+  alias Authify.Accounts.User
   alias AuthifyWeb.Helpers.AuditHelper
 
   @doc """
@@ -22,7 +23,7 @@ defmodule AuthifyWeb.API.UsersController do
 
         render_collection_response(conn, users,
           resource_type: "user",
-          exclude: [:password_hash, :email_verified_at, :password_reset_token],
+          exclude: [:password_hash, :password_reset_token],
           page_info: %{
             page: page,
             per_page: per_page,
@@ -58,7 +59,7 @@ defmodule AuthifyWeb.API.UsersController do
           user ->
             render_api_response(conn, user,
               resource_type: "user",
-              exclude: [:password_hash, :email_verified_at, :password_reset_token]
+              exclude: [:password_hash, :password_reset_token]
             )
         end
 
@@ -77,15 +78,19 @@ defmodule AuthifyWeb.API.UsersController do
     case ensure_scope(conn, "users:write") do
       :ok ->
         organization = conn.assigns.current_organization
-        user_params_with_org = Map.put(user_params, "organization_id", organization.id)
 
-        case Accounts.create_user(user_params_with_org) do
+        user_attrs =
+          user_params
+          |> normalize_api_email_params()
+          |> Map.put("organization_id", organization.id)
+
+        case Accounts.create_user(user_attrs) do
           {:ok, user} ->
             AuditHelper.log_user_created(conn, user, extra_metadata: %{"source" => "api"})
 
             render_api_response(conn, user,
               resource_type: "user",
-              exclude: [:password_hash, :email_verified_at, :password_reset_token],
+              exclude: [:password_hash, :password_reset_token],
               status: :created
             )
 
@@ -134,7 +139,9 @@ defmodule AuthifyWeb.API.UsersController do
             )
 
           user ->
-            case Accounts.update_user(user, user_params) do
+            normalized_params = normalize_api_email_params(user_params)
+
+            case Accounts.update_user(user, normalized_params) do
               {:ok, updated_user} ->
                 AuditHelper.log_user_profile_update(conn, user, updated_user,
                   extra_metadata: %{"source" => "api", "admin_update" => true}
@@ -142,7 +149,7 @@ defmodule AuthifyWeb.API.UsersController do
 
                 render_api_response(conn, updated_user,
                   resource_type: "user",
-                  exclude: [:password_hash, :email_verified_at, :password_reset_token]
+                  exclude: [:password_hash, :password_reset_token]
                 )
 
               {:error, %Ecto.Changeset{} = changeset} ->
@@ -205,6 +212,9 @@ defmodule AuthifyWeb.API.UsersController do
                 "You cannot delete your own account"
               )
             else
+              # Preload emails for audit logging
+              user = Authify.Repo.preload(user, :emails)
+
               case Accounts.delete_user(user) do
                 {:ok, deleted_user} ->
                   AuditHelper.log_user_deleted(conn, deleted_user,
@@ -256,7 +266,7 @@ defmodule AuthifyWeb.API.UsersController do
 
                   render_api_response(conn, updated_user,
                     resource_type: "user",
-                    exclude: [:password_hash, :email_verified_at, :password_reset_token]
+                    exclude: [:password_hash, :password_reset_token]
                   )
 
                 {:error, changeset} ->
@@ -290,6 +300,23 @@ defmodule AuthifyWeb.API.UsersController do
 
       {:error, response} ->
         response
+    end
+  end
+
+  defp normalize_api_email_params(params) do
+    case params do
+      %{"email" => email_value} = p when is_binary(email_value) ->
+        p
+        |> Map.delete("email")
+        |> Map.put("emails", [%{"value" => email_value, "primary" => true, "type" => "work"}])
+
+      %{:email => email_value} = p when is_binary(email_value) ->
+        p
+        |> Map.delete(:email)
+        |> Map.put(:emails, [%{"value" => email_value, "primary" => true, "type" => "work"}])
+
+      other ->
+        other
     end
   end
 
@@ -363,7 +390,7 @@ defmodule AuthifyWeb.API.UsersController do
               "user",
               user.id,
               "success",
-              %{"source" => "api", "target_user_email" => user.email}
+              %{"source" => "api", "target_user_email" => User.get_primary_email_value(user)}
             )
 
             json(conn, %{
@@ -416,7 +443,7 @@ defmodule AuthifyWeb.API.UsersController do
               "user",
               user.id,
               "success",
-              %{"source" => "api", "target_user_email" => user.email}
+              %{"source" => "api", "target_user_email" => User.get_primary_email_value(user)}
             )
 
             json(conn, %{

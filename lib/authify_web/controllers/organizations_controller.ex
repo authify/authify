@@ -61,7 +61,7 @@ defmodule AuthifyWeb.OrganizationsController do
     target_organization = Accounts.get_organization!(id)
 
     # Get organization stats
-    users = Accounts.list_users(target_organization.id)
+    users = Accounts.list_users(target_organization.id) |> Authify.Repo.preload(:emails)
     invitations = Accounts.list_invitations(target_organization.id)
 
     render(conn, :show,

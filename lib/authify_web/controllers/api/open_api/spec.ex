@@ -104,6 +104,10 @@ defmodule AuthifyWeb.API.OpenAPI.Spec do
         description: "SAML 2.0 service provider configuration"
       },
       %{
+        name: "SCIM Clients",
+        description: "SCIM 2.0 client management for outbound user and group provisioning"
+      },
+      %{
         name: "Audit Logs",
         description: "Organization audit log access and filtering"
       },

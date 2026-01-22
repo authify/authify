@@ -393,7 +393,7 @@ defmodule Authify.SAML.XML do
 
   defp get_simple_user_field(%User{} = user, field) do
     case field do
-      "email" -> user.email
+      "email" -> User.get_primary_email_value(user)
       "first_name" -> user.first_name
       "last_name" -> user.last_name
       "username" -> user.username

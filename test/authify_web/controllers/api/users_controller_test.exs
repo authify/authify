@@ -3,6 +3,8 @@ defmodule AuthifyWeb.API.UsersControllerTest do
 
   import Authify.AccountsFixtures
 
+  alias Authify.Accounts.User
+
   setup %{conn: conn} do
     organization = organization_fixture()
     admin_user = user_fixture(organization: organization, role: "admin")
@@ -110,7 +112,7 @@ defmodule AuthifyWeb.API.UsersControllerTest do
 
       assert String.starts_with?(self_link, "/#{organization.slug}/api/users/")
       assert id == to_string(regular_user.id)
-      assert attributes["email"] == regular_user.email
+      assert attributes["primary_email"] == User.get_primary_email_value(regular_user)
     end
 
     test "returns 404 for non-existent user", %{conn: conn, organization: organization} do
@@ -149,7 +151,9 @@ defmodule AuthifyWeb.API.UsersControllerTest do
     test "creates user with valid data", %{conn: conn, organization: organization} do
       user_attrs = %{
         "user" => %{
-          "email" => "newuser@example.com",
+          "emails" => [
+            %{"value" => "newuser@example.com", "primary" => true, "type" => "work"}
+          ],
           "first_name" => "New",
           "last_name" => "User",
           "password" => "SecureP@ssw0rd!",
@@ -166,7 +170,8 @@ defmodule AuthifyWeb.API.UsersControllerTest do
                }
              } = json_response(conn, 201)
 
-      assert attributes["email"] == "newuser@example.com"
+      assert attributes["primary_email"] == "newuser@example.com"
+
       assert attributes["first_name"] == "New"
       assert attributes["last_name"] == "User"
     end
@@ -174,7 +179,9 @@ defmodule AuthifyWeb.API.UsersControllerTest do
     test "returns validation errors for invalid email", %{conn: conn, organization: organization} do
       invalid_attrs = %{
         "user" => %{
-          "email" => "invalid-email",
+          "emails" => [
+            %{"value" => "invalid-email"}
+          ],
           "password" => "short"
         }
       }
@@ -188,7 +195,7 @@ defmodule AuthifyWeb.API.UsersControllerTest do
                }
              } = json_response(conn, 422)
 
-      assert details["email"]
+      assert details["emails"]
       # Note: password validation only runs when email is valid
     end
 
@@ -198,7 +205,9 @@ defmodule AuthifyWeb.API.UsersControllerTest do
     } do
       invalid_attrs = %{
         "user" => %{
-          "email" => "valid@example.com",
+          "emails" => [
+            %{"value" => "valid@example.com", "primary" => true}
+          ],
           "password" => "short"
         }
       }
@@ -223,7 +232,9 @@ defmodule AuthifyWeb.API.UsersControllerTest do
 
       user_attrs = %{
         "user" => %{
-          "email" => "newuser@example.com",
+          "emails" => [
+            %{"value" => "newuser@example.com", "primary" => true}
+          ],
           "first_name" => "New",
           "last_name" => "User",
           "password" => "SecureP@ssw0rd!",

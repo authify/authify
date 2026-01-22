@@ -192,6 +192,18 @@ defmodule AuthifyWeb.NavigationComponents do
                   <i class="bi bi-people-fill"></i> Groups
                 </a>
               </li>
+              <li class="nav-item">
+                <a
+                  class={[
+                    "nav-link",
+                    if(@current_page == "scim_clients", do: "active", else: "")
+                  ]}
+                  aria-current={if @current_page == "scim_clients", do: "page", else: false}
+                  href={"/#{@organization.slug}/scim_clients"}
+                >
+                  <i class="bi bi-arrow-left-right"></i> SCIM Clients
+                </a>
+              </li>
             <% end %>
             <li class="nav-item">
               <a
@@ -214,7 +226,7 @@ defmodule AuthifyWeb.NavigationComponents do
             <br />
             <strong>{Authify.Accounts.User.full_name(@user)}</strong>
             <br />
-            <small class="text-muted">{@user.email}</small>
+            <small class="text-muted">{Authify.Accounts.User.get_primary_email_value(@user)}</small>
           </div>
           <ul class="nav flex-column">
             <%= if Authify.Accounts.User.active_member_of?(@user, @organization.id) do %>
@@ -225,15 +237,6 @@ defmodule AuthifyWeb.NavigationComponents do
                   href={"/#{@organization.slug}/profile"}
                 >
                   <i class="bi bi-person-circle"></i> My Profile
-                </a>
-              </li>
-              <li class="nav-item">
-                <a
-                  class={["nav-link", if(@current_page == "mfa", do: "active", else: "")]}
-                  aria-current={if @current_page == "mfa", do: "page", else: false}
-                  href={"/#{@organization.slug}/profile/mfa"}
-                >
-                  <i class="bi bi-shield-lock"></i> Multi-Factor Auth
                 </a>
               </li>
             <% end %>

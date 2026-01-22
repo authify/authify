@@ -6,8 +6,9 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   certificate lifecycle actions with consistent metadata.
   """
 
-  alias Authify.Accounts.{Invitation, PersonalAccessToken}
+  alias Authify.Accounts.{Invitation, PersonalAccessToken, User}
   alias Authify.AuditLog
+  alias Authify.Repo
   alias Ecto.Changeset
   alias Plug.Conn
 
@@ -23,7 +24,7 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   ))
 
   @sensitive_fields MapSet.new(~w(smtp_password))
-  @user_profile_fields ~w(email first_name last_name username theme_preference)a
+  @user_profile_fields ~w(first_name last_name username theme_preference)a
 
   @doc """
   Logs an audit event using the connection assigns to determine actor metadata.
@@ -45,7 +46,7 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
     attrs =
       case actor_type do
         :user ->
-          user = conn.assigns.current_user
+          user = ensure_user_emails_loaded(conn.assigns.current_user)
 
           Map.merge(base_attrs, %{
             actor_type: "user",
@@ -325,11 +326,13 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs successful password reset completions.
   """
   def log_password_reset_completed(conn, user, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
     conn = assign_actor_from_user(conn, user)
 
     metadata =
       %{
         "user_id" => user.id,
+        "email" => User.get_primary_email_value(user),
         "organization_slug" => user.organization.slug
       }
       |> maybe_merge(opts[:extra_metadata])
@@ -348,11 +351,13 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs failed password reset attempts when the user is known.
   """
   def log_password_reset_failure(conn, user, reason, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
     conn = assign_actor_from_user(conn, user)
 
     metadata =
       %{
         "user_id" => user.id,
+        "email" => User.get_primary_email_value(user),
         "organization_slug" => user.organization.slug,
         "reason" => to_string(reason)
       }
@@ -370,13 +375,91 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   end
 
   @doc """
-  Logs successful email verification resend events.
+  Logs when a user adds a new email address.
   """
-  def log_email_verification_resent(conn, user, opts \\ []) do
+  def log_email_added(conn, user, email, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
-        "email" => user.email,
+        "email_id" => email.id,
+        "email_value" => email.value,
+        "email_type" => email.type,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :email_added,
+      opts[:resource_type] || "user_email",
+      opts[:resource_id] || email.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs when a user deletes an email address.
+  """
+  def log_email_deleted(conn, user, email, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
+    metadata =
+      %{
+        "user_id" => user.id,
+        "email_id" => email.id,
+        "email_value" => email.value,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :email_deleted,
+      opts[:resource_type] || "user_email",
+      opts[:resource_id] || email.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs when a user changes their primary email address.
+  """
+  def log_primary_email_changed(conn, user, email, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
+    metadata =
+      %{
+        "user_id" => user.id,
+        "new_primary_email_id" => email.id,
+        "new_primary_email_value" => email.value,
+        "organization_slug" => conn.assigns.current_organization.slug
+      }
+      |> maybe_merge(opts[:extra_metadata])
+
+    log_event_async(
+      conn,
+      :primary_email_changed,
+      opts[:resource_type] || "user",
+      opts[:resource_id] || user.id,
+      "success",
+      metadata
+    )
+  end
+
+  @doc """
+  Logs successful email verification resend events.
+  """
+  def log_email_verification_resent(conn, user, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
+    metadata =
+      %{
+        "user_id" => user.id,
+        "email" => User.get_primary_email_value(user),
         "organization_slug" => conn.assigns.current_organization.slug
       }
       |> maybe_merge(opts[:extra_metadata])
@@ -395,10 +478,12 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs failed email verification resend attempts.
   """
   def log_email_verification_resend_failure(conn, user, reason, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
-        "email" => user.email,
+        "email" => User.get_primary_email_value(user),
         "organization_slug" => conn.assigns.current_organization.slug,
         "reason" => to_string(reason)
       }
@@ -419,6 +504,9 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs profile updates for the current user, capturing changed fields.
   """
   def log_user_profile_update(conn, old_user, new_user, opts \\ []) do
+    old_user = ensure_user_emails_loaded(old_user)
+    new_user = ensure_user_emails_loaded(new_user)
+
     fields = opts[:fields] || @user_profile_fields
     sensitive_fields = kwargs_to_set(opts[:sensitive_fields], MapSet.new())
 
@@ -446,6 +534,8 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs failed attempts to update a user profile.
   """
   def log_user_profile_failure(conn, user, errors, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
@@ -468,9 +558,12 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs successful password change attempts.
   """
   def log_password_change(conn, user, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
+        "email" => User.get_primary_email_value(user),
         "organization_slug" => conn.assigns.current_organization.slug
       }
       |> maybe_merge(opts[:extra_metadata])
@@ -489,10 +582,12 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs successful user creation events (admin-initiated).
   """
   def log_user_created(conn, user, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
-        "email" => user.email,
+        "email" => User.get_primary_email_value(user),
         "role" => user.role,
         "organization_slug" => conn.assigns.current_organization.slug
       }
@@ -514,10 +609,12 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs successful user deletion events (admin-initiated).
   """
   def log_user_deleted(conn, user, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
-        "email" => user.email,
+        "email" => User.get_primary_email_value(user),
         "role" => user.role,
         "organization_slug" => conn.assigns.current_organization.slug
       }
@@ -539,10 +636,12 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs role assignment/changes for users.
   """
   def log_role_assigned(conn, user, old_role, new_role, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
-        "email" => user.email,
+        "email" => User.get_primary_email_value(user),
         "old_role" => old_role,
         "new_role" => new_role,
         "organization_slug" => conn.assigns.current_organization.slug
@@ -610,6 +709,8 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs failed password change attempts.
   """
   def log_password_change_failure(conn, user, errors, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
@@ -632,9 +733,12 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs successful MFA enablement events.
   """
   def log_mfa_enabled(conn, user, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
+        "email" => User.get_primary_email_value(user),
         "organization_slug" => conn.assigns.current_organization.slug
       }
       |> maybe_merge(opts[:extra_metadata])
@@ -653,9 +757,12 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs successful MFA disablement events.
   """
   def log_mfa_disabled(conn, user, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
+        "email" => User.get_primary_email_value(user),
         "organization_slug" => conn.assigns.current_organization.slug
       }
       |> maybe_merge(opts[:extra_metadata])
@@ -674,9 +781,12 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs successful MFA verification events during login.
   """
   def log_mfa_verified(conn, user, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
+        "email" => User.get_primary_email_value(user),
         "organization_slug" => user.organization.slug
       }
       |> maybe_merge(opts[:extra_metadata])
@@ -695,9 +805,12 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs failed MFA verification attempts during login.
   """
   def log_mfa_failed(conn, user, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
+        "email" => User.get_primary_email_value(user),
         "organization_slug" => user.organization.slug
       }
       |> maybe_merge(opts[:extra_metadata])
@@ -716,9 +829,12 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs backup code regeneration events.
   """
   def log_mfa_backup_codes_regenerated(conn, user, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
+        "email" => User.get_primary_email_value(user),
         "organization_slug" => conn.assigns.current_organization.slug
       }
       |> maybe_merge(opts[:extra_metadata])
@@ -737,9 +853,12 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs trusted device revocation events.
   """
   def log_mfa_device_revoked(conn, user, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
+        "email" => User.get_primary_email_value(user),
         "organization_slug" => conn.assigns.current_organization.slug
       }
       |> maybe_merge(opts[:extra_metadata])
@@ -758,9 +877,12 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   Logs events where all trusted devices are revoked.
   """
   def log_mfa_all_devices_revoked(conn, user, opts \\ []) do
+    user = ensure_user_emails_loaded(user)
+
     metadata =
       %{
         "user_id" => user.id,
+        "email" => User.get_primary_email_value(user),
         "organization_slug" => conn.assigns.current_organization.slug
       }
       |> maybe_merge(opts[:extra_metadata])
@@ -809,7 +931,12 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   end
 
   defp build_user_name(user) do
-    "#{user.first_name} #{user.last_name}"
+    cond do
+      user.first_name && user.last_name -> "#{user.first_name} #{user.last_name}"
+      user.first_name -> user.first_name
+      user.last_name -> user.last_name
+      true -> User.get_primary_email_value(user)
+    end
   end
 
   defp diff_settings(old_settings, new_settings, sensitive_fields) do
@@ -1023,6 +1150,16 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
 
   defp personal_access_token_scopes(_), do: nil
 
+  defp ensure_user_emails_loaded(nil), do: nil
+
+  defp ensure_user_emails_loaded(%User{emails: %Ecto.Association.NotLoaded{}} = user) do
+    Repo.preload(user, :emails)
+  end
+
+  defp ensure_user_emails_loaded(%User{emails: emails} = user) when is_list(emails), do: user
+
+  defp ensure_user_emails_loaded(%User{} = user), do: Repo.preload(user, :emails)
+
   defp ensure_current_organization(conn, nil), do: conn
 
   defp ensure_current_organization(conn, organization) do
@@ -1037,6 +1174,8 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   defp normalize_resend_flag(value), do: to_string(value)
 
   defp assign_actor_from_user(conn, user) do
+    user = ensure_user_emails_loaded(user)
+
     conn
     |> Conn.assign(:actor_type, :user)
     |> Conn.assign(:current_user, user)

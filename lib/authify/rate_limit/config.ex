@@ -52,6 +52,10 @@ defmodule Authify.RateLimit.Config do
     get_limit_for_scope(org, :api_rate_limit, :quota_api_rate_limit)
   end
 
+  def get_limit(org, :scim) do
+    get_limit_for_scope(org, :scim_rate_limit, :quota_scim_rate_limit)
+  end
+
   defp get_limit_for_scope(org, setting_name, quota_name) do
     # Try org-specific limit first
     limit = Configurations.get_organization_setting(org, setting_name)
@@ -101,6 +105,10 @@ defmodule Authify.RateLimit.Config do
     Configurations.get_organization_setting(org, :quota_api_rate_limit)
   end
 
+  def get_quota(org, :scim) do
+    Configurations.get_organization_setting(org, :quota_scim_rate_limit)
+  end
+
   @doc """
   Gets the configured (non-quota) rate limit for an organization and scope.
 
@@ -137,5 +145,9 @@ defmodule Authify.RateLimit.Config do
 
   def get_configured_limit(org, :api) do
     Configurations.get_organization_setting(org, :api_rate_limit)
+  end
+
+  def get_configured_limit(org, :scim) do
+    Configurations.get_organization_setting(org, :scim_rate_limit)
   end
 end

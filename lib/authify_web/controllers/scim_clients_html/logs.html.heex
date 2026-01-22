@@ -1,0 +1,131 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@current_user}
+      organization={@current_organization}
+      current_page="scim_clients"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Sync Logs: {@scim_client.name}</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <a
+          href={~p"/#{@current_organization.slug}/scim_clients/#{@scim_client}"}
+          class="btn btn-sm btn-outline-secondary"
+        >
+          <i class="bi bi-arrow-left"></i> Back to Client
+        </a>
+      </div>
+    </div>
+
+    <%= if @sync_logs == [] do %>
+      <div class="card">
+        <div class="card-body text-center py-5 text-muted">
+          <i class="bi bi-clock-history display-4"></i>
+          <h5 class="mt-3">No sync logs yet</h5>
+          <p>Sync logs will appear here when provisioning events occur.</p>
+        </div>
+      </div>
+    <% else %>
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0">Sync History</h5>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Operation</th>
+                <th>Resource</th>
+                <th>Status</th>
+                <th>HTTP</th>
+                <th>Retries</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              <%= for log <- @sync_logs do %>
+                <tr>
+                  <td>
+                    <small>{Calendar.strftime(log.inserted_at, "%Y-%m-%d %H:%M:%S")}</small>
+                  </td>
+                  <td>
+                    <span class="badge bg-primary">{String.upcase(log.operation)}</span>
+                  </td>
+                  <td>
+                    {log.resource_type} #{log.resource_id}
+                  </td>
+                  <td>
+                    <%= if log.status == "success" do %>
+                      <span class="badge bg-success">Success</span>
+                    <% else %>
+                      <%= if log.status == "failed" do %>
+                        <span class="badge bg-danger">Failed</span>
+                      <% else %>
+                        <span class="badge bg-secondary">Pending</span>
+                      <% end %>
+                    <% end %>
+                  </td>
+                  <td>
+                    <%= if log.http_status do %>
+                      <code>{log.http_status}</code>
+                    <% else %>
+                      -
+                    <% end %>
+                  </td>
+                  <td>
+                    {log.retry_count}/{if log.next_retry_at, do: "5", else: "-"}
+                  </td>
+                  <td>
+                    <%= if log.error_message do %>
+                      <small class="text-danger">{String.slice(log.error_message, 0..50)}</small>
+                    <% else %>
+                      -
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+        <%= if @total > @per_page do %>
+          <div class="card-footer">
+            <nav>
+              <ul class="pagination pagination-sm mb-0">
+                <%= if @page > 1 do %>
+                  <li class="page-item">
+                    <a
+                      class="page-link"
+                      href={
+                        ~p"/#{@current_organization.slug}/scim_clients/#{@scim_client}/logs?page=#{@page - 1}"
+                      }
+                    >
+                      Previous
+                    </a>
+                  </li>
+                <% end %>
+                <li class="page-item active">
+                  <span class="page-link">Page {@page}</span>
+                </li>
+                <%= if @page * @per_page < @total do %>
+                  <li class="page-item">
+                    <a
+                      class="page-link"
+                      href={
+                        ~p"/#{@current_organization.slug}/scim_clients/#{@scim_client}/logs?page=#{@page + 1}"
+                      }
+                    >
+                      Next
+                    </a>
+                  </li>
+                <% end %>
+              </ul>
+            </nav>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </:main>
+</.two_column_layout>

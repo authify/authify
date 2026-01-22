@@ -12,6 +12,8 @@ defmodule AuthifyWeb.SAMLRealWorldFlowsTest do
   import Authify.AccountsFixtures
   import Authify.SAMLFixtures
 
+  alias Authify.Accounts.User
+
   describe "Complete SAML SSO to SLO flow" do
     test "user can SSO to multiple SPs and perform global SLO" do
       # Step 1: Create organization with admin and user
@@ -226,7 +228,7 @@ defmodule AuthifyWeb.SAMLRealWorldFlowsTest do
 
       # Verify user data is available for assertion generation
       session_user = Authify.Accounts.get_user!(session.user_id)
-      assert session_user.email == "john.doe@example.com"
+      assert User.get_primary_email_value(session_user) == "john.doe@example.com"
       assert session_user.first_name == "John"
       assert session_user.last_name == "Doe"
     end

@@ -1,0 +1,211 @@
+defmodule AuthifyWeb.SCIM.BaseController do
+  @moduledoc """
+  Base controller for SCIM 2.0 endpoints.
+
+  Provides common functionality for rendering SCIM responses with proper
+  content types and error handling per RFC 7644.
+  """
+
+  import Plug.Conn
+  import Phoenix.Controller
+
+  alias Authify.SCIM.ResourceFormatter
+
+  @scim_content_type "application/scim+json"
+
+  @doc """
+  Renders a single SCIM resource.
+
+  ## Parameters
+    - conn: Plug connection
+    - resource: Formatted SCIM resource map
+    - opts: Optional keyword list
+      - :status - HTTP status code (default: 200)
+      - :resource_struct - The original resource struct for ETag generation
+
+  ## Examples
+      render_scim_resource(conn, user_resource)
+      render_scim_resource(conn, user_resource, status: 201)
+      render_scim_resource(conn, user_resource, status: 200, resource_struct: user)
+  """
+  def render_scim_resource(conn, resource, opts \\ []) do
+    status = Keyword.get(opts, :status, 200)
+
+    # Add ETag header if resource struct provided
+    conn =
+      case Keyword.get(opts, :resource_struct) do
+        nil ->
+          conn
+
+        resource_struct ->
+          etag = Authify.SCIM.Version.generate_etag(resource_struct)
+          put_resp_header(conn, "etag", etag)
+      end
+
+    conn
+    |> put_resp_content_type(@scim_content_type)
+    |> put_status(status)
+    |> json(resource)
+  end
+
+  @doc """
+  Renders a SCIM ListResponse.
+
+  ## Parameters
+    - conn: Plug connection
+    - resources: List of formatted SCIM resources
+    - total: Total number of resources matching the query
+    - start_index: 1-based index of first result (SCIM spec)
+    - per_page: Number of resources per page
+    - resource_type: :user or :group (for HATEOAS links)
+
+  ## Examples
+      render_scim_list(conn, users, 100, 1, 25, :user)
+  """
+  def render_scim_list(conn, resources, total, start_index, per_page, _resource_type) do
+    response = ResourceFormatter.format_list_response(resources, total, start_index, per_page)
+
+    conn
+    |> put_resp_content_type(@scim_content_type)
+    |> put_status(200)
+    |> json(response)
+  end
+
+  @doc """
+  Renders a SCIM error response.
+
+  ## Parameters
+    - conn: Plug connection
+    - status: HTTP status code
+    - scim_type: SCIM error type atom or string
+    - detail: Human-readable error message
+
+  ## SCIM Error Types
+    - :invalid_filter - The specified filter syntax is invalid
+    - :too_many - Too many results to return
+    - :uniqueness - One or more attribute values are not unique
+    - :mutability - Attempted to modify an immutable attribute
+    - :invalid_syntax - Request body syntax is invalid
+    - :invalid_path - Path attribute in PATCH is invalid
+    - :no_target - Specified path does not exist
+    - :invalid_value - Attribute value is invalid
+    - :invalid_vers - Specified API version is not supported
+    - :sensitive - Requested operation contains sensitive data
+
+  ## Examples
+      render_scim_error(conn, 400, :invalid_filter, "Invalid filter syntax")
+      render_scim_error(conn, 404, :no_target, "User not found")
+      render_scim_error(conn, 409, :uniqueness, "User already exists")
+  """
+  def render_scim_error(conn, status, scim_type, detail) do
+    scim_type_string = normalize_scim_type(scim_type)
+
+    error = ResourceFormatter.format_error(status, scim_type_string, detail)
+
+    conn
+    |> put_resp_content_type(@scim_content_type)
+    |> put_status(status)
+    |> json(error)
+  end
+
+  @doc """
+  Ensures the request has the required SCIM OAuth scope.
+
+  Uses the same scope checking pattern as APIAuth for consistency.
+
+  ## Parameters
+    - conn: Plug connection
+    - required_scope: Scope string (e.g., "scim:read", "scim:users:write")
+
+  ## Returns
+    - {:ok, conn} if authorized
+    - {:error, :unauthorized} if not authorized
+
+  ## Examples
+      case ensure_scim_scope(conn, "scim:users:read") do
+        {:ok, conn} -> # continue
+        {:error, :unauthorized} -> render_scim_error(conn, 403, :sensitive, "Insufficient scope")
+      end
+  """
+  def ensure_scim_scope(conn, required_scope) do
+    scopes = conn.assigns[:current_scopes] || []
+
+    if has_scope?(scopes, required_scope) do
+      {:ok, conn}
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  # Private functions
+
+  defp normalize_scim_type(type) when is_atom(type) do
+    type
+    |> Atom.to_string()
+    |> Macro.camelize()
+    |> then(&(String.downcase(String.first(&1)) <> String.slice(&1, 1..-1//1)))
+  end
+
+  defp normalize_scim_type(type) when is_binary(type), do: type
+
+  # Scope checking - mirrors APIAuth.scope_matches?/2
+  defp has_scope?(scopes, required_scope) do
+    Enum.any?(scopes, fn scope ->
+      scope_matches?(scope, required_scope)
+    end)
+  end
+
+  defp scope_matches?(user_scope, required_scope) do
+    user_scope == required_scope or
+      write_includes_read?(user_scope, required_scope) or
+      me_scope_included?(user_scope, required_scope) or
+      users_scope_includes_me?(user_scope, required_scope) or
+      broad_scope_matches?(user_scope, required_scope)
+  end
+
+  # Write includes read at same level (scim:users:write includes scim:users:read)
+  defp write_includes_read?(user_scope, required_scope) do
+    String.ends_with?(user_scope, ":write") and
+      String.replace_suffix(user_scope, ":write", ":read") == required_scope
+  end
+
+  # scim:me:write includes scim:me
+  defp me_scope_included?(user_scope, required_scope) do
+    user_scope == "scim:me:write" and required_scope == "scim:me"
+  end
+
+  # scim:users:* includes scim:me:* (user scopes include self-service)
+  defp users_scope_includes_me?(user_scope, required_scope) do
+    (user_scope == "scim:users:read" and required_scope == "scim:me") or
+      (user_scope == "scim:users:write" and
+         (required_scope == "scim:me" or required_scope == "scim:me:write"))
+  end
+
+  # Broad scopes (scim:read, scim:write) include specific scopes
+  defp broad_scope_matches?(user_scope, required_scope) do
+    scim_read_matches?(user_scope, required_scope) or
+      scim_write_matches?(user_scope, required_scope)
+  end
+
+  # scim:read includes scim:users:read, scim:groups:read, scim:me
+  defp scim_read_matches?(user_scope, required_scope) do
+    user_scope == "scim:read" and
+      String.starts_with?(required_scope, "scim:") and
+      (String.ends_with?(required_scope, ":read") or required_scope == "scim:me")
+  end
+
+  # scim:write includes all scim:*:write scopes
+  defp scim_write_matches?(user_scope, required_scope) do
+    user_scope == "scim:write" and
+      String.starts_with?(required_scope, "scim:") and
+      String.ends_with?(required_scope, ":write")
+  end
+
+  @doc false
+  defmacro __using__(_opts) do
+    quote do
+      use AuthifyWeb, :controller
+      import AuthifyWeb.SCIM.BaseController
+    end
+  end
+end

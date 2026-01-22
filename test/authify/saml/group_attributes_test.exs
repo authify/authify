@@ -17,13 +17,13 @@ defmodule Authify.SAML.GroupAttributesTest do
       # Create user with username
       {:ok, user} =
         Accounts.create_user(%{
-          email: "user@example.com",
-          password: "SecurePassword123!",
-          first_name: "John",
-          last_name: "Doe",
-          username: "johndoe",
-          organization_id: org.id,
-          role: "user"
+          "emails" => [%{"value" => "user@example.com", "type" => "work", "primary" => true}],
+          "password" => "SecurePassword123!",
+          "first_name" => "John",
+          "last_name" => "Doe",
+          "username" => "johndoe",
+          "organization_id" => org.id,
+          "role" => "user"
         })
 
       # Create groups

@@ -97,27 +97,6 @@
               </div>
 
               <div class="mb-3">
-                <label for="user_email" class="form-label">Email Address</label>
-                <input
-                  type="email"
-                  name="user[email]"
-                  id="user_email"
-                  class="form-control"
-                  value={
-                    Map.get(@changeset.changes, :email) ||
-                      Map.get(@changeset.data, :email) || ""
-                  }
-                  required
-                />
-                <div class="form-text">
-                  Changing your email address will require verification.
-                </div>
-                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :email) || []) do %>
-                  <div class="invalid-feedback d-block">{msg}</div>
-                <% end %>
-              </div>
-
-              <div class="mb-3">
                 <label for="user_theme_preference" class="form-label">
                   <i class="bi bi-palette"></i> Theme Preference
                 </label>
@@ -165,10 +144,28 @@
             <p class="small mb-2">Keep your profile up to date:</p>
             <ul class="small mb-0">
               <li>Use your real name for better collaboration</li>
-              <li>Keep your email address current</li>
-              <li>Changes to email require verification</li>
-              <li>All fields are optional except email</li>
+              <li>Choose a unique username for easy identification</li>
+              <li>All fields on this page are optional</li>
             </ul>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-envelope"></i> Email Addresses
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-2">
+              Manage your email addresses separately.
+            </p>
+            <a
+              href={~p"/#{@current_organization.slug}/profile/emails"}
+              class="btn btn-outline-primary btn-sm"
+            >
+              <i class="bi bi-envelope-gear"></i> Manage Emails
+            </a>
           </div>
         </div>
 

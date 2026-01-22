@@ -1,0 +1,142 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@current_user}
+      organization={@current_organization}
+      current_page="scim_clients"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">SCIM Clients</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <a
+          href={~p"/#{@current_organization.slug}/scim_clients/new"}
+          class="btn btn-primary btn-sm"
+        >
+          <i class="bi bi-plus-circle"></i> New SCIM Client
+        </a>
+      </div>
+    </div>
+
+    <p class="text-muted mb-4">
+      Configure outbound SCIM provisioning to automatically sync users and groups to downstream applications (Slack, GitHub, AWS SSO, etc.).
+    </p>
+
+    <%= if @provisioning_enabled == false do %>
+      <div class="alert alert-warning" role="alert">
+        <i class="bi bi-exclamation-triangle"></i>
+        <strong>SCIM Outbound Provisioning Disabled</strong>
+        <p class="mb-0">
+          You can configure SCIM clients, but automatic provisioning will not occur until you enable SCIM outbound provisioning in <a
+            href={~p"/#{@current_organization.slug}/settings/configuration"}
+            class="alert-link"
+          >
+            organization settings
+          </a>.
+        </p>
+      </div>
+    <% end %>
+
+    <%= if @scim_clients == [] do %>
+      <div class="card">
+        <div class="card-body text-center py-5">
+          <i class="bi bi-cloud-arrow-up display-4 text-muted"></i>
+          <h5 class="mt-3 text-muted">No SCIM clients configured</h5>
+          <p class="text-muted">
+            Create your first SCIM client to enable automatic user provisioning.
+          </p>
+          <a href={~p"/#{@current_organization.slug}/scim_clients/new"} class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Create SCIM Client
+          </a>
+        </div>
+      </div>
+    <% else %>
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-list"></i> Configured Clients
+          </h5>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Base URL</th>
+                <th>Auth Type</th>
+                <th>Sync Users</th>
+                <th>Sync Groups</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <%= for client <- @scim_clients do %>
+                <tr>
+                  <td>
+                    <a
+                      href={~p"/#{@current_organization.slug}/scim_clients/#{client}"}
+                      class="text-decoration-none"
+                    >
+                      <strong>{client.name}</strong>
+                    </a>
+                    <%= if client.description do %>
+                      <br />
+                      <small class="text-muted">{client.description}</small>
+                    <% end %>
+                  </td>
+                  <td>
+                    <code class="text-muted">{client.base_url}</code>
+                  </td>
+                  <td>
+                    <span class="badge bg-secondary">{String.upcase(client.auth_type)}</span>
+                  </td>
+                  <td>
+                    <%= if client.sync_users do %>
+                      <i class="bi bi-check-circle text-success"></i>
+                    <% else %>
+                      <i class="bi bi-x-circle text-muted"></i>
+                    <% end %>
+                  </td>
+                  <td>
+                    <%= if client.sync_groups do %>
+                      <i class="bi bi-check-circle text-success"></i>
+                    <% else %>
+                      <i class="bi bi-x-circle text-muted"></i>
+                    <% end %>
+                  </td>
+                  <td>
+                    <%= if client.is_active do %>
+                      <span class="badge bg-success">Active</span>
+                    <% else %>
+                      <span class="badge bg-secondary">Inactive</span>
+                    <% end %>
+                  </td>
+                  <td>
+                    <div class="btn-group btn-group-sm" role="group">
+                      <a
+                        href={~p"/#{@current_organization.slug}/scim_clients/#{client}/edit"}
+                        class="btn btn-outline-secondary"
+                        title="Edit"
+                      >
+                        <i class="bi bi-pencil"></i>
+                      </a>
+                      <a
+                        href={~p"/#{@current_organization.slug}/scim_clients/#{client}/logs"}
+                        class="btn btn-outline-secondary"
+                        title="View Logs"
+                      >
+                        <i class="bi bi-list-ul"></i>
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% end %>
+  </:main>
+</.two_column_layout>

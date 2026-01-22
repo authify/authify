@@ -30,6 +30,7 @@ defmodule AuthifyWeb.AuditLogsHTML do
   """
   def event_type_badge_class(event_type) do
     cond do
+      String.contains?(event_type, "scim") -> "badge bg-cyan"
       String.contains?(event_type, "login") -> "badge bg-primary"
       String.contains?(event_type, "logout") -> "badge bg-info"
       String.contains?(event_type, "oauth") -> "badge bg-purple"

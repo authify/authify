@@ -58,7 +58,7 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Organizations do
         tags: ["Organization"],
         summary: "Get organization configuration",
         description:
-          "Retrieve organization configuration settings. For authify-global organization, returns global settings (allow_organization_registration, site_name, support_email). For regular organizations, returns organization-specific settings (allow_invitations, allow_saml, allow_oauth, description, website_url, contact_email, logo_url).",
+          "Retrieve organization configuration settings. For authify-global organization, returns global settings (allow_organization_registration, site_name, support_email). For regular organizations, returns organization-specific settings (allow_invitations, allow_saml, allow_oauth, scim_inbound_provisioning_enabled, description, website_url, contact_email, logo_url).",
         security: [
           %{"OAuth2" => ["organizations:read"]},
           %{"BearerAuth" => []},
@@ -81,7 +81,7 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Organizations do
         tags: ["Organization"],
         summary: "Update organization configuration",
         description:
-          "Update organization configuration settings. Settings vary by organization: Global settings for authify-global (allow_organization_registration, site_name, support_email), Organization settings for regular orgs (allow_invitations, allow_saml, allow_oauth, description, website_url, contact_email, logo_url).",
+          "Update organization configuration settings. Settings vary by organization: Global settings for authify-global (allow_organization_registration, site_name, support_email), Organization settings for regular orgs (allow_invitations, allow_saml, allow_oauth, scim_inbound_provisioning_enabled, description, website_url, contact_email, logo_url).",
         security: [
           %{"OAuth2" => ["organizations:write"]},
           %{"BearerAuth" => []},
@@ -110,6 +110,7 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Organizations do
                       allow_invitations: true,
                       allow_saml: true,
                       allow_oauth: true,
+                      scim_inbound_provisioning_enabled: true,
                       description: "Leading technology company",
                       website_url: "https://acme.com",
                       contact_email: "info@acme.com",

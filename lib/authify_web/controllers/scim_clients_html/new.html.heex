@@ -1,0 +1,342 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@current_user}
+      organization={@current_organization}
+      current_page="scim_clients"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">New SCIM Client</h1>
+      <div class="btn-toolbar mb-2 mb-md-0">
+        <a
+          href={~p"/#{@current_organization.slug}/scim_clients"}
+          class="btn btn-outline-secondary btn-sm"
+        >
+          <i class="bi bi-arrow-left"></i> Back to SCIM Clients
+        </a>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-plus-circle"></i> SCIM Client Configuration
+            </h5>
+          </div>
+          <div class="card-body">
+            <.form
+              :let={f}
+              for={@changeset}
+              action={~p"/#{@current_organization.slug}/scim_clients"}
+              method="post"
+            >
+              <%= if @changeset.action do %>
+                <div class="alert alert-danger">
+                  <h6>Oops, something went wrong! Please check the errors below.</h6>
+                </div>
+              <% end %>
+
+              <div class="mb-4">
+                <label for="scim_client_name" class="form-label">
+                  <strong>Name</strong>
+                  <span class="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="scim_client_name"
+                  name="scim_client[name]"
+                  value={Phoenix.HTML.Form.input_value(f, :name)}
+                  required
+                />
+                <small class="text-muted">A friendly name for this SCIM client</small>
+                <%= if @changeset.action do %>
+                  <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :name) || []) do %>
+                    <div class="invalid-feedback d-block">{msg}</div>
+                  <% end %>
+                <% end %>
+              </div>
+
+              <div class="mb-4">
+                <label for="scim_client_description" class="form-label">
+                  <strong>Description</strong>
+                </label>
+                <textarea
+                  class="form-control"
+                  id="scim_client_description"
+                  name="scim_client[description]"
+                  rows="3"
+                ><%= Phoenix.HTML.Form.input_value(f, :description) %></textarea>
+                <small class="text-muted">Optional description of this SCIM integration</small>
+                <%= if @changeset.action do %>
+                  <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :description) || []) do %>
+                    <div class="invalid-feedback d-block">{msg}</div>
+                  <% end %>
+                <% end %>
+              </div>
+
+              <div class="mb-4">
+                <label for="scim_client_base_url" class="form-label">
+                  <strong>Base URL</strong>
+                  <span class="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="scim_client_base_url"
+                  name="scim_client[base_url]"
+                  value={Phoenix.HTML.Form.input_value(f, :base_url)}
+                  placeholder="https://example.com/scim/v2"
+                  required
+                />
+                <small class="text-muted">
+                  The SCIM 2.0 endpoint URL (e.g., https://api.slack.com/scim/v2)
+                </small>
+                <%= if @changeset.action do %>
+                  <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :base_url) || []) do %>
+                    <div class="invalid-feedback d-block">{msg}</div>
+                  <% end %>
+                <% end %>
+              </div>
+
+              <div class="mb-4">
+                <label for="scim_client_auth_type" class="form-label">
+                  <strong>Authentication Type</strong>
+                  <span class="text-danger">*</span>
+                </label>
+                <select
+                  class="form-select"
+                  id="scim_client_auth_type"
+                  name="scim_client[auth_type]"
+                  required
+                >
+                  <option
+                    value="bearer"
+                    selected={Phoenix.HTML.Form.input_value(f, :auth_type) == "bearer"}
+                  >
+                    Bearer Token
+                  </option>
+                  <option
+                    value="basic"
+                    selected={Phoenix.HTML.Form.input_value(f, :auth_type) == "basic"}
+                  >
+                    Basic Auth
+                  </option>
+                </select>
+                <small class="text-muted">How to authenticate with the SCIM endpoint</small>
+                <%= if @changeset.action do %>
+                  <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :auth_type) || []) do %>
+                    <div class="invalid-feedback d-block">{msg}</div>
+                  <% end %>
+                <% end %>
+              </div>
+
+              <div class="mb-4">
+                <label for="scim_client_auth_credential" class="form-label">
+                  <strong>Token/Password</strong>
+                  <span class="text-danger">*</span>
+                </label>
+                <input
+                  type="password"
+                  class="form-control"
+                  id="scim_client_auth_credential"
+                  name="scim_client[auth_credential]"
+                  required
+                />
+                <small class="text-muted">Bearer token or password for authentication</small>
+                <%= if @changeset.action do %>
+                  <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :auth_credential) || []) do %>
+                    <div class="invalid-feedback d-block">{msg}</div>
+                  <% end %>
+                <% end %>
+              </div>
+
+              <div class="mb-4">
+                <label for="scim_client_auth_username" class="form-label">
+                  <strong>Username</strong>
+                  <span class="text-muted">(for Basic Auth)</span>
+                </label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="scim_client_auth_username"
+                  name="scim_client[auth_username]"
+                  value={Phoenix.HTML.Form.input_value(f, :auth_username)}
+                />
+                <small class="text-muted">Only required when using Basic Auth</small>
+                <%= if @changeset.action do %>
+                  <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :auth_username) || []) do %>
+                    <div class="invalid-feedback d-block">{msg}</div>
+                  <% end %>
+                <% end %>
+              </div>
+
+              <div class="mb-4">
+                <label for="scim_client_attribute_mapping" class="form-label">
+                  <strong>Attribute Mapping (JSON)</strong>
+                </label>
+                <textarea
+                  class="form-control font-monospace"
+                  id="scim_client_attribute_mapping"
+                  name="scim_client[attribute_mapping]"
+                  rows="6"
+                  placeholder='{"user": {"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "{{username}}"}}'
+                ><%= Phoenix.HTML.Form.input_value(f, :attribute_mapping) %></textarea>
+                <small class="text-muted">
+                  Optional custom JSON template for attribute mapping. Leave blank to use defaults.
+                </small>
+                <%= if @changeset.action do %>
+                  <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :attribute_mapping) || []) do %>
+                    <div class="invalid-feedback d-block">{msg}</div>
+                  <% end %>
+                <% end %>
+              </div>
+
+              <div class="mb-4">
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="scim_client_sync_users"
+                    name="scim_client[sync_users]"
+                    value="true"
+                    checked={
+                      Phoenix.HTML.Form.normalize_value(
+                        "checkbox",
+                        Phoenix.HTML.Form.input_value(f, :sync_users)
+                      )
+                    }
+                  />
+                  <label class="form-check-label" for="scim_client_sync_users">
+                    <strong>Sync Users</strong>
+                  </label>
+                </div>
+                <small class="text-muted ms-4">
+                  Automatically provision user changes to this SCIM endpoint
+                </small>
+              </div>
+
+              <div class="mb-4">
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="scim_client_sync_groups"
+                    name="scim_client[sync_groups]"
+                    value="true"
+                    checked={
+                      Phoenix.HTML.Form.normalize_value(
+                        "checkbox",
+                        Phoenix.HTML.Form.input_value(f, :sync_groups)
+                      )
+                    }
+                  />
+                  <label class="form-check-label" for="scim_client_sync_groups">
+                    <strong>Sync Groups</strong>
+                  </label>
+                </div>
+                <small class="text-muted ms-4">
+                  Automatically provision group changes to this SCIM endpoint
+                </small>
+              </div>
+
+              <div class="mb-4">
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="scim_client_is_active"
+                    name="scim_client[is_active]"
+                    value="true"
+                    checked={
+                      Phoenix.HTML.Form.normalize_value(
+                        "checkbox",
+                        Phoenix.HTML.Form.input_value(f, :is_active)
+                      )
+                    }
+                  />
+                  <label class="form-check-label" for="scim_client_is_active">
+                    <strong>Active</strong>
+                  </label>
+                </div>
+                <small class="text-muted ms-4">
+                  Only active SCIM clients will provision users and groups
+                </small>
+              </div>
+
+              <div class="mt-4">
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-plus-circle"></i> Create SCIM Client
+                </button>
+                <a
+                  href={~p"/#{@current_organization.slug}/scim_clients"}
+                  class="btn btn-outline-secondary ms-2"
+                >
+                  Cancel
+                </a>
+              </div>
+            </.form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-info-circle"></i> SCIM Provisioning
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-3">
+              SCIM (System for Cross-domain Identity Management) enables automatic user and group
+              provisioning to downstream applications.
+            </p>
+
+            <h6 class="small">Supported Providers</h6>
+            <ul class="small mb-3">
+              <li>Slack</li>
+              <li>GitHub Enterprise</li>
+              <li>AWS SSO</li>
+              <li>Okta</li>
+              <li>Any SCIM 2.0 compliant endpoint</li>
+            </ul>
+
+            <h6 class="small">How It Works</h6>
+            <p class="small mb-0">
+              When users or groups are created, updated, or deleted in Authify,
+              changes are automatically synced to the configured SCIM endpoint.
+            </p>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-header">
+            <h6 class="card-title mb-0">
+              <i class="bi bi-shield-lock"></i> Security
+            </h6>
+          </div>
+          <div class="card-body">
+            <p class="small mb-2">
+              <strong>Credentials:</strong> Authentication tokens are encrypted before storage.
+            </p>
+            <p class="small mb-2">
+              <strong>HTTPS Only:</strong> All SCIM requests use HTTPS for secure transmission.
+            </p>
+            <p class="small mb-0">
+              <strong>Retry Logic:</strong>
+              Failed requests are automatically retried with exponential backoff.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>

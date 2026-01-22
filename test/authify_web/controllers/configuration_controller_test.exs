@@ -34,6 +34,22 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
       assert html_response(conn, 200) =~ "Allow Invitations"
       assert html_response(conn, 200) =~ "Enable SAML"
       assert html_response(conn, 200) =~ "Enable OAuth2/OIDC"
+      assert html_response(conn, 200) =~ "Enable SCIM 2.0 Inbound Provisioning"
+    end
+
+    test "shows SCIM inbound provisioning toggle in configuration", %{conn: conn} do
+      organization = organization_fixture()
+      admin = user_fixture(%{organization: organization, role: "admin"})
+
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> get(~p"/#{organization.slug}/settings/configuration")
+
+      response = html_response(conn, 200)
+      assert response =~ "Enable SCIM 2.0 Inbound Provisioning"
+      assert response =~ "scim_inbound_provisioning_enabled"
+      assert response =~ "Allow external identity providers"
     end
   end
 
@@ -115,6 +131,7 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
             "allow_invitations" => "true",
             "allow_saml" => "true",
             "allow_oauth" => "false",
+            "scim_inbound_provisioning_enabled" => "true",
             "description" => "Test organization",
             "website_url" => "https://example.com",
             "contact_email" => "contact@example.com"
@@ -137,6 +154,13 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
 
       assert Authify.Configurations.get_setting("Organization", organization.id, :allow_oauth) ==
                false
+
+      assert Authify.Configurations.get_setting(
+               "Organization",
+               organization.id,
+               :scim_inbound_provisioning_enabled
+             ) ==
+               true
 
       assert Authify.Configurations.get_setting("Organization", organization.id, :description) ==
                "Test organization"
@@ -180,6 +204,13 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
       Authify.Configurations.set_setting("Organization", organization.id, :allow_saml, true)
       Authify.Configurations.set_setting("Organization", organization.id, :allow_oauth, true)
 
+      Authify.Configurations.set_setting(
+        "Organization",
+        organization.id,
+        :scim_inbound_provisioning_enabled,
+        true
+      )
+
       # Now submit form with all checkboxes unchecked
       conn =
         conn
@@ -205,6 +236,13 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
                false
 
       assert Authify.Configurations.get_setting("Organization", organization.id, :allow_oauth) ==
+               false
+
+      assert Authify.Configurations.get_setting(
+               "Organization",
+               organization.id,
+               :scim_inbound_provisioning_enabled
+             ) ==
                false
     end
 
