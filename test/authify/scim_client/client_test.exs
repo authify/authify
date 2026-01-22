@@ -25,7 +25,9 @@ defmodule Authify.SCIMClient.ClientTest do
 
     test "list_active_scim_clients/2 returns only active clients with sync enabled" do
       organization = organization_fixture()
-      active_client = scim_client_fixture(organization: organization, is_active: true)
+
+      active_client =
+        scim_client_fixture(organization: organization, is_active: true, sync_users: true)
 
       _inactive_client =
         scim_client_fixture(organization: organization, name: "Inactive", is_active: false)
@@ -60,12 +62,12 @@ defmodule Authify.SCIMClient.ClientTest do
       valid_attrs = %{
         "name" => "Test Client",
         "description" => "A test client",
-        "base_url" => "https://example.com/scim/v2",
+        "base_url" => "https://test-scim.local/scim/v2",
         "auth_type" => "bearer",
         "auth_credential" => "secret-token",
         "attribute_mapping" => default_mapping,
         "is_active" => true,
-        "sync_users" => true,
+        "sync_users" => false,
         "sync_groups" => false
       }
 
@@ -74,10 +76,10 @@ defmodule Authify.SCIMClient.ClientTest do
 
       assert client.name == "Test Client"
       assert client.description == "A test client"
-      assert client.base_url == "https://example.com/scim/v2"
+      assert client.base_url == "https://test-scim.local/scim/v2"
       assert client.auth_type == "bearer"
       assert client.is_active == true
-      assert client.sync_users == true
+      assert client.sync_users == false
       assert client.sync_groups == false
       assert client.organization_id == organization.id
     end
@@ -94,7 +96,7 @@ defmodule Authify.SCIMClient.ClientTest do
 
       attrs = %{
         "name" => "Test",
-        "base_url" => "https://example.com/scim/v2",
+        "base_url" => "https://test-scim.local/scim/v2",
         "auth_type" => "bearer"
       }
 
@@ -109,7 +111,7 @@ defmodule Authify.SCIMClient.ClientTest do
 
       attrs = %{
         "name" => "Test",
-        "base_url" => "https://example.com/scim/v2",
+        "base_url" => "https://test-scim.local/scim/v2",
         "auth_type" => "basic"
       }
 

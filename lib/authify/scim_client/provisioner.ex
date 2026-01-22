@@ -13,6 +13,22 @@ defmodule Authify.SCIMClient.Provisioner do
   @max_retries 5
 
   @doc """
+  Triggers a full sync asynchronously (or synchronously in test environment).
+
+  In production, this spawns an async task. In test environment with
+  sync_provisioning_in_tests: true, it runs synchronously.
+  """
+  def async_full_sync(client) do
+    if Application.get_env(:authify, :sync_provisioning_in_tests, false) do
+      # Synchronous execution for tests
+      full_sync(client)
+    else
+      # Async execution for production
+      Task.Supervisor.start_child(Authify.TaskSupervisor, fn -> full_sync(client) end)
+    end
+  end
+
+  @doc """
   Performs a full sync of all users and groups to a specific SCIM client.
 
   This manually triggers provisioning of all resources, useful for:

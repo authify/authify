@@ -12,7 +12,14 @@ defmodule Authify.SCIMClient.ProvisionerTest do
   setup do
     organization = organization_fixture()
     user = user_fixture(organization: organization)
-    scim_client = scim_client_fixture(organization: organization, is_active: true)
+
+    scim_client =
+      scim_client_fixture(
+        organization: organization,
+        is_active: true,
+        sync_users: true,
+        sync_groups: true
+      )
 
     %{
       organization: organization,

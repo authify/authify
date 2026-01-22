@@ -248,11 +248,8 @@ defmodule AuthifyWeb.API.ScimClientsController do
         try do
           scim_client = Client.get_scim_client!(id, organization.id)
 
-          # Trigger async full sync
-          Task.Supervisor.start_child(
-            Authify.TaskSupervisor,
-            fn -> Provisioner.full_sync(scim_client) end
-          )
+          # Trigger full sync (async in production, sync in tests)
+          Provisioner.async_full_sync(scim_client)
 
           # Log audit event
           AuditHelper.log_event_async(

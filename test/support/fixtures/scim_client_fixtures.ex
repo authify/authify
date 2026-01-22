@@ -37,13 +37,13 @@ defmodule Authify.SCIMClientFixtures do
         %{
           "name" => "Test SCIM Client",
           "description" => "A test SCIM client",
-          "base_url" => "https://example.com/scim/v2",
+          "base_url" => "https://test-scim-fixture.local/scim/v2",
           "auth_type" => "bearer",
           "auth_credential" => "test-bearer-token-secret",
           "attribute_mapping" => default_mapping,
           "is_active" => true,
-          "sync_users" => true,
-          "sync_groups" => true
+          "sync_users" => false,
+          "sync_groups" => false
         },
         stringify_keys(attrs)
       )
