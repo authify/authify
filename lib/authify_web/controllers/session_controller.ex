@@ -174,7 +174,7 @@ defmodule AuthifyWeb.SessionController do
 
   # Routes user after successful password authentication based on MFA status
   defp route_after_authentication(conn, user, organization) do
-    if Accounts.User.totp_enabled?(user) do
+    if Accounts.User.mfa_enabled?(user) do
       handle_mfa_enabled_user(conn, user, organization)
     else
       handle_mfa_disabled_user(conn, user, organization)

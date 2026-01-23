@@ -73,6 +73,7 @@ defmodule Authify.MixProject do
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_metrics_prometheus, "~> 1.1"},
       {:telemetry_poller, "~> 1.0"},
+      {:wax_, "~> 0.7"},
       {:x509, "~> 0.9"},
       # Static analysis & security (dev/test only)
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
