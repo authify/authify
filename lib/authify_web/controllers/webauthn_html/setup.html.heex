@@ -1,0 +1,269 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@user}
+      organization={@organization}
+      current_page="mfa"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Register Security Key or Passkey</h1>
+    </div>
+
+    <%= if @credentials_count > 0 do %>
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        You already have {@credentials_count} security {if @credentials_count == 1,
+          do: "key",
+          else: "keys"} registered.
+        You can register additional keys as backups.
+      </div>
+    <% end %>
+
+    <div id="webauthn-register-form">
+      <div class="mb-4">
+        <h6>Choose your authenticator type:</h6>
+        <div class="btn-group w-100" role="group">
+          <input
+            type="radio"
+            class="btn-check"
+            name="authenticator_type"
+            id="type-any"
+            value="any"
+            checked
+          />
+          <label class="btn btn-outline-primary" for="type-any">
+            <i class="bi bi-shield-check me-1"></i> Any (Recommended)
+          </label>
+
+          <input
+            type="radio"
+            class="btn-check"
+            name="authenticator_type"
+            id="type-platform"
+            value="platform"
+          />
+          <label class="btn btn-outline-primary" for="type-platform">
+            <i class="bi bi-laptop me-1"></i> Built-in (Touch ID, Face ID)
+          </label>
+
+          <input
+            type="radio"
+            class="btn-check"
+            name="authenticator_type"
+            id="type-security-key"
+            value="cross-platform"
+          />
+          <label class="btn btn-outline-primary" for="type-security-key">
+            <i class="bi bi-key me-1"></i> Security Key (YubiKey, etc.)
+          </label>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="credential-name" class="form-label">Friendly Name (Optional)</label>
+        <input
+          type="text"
+          class="form-control"
+          id="credential-name"
+          placeholder="e.g., My YubiKey 5C"
+        />
+        <div class="form-text">Give this credential a name to help you identify it later.</div>
+      </div>
+
+      <div class="d-grid gap-2">
+        <button type="button" class="btn btn-primary btn-lg" id="register-button">
+          <i class="bi bi-plus-circle me-2"></i> Register Security Key
+        </button>
+      </div>
+
+      <div id="register-status" class="mt-3"></div>
+    </div>
+
+    <hr class="my-4" />
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card bg-light">
+          <div class="card-body">
+            <h6 class="card-title">
+              <i class="bi bi-laptop text-info me-2"></i> Platform Authenticators
+            </h6>
+            <p class="card-text small">
+              Use the biometric sensors built into your device:
+            </p>
+            <ul class="small">
+              <li>Touch ID (Mac, iPhone, iPad)</li>
+              <li>Face ID (iPhone, iPad)</li>
+              <li>Windows Hello (Windows PC)</li>
+            </ul>
+            <p class="card-text small text-muted">
+              <i class="bi bi-info-circle me-1"></i>
+              May sync across your devices via iCloud Keychain or Google Password Manager.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card bg-light">
+          <div class="card-body">
+            <h6 class="card-title">
+              <i class="bi bi-key text-primary me-2"></i> Security Keys
+            </h6>
+            <p class="card-text small">
+              Use a physical security key:
+            </p>
+            <ul class="small">
+              <li>YubiKey (USB, NFC, USB-C)</li>
+              <li>Google Titan Key</li>
+              <li>Other FIDO2-compatible keys</li>
+            </ul>
+            <p class="card-text small text-muted">
+              <i class="bi bi-info-circle me-1"></i>
+              Provides the highest level of security and doesn't sync.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>
+
+<script>
+  // WebAuthn Registration Flow
+  (function() {
+    const registerButton = document.getElementById('register-button');
+    const statusDiv = document.getElementById('register-status');
+    const credentialNameInput = document.getElementById('credential-name');
+
+    if (!registerButton) return;
+
+    // Check if WebAuthn is supported
+    if (!window.PublicKeyCredential) {
+      showError('WebAuthn is not supported in this browser. Please use a modern browser like Chrome, Firefox, Safari, or Edge.');
+      registerButton.disabled = true;
+      return;
+    }
+
+    registerButton.addEventListener('click', async function() {
+      try {
+        registerButton.disabled = true;
+        showStatus('Preparing registration...', 'info');
+
+        // Get selected authenticator type
+        const authenticatorType = document.querySelector('input[name="authenticator_type"]:checked').value;
+        const authenticatorAttachment = authenticatorType === 'any' ? null : authenticatorType;
+        const credentialType = authenticatorType === 'platform' ? 'platform' : 'roaming';
+        const credentialName = credentialNameInput.value || null;
+
+        // Step 1: Get registration options from server
+        const beginResponse = await fetch('<%= ~p"/#{@organization.slug}/profile/webauthn/register/begin" %>', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({
+            authenticatorAttachment: authenticatorAttachment,
+            credentialType: credentialType
+          })
+        });
+
+        const beginData = await beginResponse.json();
+        if (!beginData.success) {
+          throw new Error(beginData.error || 'Failed to start registration');
+        }
+
+        // Step 2: Convert options for WebAuthn API
+        const publicKeyOptions = beginData.options;
+        publicKeyOptions.challenge = base64urlDecode(publicKeyOptions.challenge);
+        publicKeyOptions.user.id = base64urlDecode(publicKeyOptions.user.id);
+
+        showStatus('Touch your security key or use your biometric...', 'info');
+
+        // Step 3: Create credential
+        const credential = await navigator.credentials.create({
+          publicKey: publicKeyOptions
+        });
+
+        showStatus('Verifying credential...', 'info');
+
+        // Step 4: Send credential to server
+        const completeResponse = await fetch('<%= ~p"/#{@organization.slug}/profile/webauthn/register/complete" %>', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+          },
+          body: JSON.stringify({
+            credentialName: credentialName,
+            credentialType: credentialType,
+            attestationResponse: {
+              id: credential.id,
+              rawId: base64urlEncode(credential.rawId),
+              type: credential.type,
+              response: {
+                clientDataJSON: base64urlEncode(credential.response.clientDataJSON),
+                attestationObject: base64urlEncode(credential.response.attestationObject),
+                transports: credential.response.getTransports ? credential.response.getTransports() : []
+              }
+            }
+          })
+        });
+
+        const completeData = await completeResponse.json();
+        if (!completeData.success) {
+          throw new Error(completeData.error || 'Failed to complete registration');
+        }
+
+        showStatus('Security key registered successfully! Redirecting...', 'success');
+        setTimeout(() => {
+          window.location.href = '<%= ~p"/#{@organization.slug}/profile/mfa" %>';
+        }, 1500);
+
+      } catch (error) {
+        console.error('Registration error:', error);
+        registerButton.disabled = false;
+
+        if (error.name === 'NotAllowedError') {
+          showError('Registration was cancelled or timed out.');
+        } else if (error.name === 'InvalidStateError') {
+          showError('This security key is already registered.');
+        } else {
+          showError(error.message || 'Registration failed. Please try again.');
+        }
+      }
+    });
+
+    function showStatus(message, type) {
+      statusDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+    }
+
+    function showError(message) {
+      statusDiv.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>${message}</div>`;
+    }
+
+    // Base64URL encoding/decoding helpers
+    function base64urlDecode(base64url) {
+      const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+      const padding = '='.repeat((4 - base64.length % 4) % 4);
+      const binary = atob(base64 + padding);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+
+    function base64urlEncode(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+  })();
+</script>
