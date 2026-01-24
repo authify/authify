@@ -1,6 +1,8 @@
 defmodule AuthifyWeb.MfaController do
   use AuthifyWeb, :controller
 
+  import AuthifyWeb.Helpers.ConnHelpers, only: [get_client_ip: 1, get_user_agent: 1]
+
   alias Authify.{Accounts, MFA, Repo}
   alias Authify.Accounts.User
   alias AuthifyWeb.Helpers.AuditHelper
@@ -285,7 +287,7 @@ defmodule AuthifyWeb.MfaController do
         # Get authentication options from WebAuthn context
         opts = [
           ip_address: get_client_ip(conn),
-          user_agent: get_req_header(conn, "user-agent") |> List.first()
+          user_agent: get_user_agent(conn)
         ]
 
         case MFA.WebAuthn.begin_authentication(user, opts) do
@@ -738,7 +740,7 @@ defmodule AuthifyWeb.MfaController do
   defp create_trusted_device_token(conn, user) do
     device_info = %{
       ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first()
+      user_agent: get_user_agent(conn)
     }
 
     case MFA.create_trusted_device(user, device_info) do
@@ -794,13 +796,6 @@ defmodule AuthifyWeb.MfaController do
       ~p"/#{organization.slug}/dashboard"
     else
       ~p"/#{organization.slug}/user/dashboard"
-    end
-  end
-
-  defp get_client_ip(conn) do
-    case Plug.Conn.get_req_header(conn, "x-forwarded-for") do
-      [ip | _] -> ip
-      _ -> to_string(:inet_parse.ntoa(conn.remote_ip))
     end
   end
 

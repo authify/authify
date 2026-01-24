@@ -9,6 +9,8 @@ defmodule AuthifyWeb.WebAuthnController do
 
   use AuthifyWeb, :controller
 
+  import AuthifyWeb.Helpers.ConnHelpers, only: [get_client_ip: 1, get_user_agent: 1]
+
   alias Authify.{Accounts, Repo}
   alias Authify.Accounts.User
   alias Authify.MFA.WebAuthn
@@ -48,7 +50,7 @@ defmodule AuthifyWeb.WebAuthnController do
       attestation: params["attestation"] || "none",
       credential_type: params["credentialType"],
       ip_address: get_client_ip(conn),
-      user_agent: get_req_header(conn, "user-agent") |> List.first()
+      user_agent: get_user_agent(conn)
     ]
 
     case WebAuthn.begin_registration(current_user, opts) do
@@ -244,13 +246,6 @@ defmodule AuthifyWeb.WebAuthnController do
   # ============================================================================
   # Private Helpers
   # ============================================================================
-
-  defp get_client_ip(conn) do
-    case Plug.Conn.get_req_header(conn, "x-forwarded-for") do
-      [ip | _] -> ip
-      _ -> to_string(:inet_parse.ntoa(conn.remote_ip))
-    end
-  end
 
   defp format_error(:invalid_challenge), do: "Invalid or expired challenge"
   defp format_error(:challenge_already_used), do: "Challenge has already been used"
