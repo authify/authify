@@ -106,9 +106,9 @@ defmodule Authify.MFA.WebAuthn do
     with {:ok, challenge_record} <- verify_challenge(user, challenge, "registration"),
          {:ok, credential_data} <- verify_attestation(attestation_response, challenge),
          {:ok, credential} <- store_credential(user, credential_data, attestation_response, opts) do
-      # Mark challenge as consumed
+      # Mark challenge as consumed (truncate to seconds for :utc_datetime compatibility)
       challenge_record
-      |> Ecto.Changeset.change(%{consumed_at: DateTime.utc_now()})
+      |> Ecto.Changeset.change(%{consumed_at: DateTime.truncate(DateTime.utc_now(), :second)})
       |> Repo.update()
 
       {:ok, credential}
@@ -193,14 +193,14 @@ defmodule Authify.MFA.WebAuthn do
          :ok <- verify_credential_owner(credential, user),
          {:ok, updated_credential} <-
            verify_assertion(credential, assertion_response, challenge) do
-      # Mark challenge as consumed
+      # Mark challenge as consumed (truncate to seconds for :utc_datetime compatibility)
       challenge_record
-      |> Ecto.Changeset.change(%{consumed_at: DateTime.utc_now()})
+      |> Ecto.Changeset.change(%{consumed_at: DateTime.truncate(DateTime.utc_now(), :second)})
       |> Repo.update()
 
-      # Update last_used_at
+      # Update last_used_at (truncate to seconds for :utc_datetime compatibility)
       updated_credential
-      |> Ecto.Changeset.change(%{last_used_at: DateTime.utc_now()})
+      |> Ecto.Changeset.change(%{last_used_at: DateTime.truncate(DateTime.utc_now(), :second)})
       |> Repo.update()
     else
       {:error, reason} = error ->
@@ -357,6 +357,11 @@ defmodule Authify.MFA.WebAuthn do
     end
   end
 
+  # Handle CBOR.Tag wrapped authenticator data (e.g., from 1Password passkeys)
+  defp parse_authenticator_data(%CBOR.Tag{value: auth_data}) when is_binary(auth_data) do
+    parse_authenticator_data(auth_data)
+  end
+
   defp parse_authenticator_data(auth_data) when is_binary(auth_data) do
     # Parse authenticator data structure
     # Bytes 0-31: RP ID hash (32 bytes)
@@ -423,7 +428,7 @@ defmodule Authify.MFA.WebAuthn do
       transports: transports,
       aaguid: credential_data.aaguid,
       name: name,
-      last_used_at: DateTime.utc_now()
+      last_used_at: DateTime.truncate(DateTime.utc_now(), :second)
     })
     |> Repo.insert()
   end

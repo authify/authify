@@ -70,6 +70,14 @@ export class WebAuthnRegistration {
     publicKeyOptions.challenge = base64urlDecode(publicKeyOptions.challenge);
     publicKeyOptions.user.id = base64urlDecode(publicKeyOptions.user.id);
 
+    // Decode excludeCredentials IDs from base64url to ArrayBuffer
+    if (publicKeyOptions.excludeCredentials) {
+      publicKeyOptions.excludeCredentials = publicKeyOptions.excludeCredentials.map(cred => ({
+        ...cred,
+        id: base64urlDecode(cred.id)
+      }));
+    }
+
     // Step 3: Create credential
     const credential = await navigator.credentials.create({
       publicKey: publicKeyOptions

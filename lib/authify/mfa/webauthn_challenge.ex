@@ -76,9 +76,11 @@ defmodule Authify.MFA.WebAuthnChallenge do
 
   @doc """
   Calculates the expiry datetime for a new challenge.
+  Truncates to seconds for :utc_datetime compatibility.
   """
   def calculate_expiry do
     DateTime.utc_now()
     |> DateTime.add(@challenge_expiry_minutes * 60, :second)
+    |> DateTime.truncate(:second)
   end
 end

@@ -183,8 +183,8 @@
 <script>
   // WebAuthn Authentication Flow
   function showWebAuthnForm() {
-    // Check if WebAuthn is supported
-    if (!window.WebAuthn.isWebAuthnSupported()) {
+    // Check if WebAuthn module is loaded and supported
+    if (!window.WebAuthn || !window.WebAuthn.isWebAuthnSupported()) {
       alert('WebAuthn is not supported in this browser. Please use TOTP or a backup code.');
       return;
     }
@@ -226,11 +226,13 @@
   }
 
   // Check if WebAuthn is supported and disable button if not
-  if (!window.WebAuthn.isWebAuthnSupported()) {
-    const webauthnButton = document.getElementById('webauthn-button');
-    if (webauthnButton) {
-      webauthnButton.disabled = true;
-      webauthnButton.title = 'WebAuthn not supported in this browser';
+  document.addEventListener('DOMContentLoaded', function() {
+    if (!window.WebAuthn || !window.WebAuthn.isWebAuthnSupported()) {
+      const webauthnButton = document.getElementById('webauthn-button');
+      if (webauthnButton) {
+        webauthnButton.disabled = true;
+        webauthnButton.title = 'WebAuthn not supported in this browser';
+      }
     }
-  }
+  });
 </script>
