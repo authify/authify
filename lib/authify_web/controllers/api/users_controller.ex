@@ -468,6 +468,12 @@ defmodule AuthifyWeb.API.UsersController do
 
   # Private helper to build MFA status
   defp build_mfa_status(user) do
+    # Count WebAuthn credentials
+    webauthn_credentials_count =
+      user
+      |> Authify.MFA.WebAuthn.list_credentials()
+      |> length()
+
     if Accounts.User.totp_enabled?(user) do
       # Count backup codes
       backup_codes_count = Authify.MFA.backup_codes_count(user)
@@ -496,6 +502,7 @@ defmodule AuthifyWeb.API.UsersController do
         totp_enabled_at: DateTime.to_iso8601(user.totp_enabled_at),
         backup_codes_count: backup_codes_count,
         trusted_devices_count: trusted_devices_count,
+        webauthn_credentials_count: webauthn_credentials_count,
         lockout: lockout_info
       }
     else
@@ -504,6 +511,7 @@ defmodule AuthifyWeb.API.UsersController do
         totp_enabled_at: nil,
         backup_codes_count: 0,
         trusted_devices_count: 0,
+        webauthn_credentials_count: webauthn_credentials_count,
         lockout: nil
       }
     end

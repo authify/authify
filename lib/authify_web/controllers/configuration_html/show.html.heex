@@ -213,6 +213,26 @@
                       class="form-check-input"
                       type="checkbox"
                       role="switch"
+                      id="allow_webauthn"
+                      name="settings[allow_webauthn]"
+                      value="true"
+                      checked={@settings[:allow_webauthn] != false}
+                    />
+                    <label class="form-check-label" for="allow_webauthn">
+                      <strong>Enable WebAuthn/FIDO2</strong>
+                    </label>
+                  </div>
+                  <small class="text-muted ms-4">
+                    Enable WebAuthn/FIDO2 authentication (security keys, passkeys, biometrics) for this organization.
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
                       id="scim_inbound_provisioning_enabled"
                       name="settings[scim_inbound_provisioning_enabled]"
                       value="true"
