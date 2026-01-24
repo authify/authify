@@ -338,12 +338,14 @@ defmodule AuthifyWeb.MfaController do
 
     backup_codes_count = MFA.backup_codes_count(current_user)
     trusted_devices = MFA.list_trusted_devices(current_user)
+    webauthn_credentials = MFA.WebAuthn.list_credentials(current_user)
 
     render(conn, :show,
       user: current_user,
       organization: organization,
       backup_codes_count: backup_codes_count,
-      trusted_devices: trusted_devices
+      trusted_devices: trusted_devices,
+      webauthn_credentials: webauthn_credentials
     )
   end
 

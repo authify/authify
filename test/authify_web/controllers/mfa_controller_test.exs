@@ -402,10 +402,13 @@ defmodule AuthifyWeb.MfaControllerTest do
       response = html_response(conn, 200)
       assert response =~ "Multi-Factor Authentication"
       assert response =~ "Enabled"
+      assert response =~ "Authenticator App (TOTP)"
+      assert response =~ "Security Keys"
+      assert response =~ "WebAuthn"
       assert response =~ "Backup Codes"
       assert response =~ "backup codes remaining"
       assert response =~ "Trusted Devices"
-      assert response =~ "Disable MFA"
+      assert response =~ "Disable TOTP"
     end
 
     test "requires authentication", %{conn: conn, organization: organization} do
