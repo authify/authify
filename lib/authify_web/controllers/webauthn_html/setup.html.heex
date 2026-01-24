@@ -141,8 +141,8 @@
     if (!registerButton) return;
 
     // Check if WebAuthn is supported
-    if (!window.PublicKeyCredential) {
-      showError('WebAuthn is not supported in this browser. Please use a modern browser like Chrome, Firefox, Safari, or Edge.');
+    if (!window.WebAuthn.isWebAuthnSupported()) {
+      statusDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>WebAuthn is not supported in this browser. Please use a modern browser like Chrome, Firefox, Safari, or Edge.</div>';
       registerButton.disabled = true;
       return;
     }
@@ -150,75 +150,23 @@
     registerButton.addEventListener('click', async function() {
       try {
         registerButton.disabled = true;
-        showStatus('Preparing registration...', 'info');
+        statusDiv.innerHTML = '<div class="alert alert-info">Preparing registration...</div>';
 
-        // Get selected authenticator type
+        // Get selected authenticator type and credential name
         const authenticatorType = document.querySelector('input[name="authenticator_type"]:checked').value;
-        const authenticatorAttachment = authenticatorType === 'any' ? null : authenticatorType;
-        const credentialType = authenticatorType === 'platform' ? 'platform' : 'roaming';
         const credentialName = credentialNameInput.value || null;
 
-        // Step 1: Get registration options from server
-        const beginResponse = await fetch('<%= ~p"/#{@organization.slug}/profile/webauthn/register/begin" %>', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
-          },
-          body: JSON.stringify({
-            authenticatorAttachment: authenticatorAttachment,
-            credentialType: credentialType
-          })
+        // Use WebAuthn module for registration
+        const registration = new window.WebAuthn.WebAuthnRegistration({
+          beginUrl: '<%= ~p"/#{@organization.slug}/profile/webauthn/register/begin" %>',
+          completeUrl: '<%= ~p"/#{@organization.slug}/profile/webauthn/register/complete" %>',
+          redirectUrl: '<%= ~p"/#{@organization.slug}/profile/mfa" %>',
+          csrfToken: document.querySelector('meta[name="csrf-token"]').content
         });
 
-        const beginData = await beginResponse.json();
-        if (!beginData.success) {
-          throw new Error(beginData.error || 'Failed to start registration');
-        }
+        await registration.register(authenticatorType, credentialName);
 
-        // Step 2: Convert options for WebAuthn API
-        const publicKeyOptions = beginData.options;
-        publicKeyOptions.challenge = base64urlDecode(publicKeyOptions.challenge);
-        publicKeyOptions.user.id = base64urlDecode(publicKeyOptions.user.id);
-
-        showStatus('Touch your security key or use your biometric...', 'info');
-
-        // Step 3: Create credential
-        const credential = await navigator.credentials.create({
-          publicKey: publicKeyOptions
-        });
-
-        showStatus('Verifying credential...', 'info');
-
-        // Step 4: Send credential to server
-        const completeResponse = await fetch('<%= ~p"/#{@organization.slug}/profile/webauthn/register/complete" %>', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
-          },
-          body: JSON.stringify({
-            credentialName: credentialName,
-            credentialType: credentialType,
-            attestationResponse: {
-              id: credential.id,
-              rawId: base64urlEncode(credential.rawId),
-              type: credential.type,
-              response: {
-                clientDataJSON: base64urlEncode(credential.response.clientDataJSON),
-                attestationObject: base64urlEncode(credential.response.attestationObject),
-                transports: credential.response.getTransports ? credential.response.getTransports() : []
-              }
-            }
-          })
-        });
-
-        const completeData = await completeResponse.json();
-        if (!completeData.success) {
-          throw new Error(completeData.error || 'Failed to complete registration');
-        }
-
-        showStatus('Security key registered successfully! Redirecting...', 'success');
+        statusDiv.innerHTML = '<div class="alert alert-success">Security key registered successfully! Redirecting...</div>';
         setTimeout(() => {
           window.location.href = '<%= ~p"/#{@organization.slug}/profile/mfa" %>';
         }, 1500);
@@ -226,44 +174,9 @@
       } catch (error) {
         console.error('Registration error:', error);
         registerButton.disabled = false;
-
-        if (error.name === 'NotAllowedError') {
-          showError('Registration was cancelled or timed out.');
-        } else if (error.name === 'InvalidStateError') {
-          showError('This security key is already registered.');
-        } else {
-          showError(error.message || 'Registration failed. Please try again.');
-        }
+        const errorMessage = window.WebAuthn.formatWebAuthnError(error);
+        statusDiv.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>${errorMessage}</div>`;
       }
     });
-
-    function showStatus(message, type) {
-      statusDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
-    }
-
-    function showError(message) {
-      statusDiv.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>${message}</div>`;
-    }
-
-    // Base64URL encoding/decoding helpers
-    function base64urlDecode(base64url) {
-      const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-      const padding = '='.repeat((4 - base64.length % 4) % 4);
-      const binary = atob(base64 + padding);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      return bytes.buffer;
-    }
-
-    function base64urlEncode(buffer) {
-      const bytes = new Uint8Array(buffer);
-      let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-    }
   })();
 </script>
