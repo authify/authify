@@ -134,6 +134,10 @@ defmodule AuthifyWeb.Router do
     get "/verify", MfaController, :verify_form
     post "/verify", MfaController, :verify_code
     get "/locked", MfaController, :locked
+
+    # WebAuthn authentication endpoints
+    post "/webauthn/authenticate/begin", MfaController, :webauthn_authenticate_begin
+    post "/webauthn/authenticate/complete", MfaController, :webauthn_authenticate_complete
   end
 
   # Logout doesn't need rate limiting (it's a DELETE and terminates sessions)
@@ -185,6 +189,15 @@ defmodule AuthifyWeb.Router do
     get "/profile/mfa/devices", MfaController, :list_devices
     delete "/profile/mfa/devices/:id", MfaController, :revoke_device
     delete "/profile/mfa/devices", MfaController, :revoke_all_devices
+
+    # WebAuthn credential management
+    get "/profile/webauthn", WebAuthnController, :index
+    get "/profile/webauthn/setup", WebAuthnController, :setup
+    post "/profile/webauthn/register/begin", WebAuthnController, :register_begin
+    post "/profile/webauthn/register/complete", WebAuthnController, :register_complete
+    patch "/profile/webauthn/:id/rename", WebAuthnController, :rename
+    delete "/profile/webauthn/:id", WebAuthnController, :revoke
+    delete "/profile/webauthn", WebAuthnController, :revoke_all
   end
 
   # Admin-only routes - require organization admin privileges

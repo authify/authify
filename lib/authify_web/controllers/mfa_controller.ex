@@ -1,6 +1,8 @@
 defmodule AuthifyWeb.MfaController do
   use AuthifyWeb, :controller
 
+  import AuthifyWeb.Helpers.ConnHelpers, only: [get_client_ip: 1, get_user_agent: 1]
+
   alias Authify.{Accounts, MFA, Repo}
   alias Authify.Accounts.User
   alias AuthifyWeb.Helpers.AuditHelper
@@ -215,11 +217,26 @@ defmodule AuthifyWeb.MfaController do
         # Check for active lockout
         case MFA.check_lockout(user) do
           {:ok, :no_lockout} ->
+            # Determine which MFA methods are available
+            has_totp = Accounts.User.totp_enabled?(user)
+            has_webauthn = not Enum.empty?(MFA.WebAuthn.list_credentials(user))
+
+            # Prefer WebAuthn if available (more secure - phishing-resistant)
+            default_method =
+              cond do
+                has_webauthn -> :webauthn
+                has_totp -> :totp
+                true -> :totp
+              end
+
             render(conn, :verify_form,
               user: user,
               organization: organization,
               error: nil,
-              attempts_remaining: nil
+              attempts_remaining: nil,
+              default_method: default_method,
+              has_totp: has_totp,
+              has_webauthn: has_webauthn
             )
 
           {:error, {:locked, _locked_until}} ->
@@ -272,6 +289,59 @@ defmodule AuthifyWeb.MfaController do
     end
   end
 
+  @doc """
+  Begin WebAuthn authentication by generating a challenge.
+  Returns JSON with authentication options for the client.
+  """
+  def webauthn_authenticate_begin(conn, _params) do
+    case load_mfa_session(conn) do
+      {:error, _message} ->
+        json(conn, %{success: false, error: "No active MFA session"})
+
+      {:ok, user, _organization} ->
+        # Get authentication options from WebAuthn context
+        opts = [
+          ip_address: get_client_ip(conn),
+          user_agent: get_user_agent(conn)
+        ]
+
+        case MFA.WebAuthn.begin_authentication(user, opts) do
+          {:ok, %{challenge: challenge, options: options}} ->
+            # Store challenge in session
+            conn
+            |> put_session(:webauthn_authentication_challenge, challenge)
+            |> json(%{success: true, options: options})
+
+          {:error, :no_credentials} ->
+            json(conn, %{success: false, error: "No security keys registered"})
+
+          {:error, _reason} ->
+            json(conn, %{success: false, error: "Failed to generate challenge"})
+        end
+    end
+  end
+
+  @doc """
+  Complete WebAuthn authentication by verifying the assertion response.
+  """
+  def webauthn_authenticate_complete(conn, params) do
+    with {:ok, user, organization} <- load_mfa_session(conn),
+         {:ok, challenge} <- get_authentication_challenge(conn),
+         conn <- assign_user_and_org(conn, user, organization),
+         {:allow, _} <- MFA.check_rate_limit(user, organization) do
+      handle_webauthn_assertion(conn, user, organization, challenge, params)
+    else
+      {:error, message} ->
+        json(conn, %{success: false, error: message})
+
+      {:deny, _locked_until} ->
+        json(conn, %{
+          success: false,
+          error: "Too many failed attempts. Your account has been temporarily locked."
+        })
+    end
+  end
+
   # ============================================================================
   # Management Flow (Authenticated Users)
   # ============================================================================
@@ -285,12 +355,14 @@ defmodule AuthifyWeb.MfaController do
 
     backup_codes_count = MFA.backup_codes_count(current_user)
     trusted_devices = MFA.list_trusted_devices(current_user)
+    webauthn_credentials = MFA.WebAuthn.list_credentials(current_user)
 
     render(conn, :show,
       user: current_user,
       organization: organization,
       backup_codes_count: backup_codes_count,
-      trusted_devices: trusted_devices
+      trusted_devices: trusted_devices,
+      webauthn_credentials: webauthn_credentials
     )
   end
 
@@ -591,13 +663,18 @@ defmodule AuthifyWeb.MfaController do
         "Invalid code. This is your last attempt before lockout."
       end
 
+    mfa_method_assigns = get_mfa_method_assigns(user)
+
     conn
     |> put_flash(:error, error_message)
-    |> render(:verify_form,
-      user: user,
-      organization: organization,
-      error: "Invalid code",
-      attempts_remaining: remaining_attempts - 1
+    |> render(
+      :verify_form,
+      Map.merge(mfa_method_assigns, %{
+        user: user,
+        organization: organization,
+        error: "Invalid code",
+        attempts_remaining: remaining_attempts - 1
+      })
     )
   end
 
@@ -624,13 +701,18 @@ defmodule AuthifyWeb.MfaController do
          _use_backup,
          remaining_attempts
        ) do
+    mfa_method_assigns = get_mfa_method_assigns(user)
+
     conn
     |> put_flash(:error, "No backup codes available.")
-    |> render(:verify_form,
-      user: user,
-      organization: organization,
-      error: "No backup codes available",
-      attempts_remaining: remaining_attempts
+    |> render(
+      :verify_form,
+      Map.merge(mfa_method_assigns, %{
+        user: user,
+        organization: organization,
+        error: "No backup codes available",
+        attempts_remaining: remaining_attempts
+      })
     )
   end
 
@@ -643,13 +725,18 @@ defmodule AuthifyWeb.MfaController do
          _use_backup,
          remaining_attempts
        ) do
+    mfa_method_assigns = get_mfa_method_assigns(user)
+
     conn
     |> put_flash(:error, "Verification failed. Please try again.")
-    |> render(:verify_form,
-      user: user,
-      organization: organization,
-      error: "Verification failed",
-      attempts_remaining: remaining_attempts
+    |> render(
+      :verify_form,
+      Map.merge(mfa_method_assigns, %{
+        user: user,
+        organization: organization,
+        error: "Verification failed",
+        attempts_remaining: remaining_attempts
+      })
     )
   end
 
@@ -680,10 +767,30 @@ defmodule AuthifyWeb.MfaController do
     |> Enum.map_join(" ", &Enum.join/1)
   end
 
+  defp get_mfa_method_assigns(user) do
+    # Determine which MFA methods are available
+    has_totp = Accounts.User.totp_enabled?(user)
+    has_webauthn = not Enum.empty?(MFA.WebAuthn.list_credentials(user))
+
+    # Prefer WebAuthn if available (more secure - phishing-resistant)
+    default_method =
+      cond do
+        has_webauthn -> :webauthn
+        has_totp -> :totp
+        true -> :totp
+      end
+
+    %{
+      default_method: default_method,
+      has_totp: has_totp,
+      has_webauthn: has_webauthn
+    }
+  end
+
   defp create_trusted_device_token(conn, user) do
     device_info = %{
       ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first()
+      user_agent: get_user_agent(conn)
     }
 
     case MFA.create_trusted_device(user, device_info) do
@@ -741,4 +848,110 @@ defmodule AuthifyWeb.MfaController do
       ~p"/#{organization.slug}/user/dashboard"
     end
   end
+
+  defp create_and_store_trusted_device(conn, user) do
+    device_token = create_trusted_device_token(conn, user)
+
+    if device_token do
+      put_session(conn, :mfa_trusted_device_token, device_token)
+    else
+      conn
+    end
+  end
+
+  defp complete_mfa_login(conn, user, organization) do
+    # Clear rate limit on successful login
+    MFA.clear_rate_limit(user)
+
+    # Sign in and set organization
+    conn
+    |> Authify.Guardian.Plug.sign_in(user)
+    |> put_session(:current_organization_id, organization.id)
+    |> clear_mfa_session()
+  end
+
+  defp redirect_after_mfa_success(organization) do
+    "/#{organization.slug}/dashboard"
+  end
+
+  defp get_authentication_challenge(conn) do
+    case get_session(conn, :webauthn_authentication_challenge) do
+      nil -> {:error, "No active authentication challenge"}
+      challenge -> {:ok, challenge}
+    end
+  end
+
+  defp assign_user_and_org(conn, user, organization) do
+    conn
+    |> assign(:current_user, user)
+    |> assign(:current_organization, organization)
+  end
+
+  defp handle_webauthn_assertion(conn, user, organization, challenge, params) do
+    assertion_response = params["assertionResponse"]
+    remember_device = params["rememberDevice"] == true
+
+    case MFA.WebAuthn.complete_authentication(user, assertion_response, challenge) do
+      {:ok, credential} ->
+        handle_successful_webauthn_auth(conn, user, organization, credential, remember_device)
+
+      {:error, reason} ->
+        handle_failed_webauthn_auth(conn, user, reason)
+    end
+  end
+
+  defp handle_successful_webauthn_auth(conn, user, organization, credential, remember_device) do
+    conn = delete_session(conn, :webauthn_authentication_challenge)
+
+    conn =
+      if remember_device do
+        create_and_store_trusted_device(conn, user)
+      else
+        conn
+      end
+
+    AuditHelper.log_mfa_verified(conn, user,
+      extra_metadata: %{
+        "source" => "web",
+        "method" => "webauthn",
+        "credential_id" => credential.id,
+        "credential_name" => credential.name
+      }
+    )
+
+    conn = complete_mfa_login(conn, user, organization)
+
+    json(conn, %{
+      success: true,
+      redirect_url: redirect_after_mfa_success(organization)
+    })
+  end
+
+  defp handle_failed_webauthn_auth(conn, user, reason) do
+    AuditHelper.log_mfa_failed(conn, user,
+      extra_metadata: %{
+        "source" => "web",
+        "method" => "webauthn",
+        "reason" => inspect(reason)
+      }
+    )
+
+    json(conn, %{
+      success: false,
+      error: format_webauthn_error(reason)
+    })
+  end
+
+  defp format_webauthn_error(:invalid_challenge), do: "Invalid or expired challenge"
+  defp format_webauthn_error(:challenge_already_used), do: "Challenge has already been used"
+  defp format_webauthn_error(:challenge_expired), do: "Challenge has expired"
+  defp format_webauthn_error(:challenge_mismatch), do: "Challenge verification failed"
+
+  defp format_webauthn_error(:invalid_sign_count),
+    do: "Security key may be cloned (invalid sign count)"
+
+  defp format_webauthn_error(:credential_not_found), do: "Security key not recognized"
+  defp format_webauthn_error(:credential_not_owned), do: "Security key not owned by this user"
+  defp format_webauthn_error(:decryption_failed), do: "Failed to decrypt credential data"
+  defp format_webauthn_error(_), do: "Authentication failed"
 end

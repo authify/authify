@@ -1,0 +1,274 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@user}
+      organization={@organization}
+      current_page="mfa"
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Register Security Key or Passkey</h1>
+    </div>
+
+    <%= if @credentials_count > 0 do %>
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        You already have {@credentials_count} security {if @credentials_count == 1,
+          do: "key",
+          else: "keys"} registered.
+        You can register additional keys as backups.
+      </div>
+    <% end %>
+
+    <div id="webauthn-register-form">
+      <div class="mb-4">
+        <h6 class="mb-3">Choose your authenticator type:</h6>
+
+        <div class="list-group mb-3">
+          <!-- Option 1: Any (Recommended) -->
+          <label
+            class="list-group-item list-group-item-action"
+            for="type-any"
+            style="cursor: pointer;"
+          >
+            <div class="d-flex align-items-start">
+              <input
+                type="radio"
+                class="form-check-input me-3 mt-1"
+                name="authenticator_type"
+                id="type-any"
+                value="any"
+                checked
+              />
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center mb-1">
+                  <i class="bi bi-shield-check me-2 text-primary"></i>
+                  <strong>Any Available Method</strong>
+                  <span class="badge bg-success ms-2">Recommended</span>
+                </div>
+                <p class="mb-1 text-muted small">
+                  Let your device show all available options (Touch ID, Face ID, YubiKey, etc.). Your browser will present whatever authenticators you have available.
+                </p>
+                <p class="mb-0 text-muted small">
+                  <i class="bi bi-info-circle me-1"></i>
+                  <strong>Best for:</strong> Most users - provides maximum flexibility
+                </p>
+              </div>
+            </div>
+          </label>
+          
+<!-- Option 2: Built-in (Platform) -->
+          <label
+            class="list-group-item list-group-item-action"
+            for="type-platform"
+            style="cursor: pointer;"
+          >
+            <div class="d-flex align-items-start">
+              <input
+                type="radio"
+                class="form-check-input me-3 mt-1"
+                name="authenticator_type"
+                id="type-platform"
+                value="platform"
+              />
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center mb-1">
+                  <i class="bi bi-laptop me-2 text-info"></i>
+                  <strong>Built-in Biometrics Only</strong>
+                </div>
+                <p class="mb-1 text-muted small">
+                  Use only Touch ID, Face ID, or Windows Hello. Won't show external security keys even if connected.
+                </p>
+                <p class="mb-0 text-muted small">
+                  <i class="bi bi-info-circle me-1"></i>
+                  <strong>Best for:</strong>
+                  Convenience on your personal devices (may sync via iCloud Keychain or Google Password Manager)
+                </p>
+              </div>
+            </div>
+          </label>
+          
+<!-- Option 3: Security Key (Roaming) -->
+          <label
+            class="list-group-item list-group-item-action"
+            for="type-security-key"
+            style="cursor: pointer;"
+          >
+            <div class="d-flex align-items-start">
+              <input
+                type="radio"
+                class="form-check-input me-3 mt-1"
+                name="authenticator_type"
+                id="type-security-key"
+                value="cross-platform"
+              />
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center mb-1">
+                  <i class="bi bi-key me-2 text-primary"></i>
+                  <strong>External Security Key Only</strong>
+                </div>
+                <p class="mb-1 text-muted small">
+                  Use only physical hardware keys (YubiKey, Google Titan, etc.). Won't show built-in biometrics.
+                </p>
+                <p class="mb-0 text-muted small">
+                  <i class="bi bi-info-circle me-1"></i>
+                  <strong>Best for:</strong>
+                  Maximum security and portability - works on any device, never syncs
+                </p>
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div class="alert alert-info mb-4">
+          <small>
+            <i class="bi bi-lightbulb me-1"></i>
+            <strong>Tip:</strong>
+            You can register multiple authenticators as backups. For example, register both Touch ID for convenience and a YubiKey for backup.
+          </small>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="credential-name" class="form-label">Friendly Name (Optional)</label>
+        <input
+          type="text"
+          class="form-control"
+          id="credential-name"
+          placeholder="e.g., My YubiKey 5C"
+        />
+        <div class="form-text">Give this credential a name to help you identify it later.</div>
+      </div>
+
+      <div class="d-grid gap-2">
+        <button type="button" class="btn btn-primary btn-lg" id="register-button">
+          <i class="bi bi-plus-circle me-2"></i> Register Security Key
+        </button>
+      </div>
+
+      <div id="register-status" class="mt-3"></div>
+    </div>
+
+    <hr class="my-4" />
+
+    <div class="row">
+      <div class="col-md-12">
+        <h6 class="mb-3">
+          <i class="bi bi-question-circle me-1"></i> Learn More About WebAuthn
+        </h6>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card border-info mb-3">
+          <div class="card-body">
+            <h6 class="card-title">
+              <i class="bi bi-laptop text-info me-2"></i>
+              Built-in Biometrics (Platform Authenticators)
+            </h6>
+            <p class="card-text small mb-2">
+              <strong>What they are:</strong> Biometric sensors built into your device
+            </p>
+            <ul class="small mb-2">
+              <li>Touch ID (Mac, iPhone, iPad)</li>
+              <li>Face ID (iPhone, iPad)</li>
+              <li>Windows Hello (Windows PC, Surface)</li>
+            </ul>
+            <div class="border-top pt-2">
+              <p class="card-text small mb-1">
+                <i class="bi bi-check-circle text-success me-1"></i>
+                <strong>Pros:</strong> Very convenient, fast, no extra hardware needed
+              </p>
+              <p class="card-text small mb-0">
+                <i class="bi bi-exclamation-circle text-warning me-1"></i>
+                <strong>Note:</strong>
+                May sync across your devices (iCloud Keychain, Google) - convenient but less private
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card border-primary mb-3">
+          <div class="card-body">
+            <h6 class="card-title">
+              <i class="bi bi-key text-primary me-2"></i>
+              External Security Keys (Roaming Authenticators)
+            </h6>
+            <p class="card-text small mb-2">
+              <strong>What they are:</strong> Physical hardware security keys
+            </p>
+            <ul class="small mb-2">
+              <li>YubiKey (USB-A, USB-C, NFC models)</li>
+              <li>Google Titan Security Key</li>
+              <li>Nitrokey, Feitian, SoloKeys</li>
+              <li>Any FIDO2/WebAuthn compatible key</li>
+            </ul>
+            <div class="border-top pt-2">
+              <p class="card-text small mb-1">
+                <i class="bi bi-shield-check text-success me-1"></i>
+                <strong>Pros:</strong>
+                Highest security, portable, works on any device, never syncs
+              </p>
+              <p class="card-text small mb-0">
+                <i class="bi bi-info-circle text-primary me-1"></i>
+                <strong>Best practice:</strong> Register two keys as backups in case you lose one
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </:main>
+</.two_column_layout>
+
+<script>
+  // WebAuthn Registration Flow
+  document.addEventListener('DOMContentLoaded', function() {
+    const registerButton = document.getElementById('register-button');
+    const statusDiv = document.getElementById('register-status');
+    const credentialNameInput = document.getElementById('credential-name');
+
+    if (!registerButton) return;
+
+    // Check if WebAuthn module is loaded and browser supports it
+    if (!window.WebAuthn || !window.WebAuthn.isWebAuthnSupported()) {
+      statusDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>WebAuthn is not supported in this browser. Please use a modern browser like Chrome, Firefox, Safari, or Edge.</div>';
+      registerButton.disabled = true;
+      return;
+    }
+
+    registerButton.addEventListener('click', async function() {
+      try {
+        registerButton.disabled = true;
+        statusDiv.innerHTML = '<div class="alert alert-info">Preparing registration...</div>';
+
+        // Get selected authenticator type and credential name
+        const authenticatorType = document.querySelector('input[name="authenticator_type"]:checked').value;
+        const credentialName = credentialNameInput.value || null;
+
+        // Use WebAuthn module for registration
+        const registration = new window.WebAuthn.WebAuthnRegistration({
+          beginUrl: '<%= ~p"/#{@organization.slug}/profile/webauthn/register/begin" %>',
+          completeUrl: '<%= ~p"/#{@organization.slug}/profile/webauthn/register/complete" %>',
+          redirectUrl: '<%= ~p"/#{@organization.slug}/profile/mfa" %>',
+          csrfToken: document.querySelector('meta[name="csrf-token"]').content
+        });
+
+        await registration.register(authenticatorType, credentialName);
+
+        statusDiv.innerHTML = '<div class="alert alert-success">Security key registered successfully! Redirecting...</div>';
+        setTimeout(() => {
+          window.location.href = '<%= ~p"/#{@organization.slug}/profile/mfa" %>';
+        }, 1500);
+
+      } catch (error) {
+        console.error('Registration error:', error);
+        registerButton.disabled = false;
+        const errorMessage = window.WebAuthn.formatWebAuthnError(error);
+        statusDiv.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>${errorMessage}</div>`;
+      }
+    });
+  });
+</script>

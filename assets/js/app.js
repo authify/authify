@@ -30,6 +30,9 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/authify"
 import topbar from "../vendor/topbar"
 
+// Import WebAuthn utilities
+import * as WebAuthn from "./webauthn.js"
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
@@ -50,6 +53,9 @@ liveSocket.connect()
 // >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
+
+// Expose WebAuthn utilities for templates
+window.WebAuthn = WebAuthn
 
 // The lines below enable quality of life phoenix_live_reload
 // development features:

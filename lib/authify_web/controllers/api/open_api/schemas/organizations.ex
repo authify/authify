@@ -157,6 +157,11 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Organizations do
                   type: "boolean",
                   description: "Enable OAuth2/OIDC identity provider"
                 },
+                allow_webauthn: %{
+                  type: "boolean",
+                  description:
+                    "Enable WebAuthn/FIDO2 authentication (security keys, passkeys, biometrics)"
+                },
                 scim_inbound_provisioning_enabled: %{
                   type: "boolean",
                   description:

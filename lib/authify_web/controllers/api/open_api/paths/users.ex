@@ -284,7 +284,7 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Users do
         tags: ["Users"],
         summary: "Get user MFA status",
         description:
-          "Retrieve the MFA (Multi-Factor Authentication) status for a specific user, including TOTP status, backup codes count, trusted devices count, and lockout information",
+          "Retrieve the MFA (Multi-Factor Authentication) status for a specific user, including TOTP status, WebAuthn credentials count, backup codes count, trusted devices count, and lockout information",
         security: [
           %{"OAuth2" => ["users:read"]},
           %{"BearerAuth" => []},
@@ -333,6 +333,11 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Users do
                               type: "integer",
                               description: "Number of trusted devices"
                             },
+                            webauthn_credentials_count: %{
+                              type: "integer",
+                              description:
+                                "Number of registered WebAuthn credentials (security keys, passkeys)"
+                            },
                             lockout: %{
                               type: "object",
                               nullable: true,
@@ -363,6 +368,7 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Users do
                       totp_enabled_at: "2026-01-01T12:00:00Z",
                       backup_codes_count: 8,
                       trusted_devices_count: 2,
+                      webauthn_credentials_count: 1,
                       lockout: nil
                     }
                   },
@@ -468,9 +474,9 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Users do
       ],
       post: %{
         tags: ["Users"],
-        summary: "Reset user MFA",
+        summary: "Reset user TOTP",
         description:
-          "Completely reset a user's MFA configuration. This disables TOTP, revokes all trusted devices, clears backup codes, and removes any lockouts. The user will need to set up MFA again from scratch.",
+          "Reset a user's TOTP configuration. This disables TOTP, revokes all trusted devices, clears backup codes, and removes any lockouts. Note: This does not revoke WebAuthn credentials - those must be managed separately through the WebAuthn credential management endpoints. The user will need to set up TOTP again from scratch.",
         security: [
           %{"OAuth2" => ["users:write"]},
           %{"BearerAuth" => []},

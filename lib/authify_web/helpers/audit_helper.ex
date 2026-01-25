@@ -911,24 +911,18 @@ defmodule AuthifyWeb.Helpers.AuditHelper do
   end
 
   @doc """
-  Extracts the originating IP address from the connection.
+  Extracts the client IP address from the connection.
+
+  Delegates to `ConnHelpers.get_client_ip/1`.
   """
-  def get_ip_address(conn) do
-    case Plug.Conn.get_req_header(conn, "x-forwarded-for") do
-      [ip | _] -> ip
-      [] -> to_string(:inet_parse.ntoa(conn.remote_ip))
-    end
-  end
+  defdelegate get_ip_address(conn), to: AuthifyWeb.Helpers.ConnHelpers, as: :get_client_ip
 
   @doc """
   Extracts the user agent from the connection.
+
+  Delegates to `ConnHelpers.get_user_agent/1`.
   """
-  def get_user_agent(conn) do
-    case Plug.Conn.get_req_header(conn, "user-agent") do
-      [user_agent | _] -> user_agent
-      [] -> "Unknown"
-    end
-  end
+  defdelegate get_user_agent(conn), to: AuthifyWeb.Helpers.ConnHelpers
 
   defp build_user_name(user) do
     cond do

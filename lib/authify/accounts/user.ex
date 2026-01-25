@@ -659,4 +659,46 @@ defmodule Authify.Accounts.User do
     org_requires_mfa = Authify.Configurations.get_organization_setting(organization, :require_mfa)
     org_requires_mfa && !totp_enabled?(user)
   end
+
+  # WebAuthn MFA Helper Functions
+
+  @doc """
+  Checks if WebAuthn is enabled for the user by checking for registered credentials.
+  """
+  def webauthn_enabled?(%__MODULE__{} = user) do
+    # Check if user has any WebAuthn credentials
+    Authify.Repo.exists?(
+      from c in Authify.MFA.WebAuthnCredential,
+        where: c.user_id == ^user.id
+    )
+  end
+
+  @doc """
+  Checks if WebAuthn is required for the user based on organization settings.
+  Returns true if the organization requires WebAuthn but the user hasn't enabled it.
+  """
+  def webauthn_required?(%__MODULE__{} = user, organization) do
+    org_requires_webauthn =
+      Authify.Configurations.get_organization_setting(organization, :require_webauthn) || false
+
+    org_requires_webauthn && !webauthn_enabled?(user)
+  end
+
+  @doc """
+  Checks if any MFA method (TOTP or WebAuthn) is enabled for the user.
+  """
+  def mfa_enabled?(%__MODULE__{} = user) do
+    totp_enabled?(user) || webauthn_enabled?(user)
+  end
+
+  @doc """
+  Checks if MFA is required for the user based on organization settings.
+  Returns true if the organization requires MFA but the user hasn't enabled any method.
+  """
+  def mfa_required?(%__MODULE__{} = user, organization) do
+    org_requires_mfa =
+      Authify.Configurations.get_organization_setting(organization, :require_mfa) || false
+
+    org_requires_mfa && !mfa_enabled?(user)
+  end
 end

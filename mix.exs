@@ -4,7 +4,7 @@ defmodule Authify.MixProject do
   def project do
     [
       app: :authify,
-      version: "0.11.0",
+      version: "0.12.0",
       elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -73,6 +73,7 @@ defmodule Authify.MixProject do
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_metrics_prometheus, "~> 1.1"},
       {:telemetry_poller, "~> 1.0"},
+      {:wax_, "~> 0.7"},
       {:x509, "~> 0.9"},
       # Static analysis & security (dev/test only)
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
