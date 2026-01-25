@@ -70,7 +70,12 @@ Authify is a self-hosted, open-source identity provider built with Elixir and Ph
 - **Retry Logic** - Automatic retry with exponential backoff for failed operations
 
 ### **Security & Compliance**
-- **Multi-Factor Authentication (MFA)** - TOTP-based MFA with backup codes and trusted devices
+- **Multi-Factor Authentication (MFA)**
+  - **TOTP (Time-based OTP)** - Authenticator app support with QR code enrollment
+  - **WebAuthn / FIDO2** - Hardware security keys (YubiKey, etc.) and platform authenticators (Touch ID, Face ID, Windows Hello)
+  - **Backup Codes** - Single-use recovery codes for account access
+  - **Trusted Devices** - Optional "remember this device" functionality
+  - **Lockout Protection** - Automatic lockout after failed MFA attempts with admin unlock capability
 - **Secure by Default** - Strong password policies and validation
 - **Token Security** - Proper JWT handling with secure defaults
 - **Rate Limiting** - Per-organization rate limits with hierarchical quotas and MFA lockout protection
@@ -218,6 +223,8 @@ We take security seriously and will respond promptly to legitimate reports.
 ### Security Features
 
 - Password security with bcrypt hashing and complexity requirements
+- Multi-factor authentication (TOTP and WebAuthn/FIDO2)
+- WebAuthn support for hardware security keys and biometric authentication
 - JWT token security with RS256 signing
 - SAML assertions signed with RSA-SHA256
 - Multi-tenant data isolation
@@ -259,6 +266,7 @@ Built with:
 - **[Phoenix Framework](https://phoenixframework.org/)** - Web framework
 - **[Elixir](https://elixir-lang.org/)** - Programming language
 - **[Guardian](https://github.com/ueberauth/guardian)** - JWT authentication
+- **[Wax](https://github.com/tanguilp/wax)** - WebAuthn/FIDO2 authentication library
 - **[Ecto](https://hexdocs.pm/ecto/)** - Database wrapper and query generator
 - **[Bootstrap](https://getbootstrap.com/)** - UI framework
 
