@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-01-24
+
+### Added
+
+- **WebAuthn/FIDO2 Multi-Factor Authentication**
+  - Full WebAuthn (FIDO2) implementation for modern, phishing-resistant authentication
+  - Support for hardware security keys (YubiKey, Titan Key, etc.)
+  - Support for platform authenticators (Face ID, Touch ID, Windows Hello)
+  - Passkey support for passwordless authentication flows
+  - WebAuthn credential registration and management UI
+  - Real-time credential verification during login
+  - User-friendly setup wizard with device detection
+  - Comprehensive credential management interface
+  - Organization-level WebAuthn configuration and feature toggle
+  - WebAuthn support in MFA verification flow
+  - Challenge-based authentication with secure random generation
+  - Attestation and assertion verification
+  - Credential storage with public key and counter tracking
+  - Browser compatibility detection and graceful degradation
+
+- **WebAuthn Management UI**
+  - Dedicated credential management page at `/{org_slug}/webauthn`
+  - Registration flow with real-time feedback
+  - Credential listing with device information
+  - Credential revocation capability
+  - Integration with existing MFA management interface
+  - Visual indicators for credential status and last use
+  - Responsive design with Bootstrap 5 styling
+
+- **WebAuthn API Enhancements**
+  - Management API endpoints for WebAuthn credential management
+  - User WebAuthn status in user detail endpoints
+  - Organization WebAuthn settings in organization API
+  - OpenAPI documentation for WebAuthn endpoints
+
+### Changed
+
+- MFA verification flow enhanced to support multiple authentication methods (TOTP + WebAuthn)
+- Login flow updated to offer WebAuthn as an alternative to TOTP when available
+- User profile shows WebAuthn credential status alongside TOTP status
+- Organization configuration UI includes WebAuthn feature toggle
+
+### Security
+
+- WebAuthn provides phishing-resistant authentication via public key cryptography
+- Challenge-response mechanism prevents replay attacks
+- Secure credential storage with public keys only (private keys never leave device)
+- Origin and RP ID validation prevents cross-site attacks
+- Attestation verification for hardware security key validation
+- Signature counter tracking detects credential cloning attempts
+
+### Technical
+
+- Database migrations for webauthn_credentials and webauthn_challenges tables
+- New `Authify.MFA.WebAuthn` context module with credential and challenge management
+- WebAuthn controller with registration, verification, and management actions
+- JavaScript WebAuthn integration using native Web Authentication API
+- Complete test coverage (500+ new tests for WebAuthn functionality)
+- Integration tests for full WebAuthn registration and authentication flows
+- Wax library for WebAuthn protocol implementation
+- CBOR library for FIDO2 data encoding/decoding
+
 ## [0.11.0] - 2026-01-21
 
 ### Added
@@ -614,7 +676,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/authify/authify/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/authify/authify/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/authify/authify/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/authify/authify/compare/v0.8.1...v0.10.0
