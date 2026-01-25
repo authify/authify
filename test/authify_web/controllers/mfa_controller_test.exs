@@ -629,6 +629,138 @@ defmodule AuthifyWeb.MfaControllerTest do
   end
 
   # ============================================================================
+  # WebAuthn Authentication Tests
+  # ============================================================================
+
+  describe "POST /:org_slug/webauthn/authenticate/begin" do
+    setup %{organization: organization, user: user} do
+      # Create a WebAuthn credential for the user
+      credential =
+        %Authify.MFA.WebAuthnCredential{}
+        |> Authify.MFA.WebAuthnCredential.changeset(%{
+          user_id: user.id,
+          organization_id: user.organization_id,
+          credential_id: "test_cred_123",
+          public_key: :crypto.strong_rand_bytes(32),
+          sign_count: 0,
+          name: "Test Key",
+          credential_type: "platform"
+        })
+        |> Repo.insert!()
+
+      # Start MFA verification session
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(%{
+          mfa_pending_user_id: user.id,
+          mfa_pending_organization_id: organization.id
+        })
+
+      %{conn: conn, credential: credential}
+    end
+
+    test "returns authentication challenge and options", %{conn: conn} do
+      conn = post(conn, ~p"/mfa/webauthn/authenticate/begin")
+
+      response = json_response(conn, 200)
+      assert response["success"] == true
+      assert response["options"]
+      assert response["options"]["challenge"]
+      assert response["options"]["allowCredentials"]
+
+      # Verify challenge is stored in session
+      challenge = get_session(conn, :webauthn_authentication_challenge)
+      assert is_binary(challenge)
+    end
+
+    test "returns error if user has no credentials", %{
+      conn: conn,
+      credential: credential
+    } do
+      # Delete the credential
+      Repo.delete!(credential)
+
+      conn = post(conn, ~p"/mfa/webauthn/authenticate/begin")
+
+      response = json_response(conn, 200)
+      assert response["success"] == false
+      assert response["error"] =~ "No security keys registered"
+    end
+
+    test "requires MFA session" do
+      # Create new conn without MFA session
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(%{})
+        |> post(~p"/mfa/webauthn/authenticate/begin")
+
+      response = json_response(conn, 200)
+      assert response["success"] == false
+      assert response["error"] =~ "No active MFA session"
+    end
+  end
+
+  describe "POST /mfa/webauthn/authenticate/complete" do
+    setup %{conn: conn} do
+      # Begin authentication to get challenge
+      conn = post(conn, ~p"/mfa/webauthn/authenticate/begin")
+      challenge = get_session(conn, :webauthn_authentication_challenge)
+
+      %{conn: conn, challenge: challenge}
+    end
+
+    @tag :capture_log
+    test "returns error without active challenge", %{user: user} do
+      # Create new conn without challenge in session
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(%{
+          mfa_pending_user_id: user.id,
+          mfa_pending_organization_id: user.organization_id
+        })
+        |> post(~p"/mfa/webauthn/authenticate/complete", %{
+          "assertionResponse" => %{}
+        })
+
+      response = json_response(conn, 200)
+      assert response["success"] == false
+      assert response["error"] =~ "No active authentication challenge"
+    end
+
+    @tag :capture_log
+    test "handles invalid assertion response", %{conn: conn, challenge: _challenge} do
+      # This will fail at the WebAuthn verification level
+      conn =
+        post(conn, ~p"/mfa/webauthn/authenticate/complete", %{
+          "assertionResponse" => %{
+            "id" => "test_id",
+            "response" => %{
+              "authenticatorData" => Base.encode64("fake"),
+              "clientDataJSON" => Base.encode64(~s({"type":"webauthn.get"})),
+              "signature" => Base.encode64("fake")
+            }
+          }
+        })
+
+      # Should fail with WebAuthn error
+      response = json_response(conn, 200)
+      assert response["success"] == false
+    end
+
+    test "requires MFA session" do
+      # Create new conn without MFA session
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(%{})
+        |> post(~p"/mfa/webauthn/authenticate/complete", %{})
+
+      response = json_response(conn, 200)
+      assert response["success"] == false
+      assert response["error"] =~ "Please login first"
+    end
+  end
+
+  # ============================================================================
   # Helper Functions
   # ============================================================================
 
