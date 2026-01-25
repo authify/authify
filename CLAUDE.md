@@ -132,6 +132,49 @@ A comprehensive, open-source, multi-tenant identity provider supporting both OAu
 - ✅ Password complexity requirements
 - ✅ Token-based authentication (Guardian JWT)
 
+**Multi-Factor Authentication (MFA):**
+- ✅ TOTP (Time-based One-Time Password)
+  - ✅ QR code enrollment with authenticator apps (Google Authenticator, Authy, etc.)
+  - ✅ Manual secret key entry for advanced users
+  - ✅ Verification during login flow
+- ✅ WebAuthn / FIDO2 Support
+  - ✅ Hardware security keys (YubiKey, Titan, etc.)
+  - ✅ Platform authenticators (Touch ID, Face ID, Windows Hello)
+  - ✅ Registration and management UI
+  - ✅ Authentication during login flow
+  - ✅ Multiple credentials per user
+  - ✅ Credential naming and organization
+- ✅ Backup Codes
+  - ✅ Single-use recovery codes generation
+  - ✅ Secure storage with encryption
+  - ✅ Usage tracking and remaining code display
+  - ✅ Regeneration capability
+- ✅ Trusted Devices
+  - ✅ "Remember this device" functionality
+  - ✅ 30-day device trust duration
+  - ✅ Device management and revocation
+  - ✅ Device fingerprinting and tracking
+- ✅ MFA Lockout Protection
+  - ✅ Automatic lockout after failed attempts
+  - ✅ Configurable lockout duration
+  - ✅ Admin unlock capability
+- ✅ MFA Profile Management
+  - ✅ Setup and disable TOTP
+  - ✅ Register and manage WebAuthn credentials
+  - ✅ View and regenerate backup codes
+  - ✅ Manage trusted devices
+  - ✅ Admin reset capability
+- ✅ Management API Support
+  - ✅ MFA status endpoint
+  - ✅ MFA unlock endpoint
+  - ✅ TOTP reset endpoint
+  - ✅ OpenAPI documentation
+- ✅ Comprehensive Test Coverage
+  - ✅ Context tests (30 TOTP + 30 WebAuthn tests)
+  - ✅ Controller tests (28 MFA + 23 WebAuthn + 6 auth tests)
+  - ✅ Integration tests (11 WebAuthn workflow tests)
+  - ✅ All 1257 tests passing
+
 **Rate Limiting & DDoS Protection:**
 - ✅ Configurable per-organization rate limits (auth, OAuth, SAML, API endpoints)
 - ✅ Hierarchical quota system (super admin quotas + org admin limits)
@@ -154,7 +197,6 @@ A comprehensive, open-source, multi-tenant identity provider supporting both OAu
 **Enterprise Features:**
 - ⏳ Advanced SAML features (encryption, complex bindings)
 - ⏳ LDAP/Active Directory integration
-- ⏳ Multi-factor authentication (MFA)
 
 **Operational:**
 - ⏳ Backup and recovery procedures
@@ -165,6 +207,7 @@ A comprehensive, open-source, multi-tenant identity provider supporting both OAu
 - ✅ Core identity provider functionality (OAuth2/OIDC + SAML)
 - ✅ Multi-tenant architecture
 - ✅ Admin management interface
+- ✅ Multi-factor authentication (TOTP + WebAuthn/FIDO2)
 - ✅ Security best practices implemented
 - ✅ XML digital signatures (RSA-SHA256 with XMLDSig)
 - ✅ Certificate management (X509 library with self-signed generation)
