@@ -217,11 +217,26 @@ defmodule AuthifyWeb.MfaController do
         # Check for active lockout
         case MFA.check_lockout(user) do
           {:ok, :no_lockout} ->
+            # Determine which MFA methods are available
+            has_totp = Accounts.User.totp_enabled?(user)
+            has_webauthn = not Enum.empty?(MFA.WebAuthn.list_credentials(user))
+
+            # Prefer WebAuthn if available (more secure - phishing-resistant)
+            default_method =
+              cond do
+                has_webauthn -> :webauthn
+                has_totp -> :totp
+                true -> :totp
+              end
+
             render(conn, :verify_form,
               user: user,
               organization: organization,
               error: nil,
-              attempts_remaining: nil
+              attempts_remaining: nil,
+              default_method: default_method,
+              has_totp: has_totp,
+              has_webauthn: has_webauthn
             )
 
           {:error, {:locked, _locked_until}} ->
@@ -648,13 +663,18 @@ defmodule AuthifyWeb.MfaController do
         "Invalid code. This is your last attempt before lockout."
       end
 
+    mfa_method_assigns = get_mfa_method_assigns(user)
+
     conn
     |> put_flash(:error, error_message)
-    |> render(:verify_form,
-      user: user,
-      organization: organization,
-      error: "Invalid code",
-      attempts_remaining: remaining_attempts - 1
+    |> render(
+      :verify_form,
+      Map.merge(mfa_method_assigns, %{
+        user: user,
+        organization: organization,
+        error: "Invalid code",
+        attempts_remaining: remaining_attempts - 1
+      })
     )
   end
 
@@ -681,13 +701,18 @@ defmodule AuthifyWeb.MfaController do
          _use_backup,
          remaining_attempts
        ) do
+    mfa_method_assigns = get_mfa_method_assigns(user)
+
     conn
     |> put_flash(:error, "No backup codes available.")
-    |> render(:verify_form,
-      user: user,
-      organization: organization,
-      error: "No backup codes available",
-      attempts_remaining: remaining_attempts
+    |> render(
+      :verify_form,
+      Map.merge(mfa_method_assigns, %{
+        user: user,
+        organization: organization,
+        error: "No backup codes available",
+        attempts_remaining: remaining_attempts
+      })
     )
   end
 
@@ -700,13 +725,18 @@ defmodule AuthifyWeb.MfaController do
          _use_backup,
          remaining_attempts
        ) do
+    mfa_method_assigns = get_mfa_method_assigns(user)
+
     conn
     |> put_flash(:error, "Verification failed. Please try again.")
-    |> render(:verify_form,
-      user: user,
-      organization: organization,
-      error: "Verification failed",
-      attempts_remaining: remaining_attempts
+    |> render(
+      :verify_form,
+      Map.merge(mfa_method_assigns, %{
+        user: user,
+        organization: organization,
+        error: "Verification failed",
+        attempts_remaining: remaining_attempts
+      })
     )
   end
 
@@ -735,6 +765,26 @@ defmodule AuthifyWeb.MfaController do
     |> String.graphemes()
     |> Enum.chunk_every(4)
     |> Enum.map_join(" ", &Enum.join/1)
+  end
+
+  defp get_mfa_method_assigns(user) do
+    # Determine which MFA methods are available
+    has_totp = Accounts.User.totp_enabled?(user)
+    has_webauthn = not Enum.empty?(MFA.WebAuthn.list_credentials(user))
+
+    # Prefer WebAuthn if available (more secure - phishing-resistant)
+    default_method =
+      cond do
+        has_webauthn -> :webauthn
+        has_totp -> :totp
+        true -> :totp
+      end
+
+    %{
+      default_method: default_method,
+      has_totp: has_totp,
+      has_webauthn: has_webauthn
+    }
   end
 
   defp create_trusted_device_token(conn, user) do

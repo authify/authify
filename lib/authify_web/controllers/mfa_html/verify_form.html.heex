@@ -8,8 +8,15 @@
           </h4>
         </div>
         <div class="card-body p-4">
-          <p class="text-center mb-4">
-            Enter the 6-digit code from your authenticator app to continue.
+          <p class="text-center mb-4" id="mfa-instruction-text">
+            <%= case @default_method do %>
+              <% :webauthn -> %>
+                Insert your security key and touch it, or use your device's biometric authentication.
+              <% :totp -> %>
+                Enter the 6-digit code from your authenticator app to continue.
+              <% _ -> %>
+                Enter the 6-digit code from your authenticator app to continue.
+            <% end %>
           </p>
 
           <.form
@@ -17,6 +24,7 @@
             action={~p"/mfa/verify"}
             method="post"
             id="mfa-verify-form"
+            style={if @default_method == :webauthn, do: "display:none;", else: ""}
           >
             <div class="mb-3">
               <label for="totp_code" class="form-label">Authentication Code</label>
@@ -60,19 +68,21 @@
             <hr />
 
             <div class="text-center">
-              <p class="text-muted small mb-2">Alternative verification methods:</p>
+              <p class="text-muted small mb-2">Try a different way:</p>
               <div class="btn-group btn-group-sm" role="group">
-                <button
-                  type="button"
-                  class="btn btn-outline-secondary"
-                  onclick="showWebAuthnForm()"
-                  id="webauthn-button"
-                >
-                  <i class="bi bi-shield-check"></i> Security Key
-                </button>
+                <%= if @has_webauthn do %>
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    onclick="showWebAuthnForm()"
+                    id="webauthn-button"
+                  >
+                    <i class="bi bi-shield-check"></i> Security Key
+                  </button>
+                <% end %>
                 <a
                   href="#"
-                  onclick="document.getElementById('backup-form').style.display='block'; document.getElementById('mfa-verify-form').style.display='none'; document.getElementById('webauthn-form').style.display='none'; return false;"
+                  onclick="showBackupForm()"
                   class="btn btn-outline-secondary"
                 >
                   <i class="bi bi-key"></i> Backup Code
@@ -81,12 +91,12 @@
             </div>
           </.form>
 
-          <div id="webauthn-form" style="display:none;">
+          <div
+            id="webauthn-form"
+            style={if @default_method != :webauthn, do: "display:none;", else: ""}
+          >
             <p class="text-center mb-3">
               <i class="bi bi-shield-check text-primary" style="font-size: 2rem;"></i>
-            </p>
-            <p class="text-center mb-4">
-              Insert your security key and touch it, or use your device's biometric authentication.
             </p>
 
             <div class="form-check mb-3">
@@ -113,14 +123,28 @@
 
             <div id="webauthn-status" class="mt-3"></div>
 
+            <hr />
+
             <div class="text-center">
-              <a
-                href="#"
-                onclick="document.getElementById('webauthn-form').style.display='none'; document.getElementById('mfa-verify-form').style.display='block'; return false;"
-                class="btn btn-sm btn-link"
-              >
-                <i class="bi bi-arrow-left"></i> Back to Authenticator Code
-              </a>
+              <p class="text-muted small mb-2">Try a different way:</p>
+              <div class="btn-group btn-group-sm" role="group">
+                <%= if @has_totp do %>
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    onclick="showTOTPForm()"
+                  >
+                    <i class="bi bi-phone"></i> Authenticator App
+                  </button>
+                <% end %>
+                <a
+                  href="#"
+                  onclick="showBackupForm()"
+                  class="btn btn-outline-secondary"
+                >
+                  <i class="bi bi-key"></i> Backup Code
+                </a>
+              </div>
             </div>
           </div>
 
@@ -159,14 +183,30 @@
               </button>
             </div>
 
+            <hr />
+
             <div class="text-center">
-              <a
-                href="#"
-                onclick="document.getElementById('backup-form').style.display='none'; document.getElementById('mfa-verify-form').style.display='block'; return false;"
-                class="btn btn-sm btn-link"
-              >
-                <i class="bi bi-arrow-left"></i> Back to Authenticator Code
-              </a>
+              <p class="text-muted small mb-2">Try a different way:</p>
+              <div class="btn-group btn-group-sm" role="group">
+                <%= if @has_webauthn do %>
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    onclick="showWebAuthnForm()"
+                  >
+                    <i class="bi bi-shield-check"></i> Security Key
+                  </button>
+                <% end %>
+                <%= if @has_totp do %>
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    onclick="showTOTPForm()"
+                  >
+                    <i class="bi bi-phone"></i> Authenticator App
+                  </button>
+                <% end %>
+              </div>
             </div>
           </.form>
         </div>
@@ -181,7 +221,20 @@
 </div>
 
 <script>
-  // WebAuthn Authentication Flow
+  // Helper function to update instruction text
+  function updateInstructionText(text) {
+    document.getElementById('mfa-instruction-text').textContent = text;
+  }
+
+  // Show TOTP form
+  function showTOTPForm() {
+    document.getElementById('webauthn-form').style.display = 'none';
+    document.getElementById('backup-form').style.display = 'none';
+    document.getElementById('mfa-verify-form').style.display = 'block';
+    updateInstructionText('Enter the 6-digit code from your authenticator app to continue.');
+  }
+
+  // Show WebAuthn form
   function showWebAuthnForm() {
     // Check if WebAuthn module is loaded and supported
     if (!window.WebAuthn || !window.WebAuthn.isWebAuthnSupported()) {
@@ -192,6 +245,15 @@
     document.getElementById('mfa-verify-form').style.display = 'none';
     document.getElementById('backup-form').style.display = 'none';
     document.getElementById('webauthn-form').style.display = 'block';
+    updateInstructionText("Insert your security key and touch it, or use your device's biometric authentication.");
+  }
+
+  // Show backup code form
+  function showBackupForm() {
+    document.getElementById('mfa-verify-form').style.display = 'none';
+    document.getElementById('webauthn-form').style.display = 'none';
+    document.getElementById('backup-form').style.display = 'block';
+    updateInstructionText('Enter one of your backup codes to continue.');
   }
 
   async function authenticateWithWebAuthn() {
