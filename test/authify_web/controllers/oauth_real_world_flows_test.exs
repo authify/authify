@@ -16,6 +16,7 @@ defmodule AuthifyWeb.OAuthRealWorldFlowsTest do
   alias Authify.OAuth.Application
 
   describe "Complete user signup to OAuth API access flow" do
+    @tag :capture_log
     test "new user can sign up, authorize app, and app can access API on their behalf" do
       # Step 1: Organization admin signs up their organization
       org_attrs = %{

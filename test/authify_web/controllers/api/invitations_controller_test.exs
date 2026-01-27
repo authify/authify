@@ -53,6 +53,7 @@ defmodule AuthifyWeb.API.InvitationsControllerTest do
   end
 
   describe "GET /api/invitations" do
+    @describetag :capture_log
     test "returns paginated list of invitations with HATEOAS", %{
       conn: conn,
       organization: organization
@@ -164,6 +165,7 @@ defmodule AuthifyWeb.API.InvitationsControllerTest do
   end
 
   describe "GET /api/invitations/:id" do
+    @describetag :capture_log
     test "returns invitation details", %{
       conn: conn,
       invitation1: invitation,
@@ -220,6 +222,7 @@ defmodule AuthifyWeb.API.InvitationsControllerTest do
   end
 
   describe "POST /api/invitations" do
+    @describetag :capture_log
     test "creates invitation with valid data", %{conn: conn, organization: organization} do
       invitation_attrs = %{
         "invitation" => %{
@@ -365,6 +368,7 @@ defmodule AuthifyWeb.API.InvitationsControllerTest do
   end
 
   describe "PUT /api/invitations/:id" do
+    @describetag :capture_log
     test "updates invitation with valid data", %{
       conn: conn,
       invitation1: invitation,
@@ -466,6 +470,7 @@ defmodule AuthifyWeb.API.InvitationsControllerTest do
   end
 
   describe "DELETE /api/invitations/:id" do
+    @describetag :capture_log
     test "deletes invitation", %{conn: conn, invitation1: invitation, organization: organization} do
       conn = delete(conn, "/#{organization.slug}/api/invitations/#{invitation.id}")
 

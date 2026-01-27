@@ -22,6 +22,7 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
       %{organization: organization, user: user}
     end
 
+    @tag :capture_log
     test "generates reset token for valid email", %{conn: conn, user: user} do
       conn =
         post(conn, ~p"/password_reset", %{

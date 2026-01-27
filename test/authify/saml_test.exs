@@ -337,6 +337,7 @@ defmodule Authify.SAMLTest do
       assert is_binary(request_info.acs_url)
     end
 
+    @tag :capture_log
     test "parse_saml_request/1 with empty XML returns error" do
       assert {:error, "Data is neither valid Base64 nor XML"} = SAML.parse_saml_request("")
       assert {:error, "SAML request cannot be empty"} = SAML.parse_saml_request(nil)
@@ -352,6 +353,7 @@ defmodule Authify.SAMLTest do
       assert is_binary(logout_info.name_id)
     end
 
+    @tag :capture_log
     test "parse_saml_logout_request/1 with empty XML returns error" do
       assert {:error, "Data is neither valid Base64 nor XML"} = SAML.parse_saml_logout_request("")
       assert {:error, "SAML logout request cannot be empty"} = SAML.parse_saml_logout_request(nil)

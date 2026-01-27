@@ -401,6 +401,7 @@ defmodule Authify.AccountsTest do
       "role" => "invalid_role"
     }
 
+    @tag :capture_log
     test "list_invitations/1 returns all invitations for organization", %{
       organization: org,
       admin_user: admin
@@ -413,6 +414,7 @@ defmodule Authify.AccountsTest do
       assert hd(invitations).email == invitation.email
     end
 
+    @tag :capture_log
     test "list_pending_invitations/1 returns only pending invitations", %{
       organization: org,
       admin_user: admin
@@ -437,6 +439,7 @@ defmodule Authify.AccountsTest do
       assert hd(pending_invitations).id == pending_invitation.id
     end
 
+    @tag :capture_log
     test "get_invitation!/1 returns the invitation with given id", %{
       organization: org,
       admin_user: admin
@@ -449,6 +452,7 @@ defmodule Authify.AccountsTest do
       assert found_invitation.role == invitation.role
     end
 
+    @tag :capture_log
     test "get_invitation_by_token/1 returns invitation with given token", %{
       organization: org,
       admin_user: admin
@@ -515,6 +519,7 @@ defmodule Authify.AccountsTest do
       assert "User already invited to this organization" in errors_on(changeset).email
     end
 
+    @tag :capture_log
     test "create_invitation_and_send_email/2 creates invitation with inviter", %{
       organization: org,
       admin_user: admin
@@ -528,6 +533,7 @@ defmodule Authify.AccountsTest do
       assert invitation.organization_id == org.id
     end
 
+    @tag :capture_log
     test "accept_invitation/2 creates user and marks invitation as accepted", %{
       organization: org,
       admin_user: admin
@@ -555,6 +561,7 @@ defmodule Authify.AccountsTest do
       assert updated_invitation.accepted_at != nil
     end
 
+    @tag :capture_log
     test "accept_invitation/2 with invalid user data returns error", %{
       organization: org,
       admin_user: admin
@@ -601,6 +608,7 @@ defmodule Authify.AccountsTest do
                Accounts.accept_invitation(expired_invitation, user_attrs)
     end
 
+    @tag :capture_log
     test "accept_invitation/2 with already accepted invitation returns error", %{
       organization: org,
       admin_user: admin
@@ -625,6 +633,7 @@ defmodule Authify.AccountsTest do
                Accounts.accept_invitation(updated_invitation, user_attrs)
     end
 
+    @tag :capture_log
     test "delete_invitation/1 deletes the invitation", %{organization: org, admin_user: admin} do
       invitation = invitation_for_organization_fixture(org, admin)
 
@@ -632,6 +641,7 @@ defmodule Authify.AccountsTest do
       assert_raise Ecto.NoResultsError, fn -> Accounts.get_invitation!(invitation.id) end
     end
 
+    @tag :capture_log
     test "change_invitation/1 returns an invitation changeset", %{
       organization: org,
       admin_user: admin
@@ -640,6 +650,7 @@ defmodule Authify.AccountsTest do
       assert %Ecto.Changeset{} = Accounts.change_invitation(invitation)
     end
 
+    @tag :capture_log
     test "cleanup_expired_invitations/1 removes only expired invitations", %{
       organization: org,
       admin_user: admin

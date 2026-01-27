@@ -10,6 +10,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
   describe "index" do
     setup :create_user_and_login
 
+    @tag :capture_log
     test "lists all invitations for organization", %{conn: conn, organization: org, user: admin} do
       invitation = invitation_for_organization_fixture(org, admin)
       conn = get(conn, ~p"/#{org.slug}/invitations")
@@ -39,6 +40,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
   describe "create invitation" do
     setup :create_user_and_login
 
+    @tag :capture_log
     test "redirects to index when data is valid", %{conn: conn, organization: org} do
       invitation_params = %{
         "email" => unique_user_email(),
@@ -90,6 +92,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert Enum.any?(event.metadata["errors"], &String.contains?(&1, "email"))
     end
 
+    @tag :capture_log
     test "renders errors when email already invited", %{
       conn: conn,
       organization: org,
@@ -117,6 +120,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
   describe "show invitation" do
     setup :create_user_and_login
 
+    @tag :capture_log
     test "displays invitation details", %{conn: conn, organization: org, user: admin} do
       invitation = invitation_for_organization_fixture(org, admin)
       conn = get(conn, ~p"/#{org.slug}/invitations/#{invitation.id}")
@@ -125,6 +129,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert html_response(conn, 200) =~ invitation.email
     end
 
+    @tag :capture_log
     test "redirects when invitation belongs to different organization", %{
       conn: conn,
       organization: org
@@ -145,6 +150,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
   describe "delete invitation" do
     setup :create_user_and_login
 
+    @tag :capture_log
     test "deletes chosen invitation", %{conn: conn, organization: org, user: admin} do
       invitation = invitation_for_organization_fixture(org, admin)
       conn = delete(conn, ~p"/#{org.slug}/invitations/#{invitation.id}")
@@ -172,6 +178,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert event.metadata["source"] == "web"
     end
 
+    @tag :capture_log
     test "redirects when invitation belongs to different organization", %{
       conn: conn,
       organization: org
@@ -193,6 +200,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
   end
 
   describe "accept invitation (public)" do
+    @tag :capture_log
     test "renders acceptance form for valid pending invitation", %{conn: conn} do
       organization = organization_fixture()
       admin = admin_user_fixture(organization)
@@ -238,6 +246,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "This invitation has expired"
     end
 
+    @tag :capture_log
     test "redirects for already accepted invitation", %{conn: conn} do
       organization = organization_fixture()
       admin = admin_user_fixture(organization)
@@ -265,6 +274,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
   end
 
   describe "accept_invitation (public)" do
+    @tag :capture_log
     test "creates user and redirects on success", %{conn: conn} do
       organization = organization_fixture()
       admin = admin_user_fixture(organization)
@@ -311,6 +321,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert event.metadata["source"] == "web"
     end
 
+    @tag :capture_log
     test "renders errors when user data is invalid", %{conn: conn} do
       organization = organization_fixture()
       admin = admin_user_fixture(organization)
@@ -388,6 +399,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert redirected_to(conn) == ~p"/login"
     end
 
+    @tag :capture_log
     test "public invitation acceptance routes do not require authentication", %{conn: conn} do
       organization = organization_fixture()
       admin = admin_user_fixture(organization)

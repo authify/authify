@@ -29,6 +29,7 @@ defmodule Authify.SCIMClient.ProvisionerTest do
   end
 
   describe "provision/3 with feature toggle" do
+    @tag :capture_log
     test "provisions when scim_outbound_provisioning_enabled is true", %{
       organization: organization,
       user: user,
@@ -105,6 +106,7 @@ defmodule Authify.SCIMClient.ProvisionerTest do
       %{scim_client: scim_client}
     end
 
+    @tag :capture_log
     test "handles user creation events", %{user: user, scim_client: scim_client} do
       Provisioner.provision(:created, :user, user)
 
@@ -118,6 +120,7 @@ defmodule Authify.SCIMClient.ProvisionerTest do
       assert log.resource_type == "User"
     end
 
+    @tag :capture_log
     test "handles user update events", %{user: user, scim_client: scim_client} do
       Provisioner.provision(:updated, :user, user)
 
@@ -131,6 +134,7 @@ defmodule Authify.SCIMClient.ProvisionerTest do
       assert log.resource_type == "User"
     end
 
+    @tag :capture_log
     test "handles user deletion events", %{user: user, scim_client: scim_client} do
       Provisioner.provision(:deleted, :user, user)
 
@@ -158,6 +162,7 @@ defmodule Authify.SCIMClient.ProvisionerTest do
       %{group: group, scim_client: scim_client}
     end
 
+    @tag :capture_log
     test "handles group creation events", %{group: group, scim_client: scim_client} do
       Provisioner.provision(:created, :group, group)
 
@@ -171,6 +176,7 @@ defmodule Authify.SCIMClient.ProvisionerTest do
       assert log.resource_type == "Group"
     end
 
+    @tag :capture_log
     test "handles group update events", %{group: group, scim_client: scim_client} do
       Provisioner.provision(:updated, :group, group)
 
@@ -184,6 +190,7 @@ defmodule Authify.SCIMClient.ProvisionerTest do
       assert log.resource_type == "Group"
     end
 
+    @tag :capture_log
     test "handles group deletion events", %{group: group, scim_client: scim_client} do
       Provisioner.provision(:deleted, :group, group)
 
