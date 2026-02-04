@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.2] - 2026-02-03
+
+### Fixed
+
+- Fixed trusted device revocation functionality in MFA profile page - "Revoke" buttons now properly send DELETE requests using Phoenix link helpers instead of unsupported data-method attributes
+- Fixed redirect after revoking trusted devices to keep users on the MFA profile page instead of navigating to a non-existent devices page
+- Removed dedicated trusted devices page (/profile/mfa/devices) in favor of showing all devices inline on the main MFA profile page, sorted by most recently used
+- Fixed "Regenerate Codes" button to use proper Phoenix link helper with POST method
+
 ## [0.12.1] - 2026-01-25
 
 ### Changed
@@ -682,7 +691,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.12.1...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.12.2...HEAD
+[0.12.2]: https://github.com/authify/authify/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/authify/authify/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/authify/authify/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/authify/authify/compare/v0.10.1...v0.11.0

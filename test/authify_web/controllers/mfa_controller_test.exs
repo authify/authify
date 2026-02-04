@@ -519,44 +519,6 @@ defmodule AuthifyWeb.MfaControllerTest do
   # Device Management Tests
   # ============================================================================
 
-  describe "GET /:org_slug/profile/mfa/devices" do
-    test "lists trusted devices", %{conn: conn, organization: organization, user: user} do
-      # Enable TOTP
-      {:ok, secret} = MFA.setup_totp(user)
-      {:ok, user, _codes} = MFA.complete_totp_setup(user, generate_valid_totp(secret), secret)
-
-      # Create trusted device
-      {:ok, _device, _token} =
-        MFA.create_trusted_device(user, %{
-          ip_address: "127.0.0.1",
-          user_agent: "Test Browser"
-        })
-
-      conn =
-        conn
-        |> log_in_user(user, organization)
-        |> get(~p"/#{organization.slug}/profile/mfa/devices")
-
-      assert html_response(conn, 200) =~ "Trusted Devices"
-      assert html_response(conn, 200) =~ "127.0.0.1"
-      assert html_response(conn, 200) =~ "Test Browser"
-    end
-
-    test "shows message when no devices", %{conn: conn, organization: organization, user: user} do
-      # Enable TOTP
-      {:ok, secret} = MFA.setup_totp(user)
-      {:ok, user, _codes} = MFA.complete_totp_setup(user, generate_valid_totp(secret), secret)
-
-      conn =
-        conn
-        |> log_in_user(user, organization)
-        |> get(~p"/#{organization.slug}/profile/mfa/devices")
-
-      assert html_response(conn, 200) =~ "Trusted Devices"
-      assert html_response(conn, 200) =~ "don't have any trusted devices"
-    end
-  end
-
   describe "DELETE /:org_slug/profile/mfa/devices/:id" do
     test "revokes specific device", %{conn: conn, organization: organization, user: user} do
       # Enable TOTP
@@ -575,7 +537,7 @@ defmodule AuthifyWeb.MfaControllerTest do
         |> log_in_user(user, organization)
         |> delete(~p"/#{organization.slug}/profile/mfa/devices/#{device.id}")
 
-      assert redirected_to(conn) == ~p"/#{organization.slug}/profile/mfa/devices"
+      assert redirected_to(conn) == ~p"/#{organization.slug}/profile/mfa"
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "has been revoked"
 
       # Verify device revoked
@@ -596,7 +558,7 @@ defmodule AuthifyWeb.MfaControllerTest do
         |> log_in_user(user, organization)
         |> delete(~p"/#{organization.slug}/profile/mfa/devices/99999")
 
-      assert redirected_to(conn) == ~p"/#{organization.slug}/profile/mfa/devices"
+      assert redirected_to(conn) == ~p"/#{organization.slug}/profile/mfa"
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "not found"
     end
   end

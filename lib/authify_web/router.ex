@@ -186,7 +186,6 @@ defmodule AuthifyWeb.Router do
     delete "/profile/mfa", MfaController, :disable
     get "/profile/mfa/backup-codes", MfaController, :backup_codes
     post "/profile/mfa/regenerate-codes", MfaController, :regenerate_codes
-    get "/profile/mfa/devices", MfaController, :list_devices
     delete "/profile/mfa/devices/:id", MfaController, :revoke_device
     delete "/profile/mfa/devices", MfaController, :revoke_all_devices
 

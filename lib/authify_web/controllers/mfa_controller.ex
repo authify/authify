@@ -468,22 +468,6 @@ defmodule AuthifyWeb.MfaController do
   # ============================================================================
 
   @doc """
-  List all trusted devices for user.
-  """
-  def list_devices(conn, _params) do
-    current_user = conn.assigns.current_user
-    organization = conn.assigns.current_organization
-
-    devices = MFA.list_trusted_devices(current_user)
-
-    render(conn, :devices,
-      user: current_user,
-      organization: organization,
-      devices: devices
-    )
-  end
-
-  @doc """
   Revoke a specific trusted device.
   """
   def revoke_device(conn, %{"id" => device_id}) do
@@ -501,12 +485,12 @@ defmodule AuthifyWeb.MfaController do
 
         conn
         |> put_flash(:info, "Trusted device has been revoked.")
-        |> redirect(to: ~p"/#{organization.slug}/profile/mfa/devices")
+        |> redirect(to: ~p"/#{organization.slug}/profile/mfa")
 
       {:error, :not_found} ->
         conn
         |> put_flash(:error, "Device not found.")
-        |> redirect(to: ~p"/#{organization.slug}/profile/mfa/devices")
+        |> redirect(to: ~p"/#{organization.slug}/profile/mfa")
     end
   end
 
