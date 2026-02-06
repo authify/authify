@@ -8,8 +8,63 @@ defmodule AuthifyWeb.SessionController do
   alias Authify.MFA
 
   def new(conn, params) do
-    # Clear any existing session when showing login form
-    conn = Guardian.Plug.sign_out(conn)
+    # If user is already authenticated with a valid organization, redirect to their dashboard
+    case Guardian.Plug.current_resource(conn) do
+      nil ->
+        # No authenticated user, show login form
+        # Clear any stale session data when showing login form
+        conn = Guardian.Plug.sign_out(conn)
+        render_login_form(conn, params)
+
+      user ->
+        # User is authenticated - determine their current organization context
+        user_with_org = Accounts.get_user_with_organizations!(user.id)
+
+        # Check for current organization in session (respects "Switch To" functionality)
+        organization = get_current_organization_for_redirect(conn, user_with_org)
+
+        if organization do
+          # Valid organization exists, redirect to their dashboard
+          redirect(conn, to: ~p"/#{organization.slug}/dashboard")
+        else
+          # Organization is missing/invalid - sign out and show login with error
+          conn
+          |> Guardian.Plug.sign_out()
+          |> put_flash(
+            :error,
+            "Your account has an invalid organization. Please contact support."
+          )
+          |> render_login_form(params)
+        end
+    end
+  end
+
+  # Get the current organization for redirect, respecting session-based switching
+  defp get_current_organization_for_redirect(conn, user) do
+    case get_session(conn, :current_organization_id) do
+      nil ->
+        # No session override, use user's default organization
+        user.organization
+
+      organization_id when is_integer(organization_id) ->
+        # Check if user can access this organization
+        case Accounts.get_organization(organization_id) do
+          nil ->
+            # Organization was deleted, fall back to user's default
+            user.organization
+
+          organization ->
+            # Organization exists, use it (access checks are enforced by organization-scoped routes)
+            organization
+        end
+
+      _ ->
+        # Invalid session data, use user's default
+        user.organization
+    end
+  end
+
+  defp render_login_form(conn, params) do
     changeset = Accounts.change_user_registration(%Authify.Accounts.User{})
     # Pass org_slug from query params to pre-fill the form
     org_slug = params["org_slug"]

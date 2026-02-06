@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.3] - 2026-02-05
+
+### Fixed
+
+- Fixed logout bug where authenticated users visiting `/` would be unexpectedly logged out when their organization context was invalid or missing
+- Login page now properly redirects authenticated users to their current organization's dashboard instead of clearing their session
+
 ## [0.12.2] - 2026-02-03
 
 ### Fixed
@@ -691,7 +698,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.12.2...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.12.3...HEAD
+[0.12.3]: https://github.com/authify/authify/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/authify/authify/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/authify/authify/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/authify/authify/compare/v0.11.0...v0.12.0

@@ -11,6 +11,69 @@ defmodule AuthifyWeb.SessionControllerTest do
       assert html_response(conn, 200) =~ "Email Address"
       assert html_response(conn, 200) =~ "Password"
     end
+
+    test "redirects to dashboard when user is already authenticated", %{conn: conn} do
+      # Create organization and user
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+
+      user_attrs = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "email" => "john@test.com",
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      {:ok, user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
+
+      # Authenticate the user
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Authify.Guardian.Plug.sign_in(user)
+
+      # Visit /login while already authenticated
+      conn = get(conn, ~p"/login")
+
+      # Should redirect to their dashboard, not show login form
+      assert redirected_to(conn) == ~p"/#{organization.slug}/dashboard"
+
+      # Should NOT be signed out (bug fix verification)
+      assert Authify.Guardian.Plug.current_resource(conn) != nil
+    end
+
+    test "redirects to current organization when user has switched context", %{conn: conn} do
+      # Create two organizations
+      {:ok, org1} = Accounts.create_organization(%{name: "Org 1", slug: "org-1"})
+      {:ok, org2} = Accounts.create_organization(%{name: "Org 2", slug: "org-2"})
+
+      # Create a global admin user in org1
+      user_attrs = %{
+        "first_name" => "Admin",
+        "last_name" => "User",
+        "email" => "admin@test.com",
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!",
+        "super_admin" => true
+      }
+
+      {:ok, user} = Accounts.create_user_with_role(user_attrs, org1.id, "admin")
+
+      # Authenticate the user and set current_organization_id to org2 (simulating "Switch To")
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{current_organization_id: org2.id})
+        |> Authify.Guardian.Plug.sign_in(user)
+
+      # Visit /login while already authenticated with switched context
+      conn = get(conn, ~p"/login")
+
+      # Should redirect to org2's dashboard (the switched-to org), not org1 (user's primary org)
+      assert redirected_to(conn) == ~p"/#{org2.slug}/dashboard"
+
+      # Should NOT be signed out
+      assert Authify.Guardian.Plug.current_resource(conn) != nil
+    end
   end
 
   describe "POST /login" do
