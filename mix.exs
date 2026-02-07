@@ -52,7 +52,7 @@ defmodule Authify.MixProject do
       {:ecto_sql, "~> 3.13"},
       {:eqrcode, "~> 0.2"},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
-      {:gettext, "~> 0.26"},
+      {:gettext, "~> 1.0"},
       {:guardian, "~> 2.3"},
       {:hammer, "~> 7.0"},
       {:jason, "~> 1.2"},
