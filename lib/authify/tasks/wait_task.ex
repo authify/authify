@@ -119,8 +119,10 @@ defmodule Authify.Tasks.WaitTask do
   defp handle_expiration(%Task{} = task, handler) do
     hook_result = handler.on_expiration(task)
 
-    # Transition: running → expiring (TaskExecutor is running us in :running state)
-    with {:ok, task} <- Tasks.transition_task(task, :expiring) do
+    # Transition: running → waiting → expiring → expired
+    # The state machine requires running → waiting before expiring
+    with {:ok, task} <- Tasks.transition_task(task, :waiting),
+         {:ok, task} <- Tasks.transition_task(task, :expiring) do
       maybe_schedule_follow_up(hook_result, task)
       Tasks.transition_task(task, :expired)
     end

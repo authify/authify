@@ -248,3 +248,14 @@ defmodule Authify.Tasks.Handlers.Test.WaitWithFollowUp do
     {:schedule_task, %{type: "test", action: "succeed", params: %{"reminder" => true}}}
   end
 end
+
+defmodule Authify.Tasks.Handlers.Test.WaitDefaults do
+  @moduledoc """
+  WaitTask handler that uses all default callbacks.
+  Used to verify default values for task_expiration, task_check_interval, etc.
+  """
+  use Authify.Tasks.WaitTask
+
+  @impl true
+  def check_condition(_task), do: :not_met
+end
