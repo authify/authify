@@ -185,7 +185,13 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
 
   # --- Task Execution ---
 
+  defp run_task(%Task{timeout_seconds: timeout_seconds} = task, handler)
+       when is_integer(timeout_seconds) and timeout_seconds > 0 do
+    run_task_with_timeout(task, handler, timeout_seconds * 1000)
+  end
+
   defp run_task(%Task{} = task, handler) do
+    # No timeout configured, execute directly
     case handler.execute(task) do
       {:ok, results} ->
         handle_success(task, handler, results)
@@ -210,6 +216,92 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
       }
 
       handle_failure(task, handler, reason)
+  end
+
+  defp handle_result(%Task{} = task, handler, result) do
+    case result do
+      {:ok, results} ->
+        handle_success(task, handler, results)
+
+      {:error, reason} ->
+        handle_failure(task, handler, reason)
+
+      {:wait, _} ->
+        # WaitTask returns this when condition is not met
+        :ok
+
+      other ->
+        handle_failure(task, handler, %{type: "unexpected_return", value: inspect(other)})
+    end
+  end
+
+  # --- Timeout Path ---
+
+  defp run_task_with_timeout(%Task{} = task, handler, timeout_ms) do
+    task_ref = make_ref()
+    parent = self()
+
+    {pid, monitor_ref} =
+      spawn_monitor(fn ->
+        result =
+          try do
+            handler.execute(task)
+          rescue
+            exception ->
+              {:exception, exception, __STACKTRACE__}
+          end
+
+        send(parent, {task_ref, :result, result})
+      end)
+
+    receive do
+      {^task_ref, :result, {:exception, exception, stacktrace}} ->
+        reason = %{
+          type: "exception",
+          message: Exception.message(exception),
+          stacktrace: Exception.format_stacktrace(stacktrace)
+        }
+
+        handle_failure(task, handler, reason)
+
+      {^task_ref, :result, result} ->
+        handle_result(task, handler, result)
+
+      {:DOWN, ^monitor_ref, :process, ^pid, :normal} ->
+        :ok
+
+      {:DOWN, ^monitor_ref, :process, ^pid, reason} ->
+        handle_failure(task, handler, %{
+          type: "process_crash",
+          message: "Task process crashed: #{inspect(reason)}"
+        })
+    after
+      timeout_ms ->
+        Process.demonitor(monitor_ref, [:flush])
+        Process.exit(pid, :kill)
+        handle_timeout(task, handler)
+    end
+  end
+
+  defp handle_timeout(%Task{} = task, _handler) do
+    reason = %{
+      type: "timeout",
+      message: "Task execution exceeded timeout of #{task.timeout_seconds} seconds"
+    }
+
+    # Transition: running → timing_out → timed_out
+    with {:ok, task} <-
+           Tasks.update_task(task, %{
+             errors: Map.put(task.errors || %{}, "final", reason)
+           }),
+         {:ok, task} <- Tasks.transition_task(task, :timing_out),
+         {:ok, _task} <- Tasks.transition_task(task, :timed_out) do
+      :ok
+    else
+      {:error, err} ->
+        Logger.error("TaskExecutor: failed to timeout task #{task.id}: #{inspect(err)}")
+        :ok
+    end
   end
 
   # --- Success Path ---

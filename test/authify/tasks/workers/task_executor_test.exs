@@ -379,4 +379,53 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
       assert errors_on(changeset) |> Map.has_key?(:type)
     end
   end
+
+  # --- Timeout Tests ---
+
+  describe "perform/1 - timeout enforcement" do
+    test "times out a task that exceeds timeout_seconds", %{org: org} do
+      task = insert_task(org, %{action: "slow", timeout_seconds: 1})
+
+      assert :ok = perform_task(task)
+
+      timed_out_task = Tasks.get_task!(task.id)
+      assert timed_out_task.status == :timed_out
+      assert timed_out_task.errors["final"]["type"] == "timeout"
+
+      assert timed_out_task.errors["final"]["message"] ==
+               "Task execution exceeded timeout of 1 seconds"
+    end
+
+    test "allows fast tasks to complete within timeout", %{org: org} do
+      task = insert_task(org, %{timeout_seconds: 5})
+
+      assert :ok = perform_task(task)
+
+      completed_task = Tasks.get_task!(task.id)
+      assert completed_task.status == :completed
+      assert completed_task.results == %{"result" => "success"}
+    end
+
+    test "executes tasks without timeout_seconds normally", %{org: org} do
+      task = insert_task(org, %{action: "slow"})
+
+      assert :ok = perform_task(task)
+
+      # Should complete (slowly) without timing out
+      completed_task = Tasks.get_task!(task.id)
+      assert completed_task.status == :completed
+    end
+
+    test "transitions through timing_out state correctly", %{org: org} do
+      task = insert_task(org, %{action: "slow", timeout_seconds: 1})
+
+      assert :ok = perform_task(task)
+
+      timed_out_task = Tasks.get_task!(task.id)
+      assert timed_out_task.status == :timed_out
+      assert timed_out_task.started_at != nil
+      refute timed_out_task.completed_at
+      refute timed_out_task.failed_at
+    end
+  end
 end

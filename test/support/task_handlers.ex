@@ -137,6 +137,20 @@ defmodule Authify.Tasks.Handlers.Test.SuccessWithFollowUp do
   end
 end
 
+defmodule Authify.Tasks.Handlers.Test.Slow do
+  @moduledoc """
+  Test handler that takes a long time to execute. Used for timeout tests.
+  """
+  use Authify.Tasks.BasicTask
+
+  @impl true
+  def execute(_task) do
+    # Sleep for 3 seconds to trigger timeout tests
+    Process.sleep(3000)
+    {:ok, %{"result" => "slow_success"}}
+  end
+end
+
 defmodule Authify.Tasks.Handlers.Test.NoExclusivity do
   @moduledoc """
   Test handler with no exclusivity checking.
