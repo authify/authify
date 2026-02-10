@@ -259,3 +259,79 @@ defmodule Authify.Tasks.Handlers.Test.WaitDefaults do
   @impl true
   def check_condition(_task), do: :not_met
 end
+
+# --- WorkflowTask Test Handlers ---
+
+defmodule Authify.Tasks.Handlers.Test.WorkflowSuccess do
+  @moduledoc """
+  Workflow with two successful steps that accumulate context.
+  """
+  use Authify.Tasks.WorkflowTask
+
+  @impl true
+  def workflow_steps,
+    do: [Authify.Tasks.Handlers.Test.WorkflowStepOne, Authify.Tasks.Handlers.Test.WorkflowStepTwo]
+end
+
+defmodule Authify.Tasks.Handlers.Test.WorkflowFailStop do
+  @moduledoc """
+  Workflow that stops on first step failure (default behavior).
+  """
+  use Authify.Tasks.WorkflowTask
+
+  @impl true
+  def workflow_steps, do: [Authify.Tasks.Handlers.Test.WorkflowFailStep]
+end
+
+defmodule Authify.Tasks.Handlers.Test.WorkflowFailContinue do
+  @moduledoc """
+  Workflow that continues to next step after failure.
+  """
+  use Authify.Tasks.WorkflowTask
+
+  @impl true
+  def workflow_steps,
+    do: [
+      Authify.Tasks.Handlers.Test.WorkflowFailStep,
+      Authify.Tasks.Handlers.Test.WorkflowStepTwo
+    ]
+
+  @impl true
+  def continue_on_failure?, do: true
+end
+
+defmodule Authify.Tasks.Handlers.Test.WorkflowStepOne do
+  @moduledoc """
+  First workflow step; succeeds and returns a value.
+  """
+  use Authify.Tasks.BasicTask
+
+  @impl true
+  def execute(task) do
+    {:ok, Map.merge(task.params || %{}, %{"step_one" => 1})}
+  end
+end
+
+defmodule Authify.Tasks.Handlers.Test.WorkflowStepTwo do
+  @moduledoc """
+  Second workflow step; succeeds and echoes accumulated context.
+  """
+  use Authify.Tasks.BasicTask
+
+  @impl true
+  def execute(task) do
+    {:ok, Map.merge(task.params || %{}, %{"step_two" => 2})}
+  end
+end
+
+defmodule Authify.Tasks.Handlers.Test.WorkflowFailStep do
+  @moduledoc """
+  Workflow step that fails.
+  """
+  use Authify.Tasks.BasicTask
+
+  @impl true
+  def execute(_task) do
+    {:error, %{type: "workflow_step_failed", message: "intentional failure"}}
+  end
+end
