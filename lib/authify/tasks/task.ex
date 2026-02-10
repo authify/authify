@@ -48,7 +48,7 @@ defmodule Authify.Tasks.Task do
     field :correlation_id, :string
     field :metadata, :map, default: %{}
 
-    belongs_to :organization, Authify.Accounts.Organization
+    belongs_to :organization, Authify.Accounts.Organization, type: :id
     belongs_to :parent, Authify.Tasks.Task
     has_many :children, Authify.Tasks.Task, foreign_key: :parent_id
     has_many :logs, Authify.Tasks.TaskLog
