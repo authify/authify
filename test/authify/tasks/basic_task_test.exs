@@ -4,19 +4,24 @@ defmodule Authify.Tasks.BasicTaskTest do
   alias Authify.Tasks.BasicTask
 
   describe "handler_module/1" do
-    test "resolves module from type and action" do
-      task = %Authify.Tasks.Task{type: "email", action: "send_invitation"}
-      assert BasicTask.handler_module(task) == Authify.Tasks.Handlers.Email.SendInvitation
+    test "resolves module from type and action for existing handlers" do
+      task = %Authify.Tasks.Task{type: "test", action: "succeed"}
+      assert BasicTask.handler_module(task) == Authify.Tasks.Handlers.Test.Succeed
     end
 
-    test "resolves module with underscored names" do
-      task = %Authify.Tasks.Task{type: "scim_client", action: "sync_user"}
-      assert BasicTask.handler_module(task) == Authify.Tasks.Handlers.ScimClient.SyncUser
+    test "resolves module with underscored action names" do
+      task = %Authify.Tasks.Task{type: "test", action: "skip_duplicates"}
+      assert BasicTask.handler_module(task) == Authify.Tasks.Handlers.Test.SkipDuplicates
     end
 
     test "resolves module from string arguments" do
-      assert BasicTask.handler_module("certificate", "renew_cert") ==
-               Authify.Tasks.Handlers.Certificate.RenewCert
+      assert BasicTask.handler_module("test", "fail") ==
+               Authify.Tasks.Handlers.Test.Fail
+    end
+
+    test "returns nil for non-existent handler modules" do
+      task = %Authify.Tasks.Task{type: "nonexistent", action: "handler"}
+      assert BasicTask.handler_module(task) == nil
     end
   end
 

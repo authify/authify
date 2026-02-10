@@ -218,8 +218,9 @@ defmodule Authify.Tasks.BasicTask do
   def handler_module(type, action) when is_binary(type) and is_binary(action) do
     type_part = type |> Macro.camelize()
     action_part = action |> Macro.camelize()
-    # credo:disable-for-next-line Credo.Check.Warning.UnsafeToAtom
-    Module.concat([Authify.Tasks.Handlers, type_part, action_part])
+    Module.safe_concat([Authify.Tasks.Handlers, type_part, action_part])
+  rescue
+    ArgumentError -> nil
   end
 
   @doc """

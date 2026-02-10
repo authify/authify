@@ -86,12 +86,16 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
   # --- Handler Resolution ---
 
   defp resolve_handler(%Task{} = task) do
-    module = BasicTask.handler_module(task)
+    case BasicTask.handler_module(task) do
+      nil ->
+        {:error, :no_handler}
 
-    if Code.ensure_loaded?(module) and function_exported?(module, :execute, 1) do
-      {:ok, module}
-    else
-      {:error, :no_handler}
+      module ->
+        if Code.ensure_loaded?(module) and function_exported?(module, :execute, 1) do
+          {:ok, module}
+        else
+          {:error, :no_handler}
+        end
     end
   end
 
