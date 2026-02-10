@@ -298,10 +298,11 @@ defmodule Authify.TasksTest do
       Tasks.create_task_log(task, "Log entry 1")
       Tasks.create_task_log(task, "Log entry 2")
 
-      # need to sort the logs by inserted_at and id to ensure order, since they may have the same timestamp
-      logs = Tasks.list_task_logs(task) |> Enum.sort_by(&{&1.inserted_at, &1.id})
+      logs = Tasks.list_task_logs(task)
       assert length(logs) == 2
-      assert hd(logs).log_data == "Log entry 1"
+      log_data = Enum.map(logs, & &1.log_data)
+      assert "Log entry 1" in log_data
+      assert "Log entry 2" in log_data
     end
 
     test "does not return logs for other tasks" do

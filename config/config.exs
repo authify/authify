@@ -57,6 +57,13 @@ config :authify, Authify.Guardian,
       System.get_env("SECRET_KEY_BASE") ||
       "your-secret-key-here-please-change-in-production"
 
+# Oban job processing configuration
+config :authify, Oban,
+  engine: Oban.Engines.Dolphin,
+  notifier: Oban.Notifiers.PG,
+  repo: Authify.Repo,
+  queues: [tasks: 10]
+
 # Hammer rate limiting configuration
 config :hammer,
   backend: {

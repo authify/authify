@@ -6,8 +6,8 @@ defmodule Authify.Tasks.Task do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :binary_id, autogenerate: true}
-  @foreign_key_type :binary_id
+  @primary_key {:id, Uniq.UUID, version: 7, autogenerate: true}
+  @foreign_key_type Uniq.UUID
 
   # State categories
   @active_states [:scheduled, :pending, :running, :waiting, :retrying]

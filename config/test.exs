@@ -58,3 +58,6 @@ config :authify, :metrics_enabled, false
 
 # Run SCIM provisioning synchronously in tests to avoid race conditions and sleeps
 config :authify, :sync_provisioning_in_tests, true
+
+# Use Oban testing mode to prevent jobs from running automatically
+config :authify, Oban, testing: :inline

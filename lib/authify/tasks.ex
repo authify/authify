@@ -8,6 +8,7 @@ defmodule Authify.Tasks do
 
   alias Authify.Repo
   alias Authify.Tasks.{StateMachine, Task, TaskLog}
+  alias Authify.Tasks.Workers.TaskExecutor
 
   # --- Task CRUD ---
 
@@ -19,6 +20,24 @@ defmodule Authify.Tasks do
     %Task{}
     |> Task.changeset(attrs)
     |> Repo.insert()
+  end
+
+  @doc """
+  Creates a new task and immediately enqueues it for execution via Oban.
+  This is the primary entry point for scheduling task work.
+  """
+  def create_and_enqueue_task(attrs) do
+    with {:ok, task} <- create_task(attrs) do
+      delay =
+        if task.status == :scheduled and task.scheduled_at do
+          max(0, DateTime.diff(task.scheduled_at, DateTime.utc_now(), :second))
+        else
+          0
+        end
+
+      TaskExecutor.schedule_execution(task, delay)
+      {:ok, task}
+    end
   end
 
   @doc """
