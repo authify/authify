@@ -115,6 +115,36 @@ defmodule Authify.Tasks do
   end
 
   @doc """
+  Lists all tasks (across all organizations) with optional filtering and pagination.
+  Used by global admin UI. Returns `{tasks, total_count}`.
+  """
+  def list_all_tasks(opts \\ []) do
+    page = opts[:page] || 1
+    per_page = opts[:per_page] || 25
+    offset = (page - 1) * per_page
+
+    base_query = Task
+
+    tasks =
+      base_query
+      |> apply_task_filters(opts)
+      |> apply_organization_filter(opts[:organization_id])
+      |> order_by([t], desc: t.inserted_at)
+      |> limit(^per_page)
+      |> offset(^offset)
+      |> preload(:organization)
+      |> Repo.all()
+
+    total =
+      base_query
+      |> apply_task_filters(opts)
+      |> apply_organization_filter(opts[:organization_id])
+      |> Repo.aggregate(:count, :id)
+
+    {tasks, total}
+  end
+
+  @doc """
   Lists all children of a parent task.
   """
   def list_children(%Task{id: parent_id}) do
@@ -199,5 +229,11 @@ defmodule Authify.Tasks do
 
   defp filter_by_action(query, action) when is_binary(action) do
     where(query, [t], t.action == ^action)
+  end
+
+  defp apply_organization_filter(query, nil), do: query
+
+  defp apply_organization_filter(query, organization_id) when is_integer(organization_id) do
+    where(query, [t], t.organization_id == ^organization_id)
   end
 end
