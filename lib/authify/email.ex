@@ -36,6 +36,8 @@ defmodule Authify.Email do
   end
 
   defp invitation_html_body(invitation, invited_by, organization, accept_url) do
+    invited_by_email = User.get_primary_email_value(invited_by)
+
     """
     <!DOCTYPE html>
     <html>
@@ -98,7 +100,7 @@ defmodule Authify.Email do
         <p>Hello,</p>
 
         <p>
-          <strong>#{invited_by.first_name} #{invited_by.last_name}</strong> (#{invited_by.email})
+          <strong>#{invited_by.first_name} #{invited_by.last_name}</strong> (#{invited_by_email})
           has invited you to join <strong>#{organization.name}</strong> on Authify as a
           <strong>#{String.capitalize(invitation.role)}</strong>.
         </p>
@@ -126,7 +128,7 @@ defmodule Authify.Email do
       <div class="footer">
         <p>
           This email was sent by #{organization.name} via Authify.<br>
-          Questions? Contact <a href="mailto:#{invited_by.email}">#{invited_by.email}</a>
+          Questions? Contact <a href="mailto:#{invited_by_email}">#{invited_by_email}</a>
         </p>
       </div>
     </body>
@@ -135,12 +137,14 @@ defmodule Authify.Email do
   end
 
   defp invitation_text_body(invitation, invited_by, organization, accept_url) do
+    invited_by_email = User.get_primary_email_value(invited_by)
+
     """
     You've been invited to join #{organization.name}
 
     Hello,
 
-    #{invited_by.first_name} #{invited_by.last_name} (#{invited_by.email}) has invited you to join #{organization.name} on Authify as a #{String.capitalize(invitation.role)}.
+    #{invited_by.first_name} #{invited_by.last_name} (#{invited_by_email}) has invited you to join #{organization.name} on Authify as a #{String.capitalize(invitation.role)}.
 
     To accept the invitation and create your account, visit:
     #{accept_url}
@@ -151,7 +155,7 @@ defmodule Authify.Email do
 
     ---
     This email was sent by #{organization.name} via Authify.
-    Questions? Contact #{invited_by.email}
+    Questions? Contact #{invited_by_email}
     """
   end
 

@@ -4,23 +4,23 @@ defmodule Authify.Tasks.BasicTaskTest do
   alias Authify.Tasks.BasicTask
 
   describe "handler_module/1" do
-    test "resolves module from type and action for existing handlers" do
-      task = %Authify.Tasks.Task{type: "test", action: "succeed"}
-      assert BasicTask.handler_module(task) == Authify.Tasks.Handlers.Test.Succeed
+    test "resolves regular task module from type" do
+      task = %Authify.Tasks.Task{type: "test_succeed", action: "execute"}
+      assert BasicTask.handler_module(task) == Authify.Tasks.TestSucceed
     end
 
-    test "resolves module with underscored action names" do
-      task = %Authify.Tasks.Task{type: "test", action: "skip_duplicates"}
-      assert BasicTask.handler_module(task) == Authify.Tasks.Handlers.Test.SkipDuplicates
+    test "resolves module with underscored type names" do
+      task = %Authify.Tasks.Task{type: "test_skip_duplicates", action: "execute"}
+      assert BasicTask.handler_module(task) == Authify.Tasks.TestSkipDuplicates
     end
 
-    test "resolves module from string arguments" do
-      assert BasicTask.handler_module("test", "fail") ==
-               Authify.Tasks.Handlers.Test.Fail
+    test "resolves event handler module from event type" do
+      assert BasicTask.handler_module("event", "user_created") ==
+               Authify.Tasks.Event.UserCreated
     end
 
     test "returns nil for non-existent handler modules" do
-      task = %Authify.Tasks.Task{type: "nonexistent", action: "handler"}
+      task = %Authify.Tasks.Task{type: "nonexistent", action: "execute"}
       assert BasicTask.handler_module(task) == nil
     end
   end
@@ -55,9 +55,9 @@ defmodule Authify.Tasks.BasicTaskTest do
   end
 
   describe "default implementations via use" do
-    test "test handler provides default callback implementations" do
-      handler = Authify.Tasks.Handlers.Test.Succeed
-      task = %Authify.Tasks.Task{type: "test", action: "succeed"}
+    test "test task provides default callback implementations" do
+      handler = Authify.Tasks.TestSucceed
+      task = %Authify.Tasks.Task{type: "test_succeed", action: "execute"}
 
       assert handler.on_success(task, %{}) == :ok
       assert handler.on_failure(task, :reason) == :ok
@@ -74,34 +74,34 @@ defmodule Authify.Tasks.BasicTaskTest do
       assert handler.should_retry?(:any_reason) == true
     end
 
-    test "handlers can override defaults" do
-      handler = Authify.Tasks.Handlers.Test.RetryableFail
+    test "tasks can override defaults" do
+      handler = Authify.Tasks.TestRetryableFail
 
       assert handler.max_retries() == 3
       assert handler.retry_strategy() == :exponential
     end
 
-    test "skip duplicates handler overrides on_duplicate" do
-      handler = Authify.Tasks.Handlers.Test.SkipDuplicates
-      task = %Authify.Tasks.Task{type: "test", action: "skip_duplicates"}
+    test "skip duplicates task overrides on_duplicate" do
+      handler = Authify.Tasks.TestSkipDuplicates
+      task = %Authify.Tasks.Task{type: "test_skip_duplicates", action: "execute"}
 
       assert handler.on_duplicate(task, task) == :skip
     end
 
-    test "selective retry handler overrides should_retry?" do
-      handler = Authify.Tasks.Handlers.Test.SelectiveRetry
+    test "selective retry task overrides should_retry?" do
+      handler = Authify.Tasks.TestSelectiveRetry
 
       assert handler.should_retry?(%{type: "transient"}) == true
       assert handler.should_retry?(%{type: "permanent"}) == false
     end
 
     test "comparable_tasks returns an Ecto query" do
-      handler = Authify.Tasks.Handlers.Test.Succeed
+      handler = Authify.Tasks.TestSucceed
 
       task = %Authify.Tasks.Task{
         id: Ecto.UUID.generate(),
-        type: "test",
-        action: "succeed",
+        type: "test_succeed",
+        action: "execute",
         organization_id: 1
       }
 
@@ -110,23 +110,23 @@ defmodule Authify.Tasks.BasicTaskTest do
     end
 
     test "as_comparable_task returns string representation" do
-      handler = Authify.Tasks.Handlers.Test.Succeed
+      handler = Authify.Tasks.TestSucceed
 
       task = %Authify.Tasks.Task{
-        type: "test",
-        action: "succeed",
+        type: "test_succeed",
+        action: "execute",
         organization_id: 1,
         params: %{"key" => "value"}
       }
 
       result = handler.as_comparable_task(task)
       assert is_binary(result)
-      assert result =~ "test:succeed:1:"
+      assert result =~ "test_succeed:execute:1:"
     end
 
-    test "no_exclusivity handler returns nil for as_comparable_task" do
-      handler = Authify.Tasks.Handlers.Test.NoExclusivity
-      task = %Authify.Tasks.Task{type: "test", action: "no_exclusivity"}
+    test "no_exclusivity task returns nil for as_comparable_task" do
+      handler = Authify.Tasks.TestNoExclusivity
+      task = %Authify.Tasks.Task{type: "test_no_exclusivity", action: "execute"}
 
       assert handler.as_comparable_task(task) == nil
     end

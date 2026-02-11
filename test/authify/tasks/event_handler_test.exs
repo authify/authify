@@ -23,7 +23,7 @@ defmodule Authify.Tasks.EventHandlerTest do
 
         assert {:ok, task} = EventHandler.handle_event(:user_created, params)
 
-        assert task.type == "events"
+        assert task.type == "event"
         assert task.action == "user_created"
         # Params have atom keys (original type is preserved, just sorted)
         assert task.params[:user_id] == "user_123"
@@ -65,11 +65,11 @@ defmodule Authify.Tasks.EventHandlerTest do
       event_tasks = EventHandler.event_tasks()
 
       assert is_map(event_tasks)
-      assert event_tasks[:user_created] == Authify.Tasks.Handlers.Events.UserCreated
-      assert event_tasks[:user_deleted] == Authify.Tasks.Handlers.Events.UserDeleted
+      assert event_tasks[:user_created] == Authify.Tasks.Event.UserCreated
+      assert event_tasks[:user_deleted] == Authify.Tasks.Event.UserDeleted
 
       assert event_tasks[:organization_created] ==
-               Authify.Tasks.Handlers.Events.OrganizationCreated
+               Authify.Tasks.Event.OrganizationCreated
     end
   end
 

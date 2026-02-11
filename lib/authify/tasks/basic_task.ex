@@ -206,19 +206,35 @@ defmodule Authify.Tasks.BasicTask do
 
   @doc """
   Resolves a task's handler module from its type and action fields.
-  The convention is: `Authify.Tasks.Handlers.{Type}.{Action}`
 
-  For example, a task with type "email" and action "send_invitation"
-  resolves to `Authify.Tasks.Handlers.Email.SendInvitation`.
+  ## Regular Tasks
+
+  For regular tasks, `type` refers to the module name:
+  - type: "send_invitation", action: "execute"
+  - Resolves to: `Authify.Tasks.SendInvitation`
+
+  ## Event Handlers (Special Case)
+
+  Event handlers use type "event" to identify them:
+  - type: "event", action: "invite_created"
+  - Resolves to: `Authify.Tasks.Event.InviteCreated`
   """
   def handler_module(%Task{type: type, action: action}) do
     handler_module(type, action)
   end
 
-  def handler_module(type, action) when is_binary(type) and is_binary(action) do
-    type_part = type |> Macro.camelize()
+  def handler_module("event", action) when is_binary(action) do
+    # Event handlers: Authify.Tasks.Event.{Action}
     action_part = action |> Macro.camelize()
-    Module.safe_concat([Authify.Tasks.Handlers, type_part, action_part])
+    Module.safe_concat([Authify.Tasks.Event, action_part])
+  rescue
+    ArgumentError -> nil
+  end
+
+  def handler_module(type, _action) when is_binary(type) do
+    # Regular tasks: Authify.Tasks.{Type}
+    type_part = type |> Macro.camelize()
+    Module.safe_concat([Authify.Tasks, type_part])
   rescue
     ArgumentError -> nil
   end

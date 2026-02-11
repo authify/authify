@@ -163,14 +163,18 @@ defmodule Authify.Tasks.WorkflowTask do
   end
 
   defp module_to_type_action(module) when is_atom(module) do
-    parts = Module.split(module)
+    case Enum.reverse(Module.split(module)) do
+      # Event handlers: Authify.Tasks.Event.* → {"event", action}
+      [action, "Event", "Tasks", "Authify" | _rest] ->
+        {"event", Macro.underscore(action)}
 
-    case Enum.reverse(parts) do
-      [action, type, "Handlers", "Tasks", "Authify" | _rest] ->
-        {Macro.underscore(type), Macro.underscore(action)}
+      # Regular tasks: Authify.Tasks.* → {type, "execute"}
+      [type, "Tasks", "Authify" | _rest] ->
+        {Macro.underscore(type), "execute"}
 
-      [action, type | _] ->
-        {Macro.underscore(type), Macro.underscore(action)}
+      # Fallback for any other pattern
+      [last | _] ->
+        {Macro.underscore(last), "execute"}
     end
   end
 end

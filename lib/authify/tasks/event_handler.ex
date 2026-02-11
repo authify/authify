@@ -1,47 +1,74 @@
 defmodule Authify.Tasks.EventHandler do
   @moduledoc """
-  Simple dispatch layer that maps domain events to task modules.
+  Simple dispatch layer that maps domain events to event handler tasks.
 
-  EventHandler provides a centralized mechanism for triggering tasks in response
-  to application events. Each event name maps to a task handler module that
-  implements the event's business logic.
+  EventHandler provides a centralized mechanism for responding to application
+  events. When a domain event occurs, EventHandler creates an event handler task
+  that orchestrates the workflow for that event, which may include creating
+  additional child tasks.
+
+  ## Architecture
+
+  - **Domain Events**: Business occurrences (e.g., `:invite_created`, `:password_reset_requested`)
+  - **Event Handlers**: Tasks at `Authify.Tasks.Handlers.*` that orchestrate responses
+  - **Child Tasks**: Regular tasks at `Authify.Tasks.*` that perform specific actions
 
   ## Configuration
 
   Event mappings are defined as a module attribute:
 
       @event_tasks %{
-        user_created: Authify.Tasks.Handlers.Events.UserCreated,
-        user_deleted: Authify.Tasks.Handlers.Events.UserDeleted,
-        organization_created: Authify.Tasks.Handlers.Events.OrganizationCreated
+        user_created: Authify.Tasks.Event.UserCreated,
+        invite_created: Authify.Tasks.Event.InviteCreated,
+        password_reset_requested: Authify.Tasks.Event.PasswordResetRequested
       }
 
   ## Usage
 
-      # In application code where events occur
-      EventHandler.handle_event(:user_created, %{
-        user_id: user.id,
-        organization_id: user.organization_id
+      # In application code where domain events occur
+      EventHandler.handle_event(:invite_created, %{
+        invitation_id: invitation.id,
+        organization_id: invitation.organization_id
       })
 
-  The handler task can then implement org-specific logic:
+  ## Event Handler Example
 
-      defmodule Authify.Tasks.Handlers.Events.UserCreated do
+  Event handlers orchestrate workflows and create child tasks:
+
+      defmodule Authify.Tasks.Event.InviteCreated do
         use Authify.Tasks.BasicTask
 
         def execute(task) do
-          org = Organizations.get_organization!(task.organization_id)
-          user = Accounts.get_user!(task.params["user_id"])
+          # Create child task to send invitation email
+          email_task = %{
+            type: "send_invitation",  # Maps to Authify.Tasks.SendInvitation
+            action: "execute",
+            params: %{"invitation_id" => task.params["invitation_id"]},
+            organization_id: task.organization_id
+          }
 
-          # Create tasks based on org settings
-          tasks = []
-          tasks = if org.settings["audit_enabled"], do: [audit_task(user) | tasks], else: tasks
-          tasks = if org.settings["welcome_email"], do: [welcome_task(user) | tasks], else: tasks
-
-          Enum.each(tasks, &Tasks.create_and_enqueue_task/1)
-          {:ok, %{tasks_created: length(tasks)}}
+          Tasks.create_and_enqueue_task(email_task)
         end
       end
+
+  ## Regular Task Example
+
+  Child tasks perform specific actions:
+
+      defmodule Authify.Tasks.SendInvitation do
+        use Authify.Tasks.BasicTask
+
+        def execute(task) do
+          # Load invitation and send email
+          invitation = Accounts.get_invitation!(task.params["invitation_id"])
+          Email.send_invitation_email(invitation)
+        end
+      end
+
+  ## Task Resolution
+
+  - Event handlers: `type: "event", action: "invite_created"` → `Authify.Tasks.Event.InviteCreated`
+  - Regular tasks: `type: "send_invitation", action: "execute"` → `Authify.Tasks.SendInvitation`
 
   ## Future Enhancements
 
@@ -54,9 +81,12 @@ defmodule Authify.Tasks.EventHandler do
 
   # Event name to handler module mapping
   @event_tasks %{
-    user_created: Authify.Tasks.Handlers.Events.UserCreated,
-    user_deleted: Authify.Tasks.Handlers.Events.UserDeleted,
-    organization_created: Authify.Tasks.Handlers.Events.OrganizationCreated
+    user_created: Authify.Tasks.Event.UserCreated,
+    user_deleted: Authify.Tasks.Event.UserDeleted,
+    organization_created: Authify.Tasks.Event.OrganizationCreated,
+    invite_created: Authify.Tasks.Event.InviteCreated,
+    password_reset_requested: Authify.Tasks.Event.PasswordResetRequested,
+    email_verification_needed: Authify.Tasks.Event.EmailVerificationNeeded
   }
 
   @doc """
@@ -121,11 +151,13 @@ defmodule Authify.Tasks.EventHandler do
     parts = Module.split(module)
 
     case Enum.reverse(parts) do
-      [action, "Events", "Handlers", "Tasks", "Authify" | _rest] ->
-        {"events", Macro.underscore(action)}
+      [action, "Event", "Tasks", "Authify" | _rest] ->
+        # Event handler: Authify.Tasks.Event.{Action}
+        {"event", Macro.underscore(action)}
 
-      [action, type | _] ->
-        {Macro.underscore(type), Macro.underscore(action)}
+      [type, "Tasks", "Authify" | _rest] ->
+        # Regular task: Authify.Tasks.{Type}
+        {Macro.underscore(type), "execute"}
     end
   end
 end

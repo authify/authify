@@ -14,8 +14,8 @@ defmodule Authify.Tasks.WorkflowTaskTest do
 
   defp insert_workflow(org, handler_module, attrs \\ %{}) do
     default = %{
-      type: "test",
-      action: handler_to_action(handler_module),
+      type: handler_to_type(handler_module),
+      action: "execute",
       organization_id: org.id,
       params: %{}
     }
@@ -28,7 +28,8 @@ defmodule Authify.Tasks.WorkflowTaskTest do
     TaskExecutor.perform(%Oban.Job{args: %{"task_id" => task.id}})
   end
 
-  defp handler_to_action(module) do
+  defp handler_to_type(module) do
+    # Convert Authify.Tasks.TestWorkflowSuccess → "test_workflow_success"
     module
     |> Module.split()
     |> List.last()
@@ -38,7 +39,7 @@ defmodule Authify.Tasks.WorkflowTaskTest do
   describe "workflow success" do
     test "runs steps in order and accumulates context", %{org: org} do
       Oban.Testing.with_testing_mode(:manual, fn ->
-        workflow = insert_workflow(org, Authify.Tasks.Handlers.Test.WorkflowSuccess)
+        workflow = insert_workflow(org, Authify.Tasks.TestWorkflowSuccess)
 
         # First cycle schedules step one
         assert :ok = perform_task(workflow)
@@ -75,7 +76,7 @@ defmodule Authify.Tasks.WorkflowTaskTest do
   describe "workflow failure handling" do
     test "stops on failure when continue_on_failure? is false", %{org: org} do
       Oban.Testing.with_testing_mode(:manual, fn ->
-        workflow = insert_workflow(org, Authify.Tasks.Handlers.Test.WorkflowFailStop)
+        workflow = insert_workflow(org, Authify.Tasks.TestWorkflowFailStop)
 
         # Schedule failing step
         assert :ok = perform_task(workflow)
@@ -95,7 +96,7 @@ defmodule Authify.Tasks.WorkflowTaskTest do
 
     test "continues to next step when continue_on_failure? is true", %{org: org} do
       Oban.Testing.with_testing_mode(:manual, fn ->
-        workflow = insert_workflow(org, Authify.Tasks.Handlers.Test.WorkflowFailContinue)
+        workflow = insert_workflow(org, Authify.Tasks.TestWorkflowFailContinue)
 
         # Schedule failing step
         assert :ok = perform_task(workflow)

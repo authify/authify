@@ -15,8 +15,8 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
 
   defp insert_task(org, attrs \\ %{}) do
     default = %{
-      type: "test",
-      action: "succeed",
+      type: "test_succeed",
+      action: "execute",
       organization_id: org.id,
       params: %{}
     }
@@ -57,7 +57,7 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
 
   describe "perform/1 - failure handling" do
     test "fails a task when handler returns error", %{org: org} do
-      task = insert_task(org, %{type: "test", action: "fail"})
+      task = insert_task(org, %{type: "test_fail"})
 
       assert :ok = perform_task(task)
 
@@ -68,7 +68,7 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
     end
 
     test "fails a task when handler raises an exception", %{org: org} do
-      task = insert_task(org, %{type: "test", action: "raise"})
+      task = insert_task(org, %{type: "test_raise"})
 
       assert :ok = perform_task(task)
 
@@ -93,7 +93,7 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
 
   describe "perform/1 - retry handling" do
     test "exhausts retries and fails when handler always fails (inline mode)", %{org: org} do
-      task = insert_task(org, %{type: "test", action: "retryable_fail"})
+      task = insert_task(org, %{type: "test_retryable_fail"})
 
       # In inline test mode, Oban executes retry jobs immediately, so all
       # retries are exhausted in a single perform call
@@ -109,7 +109,7 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
     end
 
     test "fails permanently when should_retry? returns false", %{org: org} do
-      task = insert_task(org, %{type: "test", action: "selective_retry"})
+      task = insert_task(org, %{type: "test_selective_retry"})
 
       assert :ok = perform_task(task)
 
@@ -123,7 +123,7 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
 
   describe "perform/1 - lifecycle hooks" do
     test "calls on_success hook on successful completion", %{org: org} do
-      task = insert_task(org, %{type: "test", action: "with_hooks"})
+      task = insert_task(org, %{type: "test_with_hooks"})
 
       assert :ok = perform_task(task)
 
@@ -132,7 +132,7 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
     end
 
     test "calls on_failure hook on permanent failure", %{org: org} do
-      task = insert_task(org, %{type: "test", action: "fail_with_hooks"})
+      task = insert_task(org, %{type: "test_fail_with_hooks"})
 
       assert :ok = perform_task(task)
 
@@ -141,7 +141,7 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
     end
 
     test "on_success can schedule a follow-up task", %{org: org} do
-      task = insert_task(org, %{type: "test", action: "success_with_follow_up"})
+      task = insert_task(org, %{type: "test_success_with_follow_up"})
 
       assert :ok = perform_task(task)
 
@@ -153,8 +153,8 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
       assert length(children) == 1
 
       child = hd(children)
-      assert child.type == "test"
-      assert child.action == "succeed"
+      assert child.type == "test_succeed"
+      assert child.action == "execute"
       assert child.parent_id == task.id
       assert child.organization_id == org.id
       assert child.params["follow_up"] == true
@@ -167,13 +167,13 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
     test "skips task when duplicate detected and policy is :skip", %{org: org} do
       # Create a running task that matches
       existing =
-        insert_task(org, %{type: "test", action: "skip_duplicates", params: %{"key" => "val"}})
+        insert_task(org, %{type: "test_skip_duplicates", params: %{"key" => "val"}})
 
       {:ok, _running} = Tasks.transition_task(existing, :running)
 
       # Create a new task with same type/action/org/params
       duplicate =
-        insert_task(org, %{type: "test", action: "skip_duplicates", params: %{"key" => "val"}})
+        insert_task(org, %{type: "test_skip_duplicates", params: %{"key" => "val"}})
 
       assert :ok = perform_task(duplicate)
 
@@ -184,12 +184,12 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
     test "proceeds when no exclusivity checking (nil key)", %{org: org} do
       # Create a running task that would match
       existing =
-        insert_task(org, %{type: "test", action: "no_exclusivity"})
+        insert_task(org, %{type: "test_no_exclusivity"})
 
       {:ok, _running} = Tasks.transition_task(existing, :running)
 
       # Create another task with same type/action
-      new_task = insert_task(org, %{type: "test", action: "no_exclusivity"})
+      new_task = insert_task(org, %{type: "test_no_exclusivity"})
 
       assert :ok = perform_task(new_task)
 
@@ -198,7 +198,8 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
     end
 
     test "proceeds when no duplicates exist", %{org: org} do
-      task = insert_task(org, %{type: "test", action: "succeed", params: %{"unique" => "data"}})
+      task =
+        insert_task(org, %{type: "test_succeed", action: "execute", params: %{"unique" => "data"}})
 
       assert :ok = perform_task(task)
 
@@ -290,7 +291,7 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
       # NoExclusivity handler returns nil for as_comparable_task,
       # so no lock should be acquired. This task should complete
       # immediately regardless of any held locks.
-      task = insert_task(org, %{type: "test", action: "no_exclusivity"})
+      task = insert_task(org, %{type: "test_no_exclusivity"})
 
       assert :ok = perform_task(task)
 
@@ -384,7 +385,7 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
 
   describe "perform/1 - timeout enforcement" do
     test "times out a task that exceeds timeout_seconds", %{org: org} do
-      task = insert_task(org, %{action: "slow", timeout_seconds: 1})
+      task = insert_task(org, %{type: "test_slow", timeout_seconds: 1})
 
       assert :ok = perform_task(task)
 
@@ -407,7 +408,7 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
     end
 
     test "executes tasks without timeout_seconds normally", %{org: org} do
-      task = insert_task(org, %{action: "slow"})
+      task = insert_task(org, %{type: "test_slow"})
 
       assert :ok = perform_task(task)
 
@@ -417,7 +418,7 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
     end
 
     test "transitions through timing_out state correctly", %{org: org} do
-      task = insert_task(org, %{action: "slow", timeout_seconds: 1})
+      task = insert_task(org, %{type: "test_slow", timeout_seconds: 1})
 
       assert :ok = perform_task(task)
 

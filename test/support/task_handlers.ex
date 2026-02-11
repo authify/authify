@@ -1,6 +1,8 @@
-defmodule Authify.Tasks.Handlers.Test.Succeed do
+# Regular test tasks - live at Authify.Tasks.Test*
+
+defmodule Authify.Tasks.TestSucceed do
   @moduledoc """
-  Test handler that always succeeds. Used in TaskExecutor tests.
+  Test task that always succeeds. Used in TaskExecutor tests.
   """
   use Authify.Tasks.BasicTask
 
@@ -10,9 +12,9 @@ defmodule Authify.Tasks.Handlers.Test.Succeed do
   end
 end
 
-defmodule Authify.Tasks.Handlers.Test.Fail do
+defmodule Authify.Tasks.TestFail do
   @moduledoc """
-  Test handler that always fails. Used in TaskExecutor tests.
+  Test task that always fails. Used in TaskExecutor tests.
   """
   use Authify.Tasks.BasicTask
 
@@ -22,9 +24,9 @@ defmodule Authify.Tasks.Handlers.Test.Fail do
   end
 end
 
-defmodule Authify.Tasks.Handlers.Test.Raise do
+defmodule Authify.Tasks.TestRaise do
   @moduledoc """
-  Test handler that raises an exception. Used in TaskExecutor tests.
+  Test task that raises an exception. Used in TaskExecutor tests.
   """
   use Authify.Tasks.BasicTask
 
@@ -34,9 +36,9 @@ defmodule Authify.Tasks.Handlers.Test.Raise do
   end
 end
 
-defmodule Authify.Tasks.Handlers.Test.RetryableFail do
+defmodule Authify.Tasks.TestRetryableFail do
   @moduledoc """
-  Test handler that fails but supports retries. Used in TaskExecutor tests.
+  Test task that fails but supports retries. Used in TaskExecutor tests.
   """
   use Authify.Tasks.BasicTask
 
@@ -52,9 +54,9 @@ defmodule Authify.Tasks.Handlers.Test.RetryableFail do
   def retry_strategy, do: :exponential
 end
 
-defmodule Authify.Tasks.Handlers.Test.SelectiveRetry do
+defmodule Authify.Tasks.TestSelectiveRetry do
   @moduledoc """
-  Test handler that retries only specific errors. Used in TaskExecutor tests.
+  Test task that retries only specific errors. Used in TaskExecutor tests.
   """
   use Authify.Tasks.BasicTask
 
@@ -71,9 +73,9 @@ defmodule Authify.Tasks.Handlers.Test.SelectiveRetry do
   def should_retry?(_), do: false
 end
 
-defmodule Authify.Tasks.Handlers.Test.WithHooks do
+defmodule Authify.Tasks.TestWithHooks do
   @moduledoc """
-  Test handler with lifecycle hooks that schedule follow-up tasks.
+  Test task with lifecycle hooks that schedule follow-up tasks.
   Stores hook calls in the process dictionary for test assertions.
   """
   use Authify.Tasks.BasicTask
@@ -102,9 +104,9 @@ defmodule Authify.Tasks.Handlers.Test.WithHooks do
   end
 end
 
-defmodule Authify.Tasks.Handlers.Test.FailWithHooks do
+defmodule Authify.Tasks.TestFailWithHooks do
   @moduledoc """
-  Test handler that fails and has hooks for verification.
+  Test task that fails and has hooks for verification.
   """
   use Authify.Tasks.BasicTask
 
@@ -120,9 +122,9 @@ defmodule Authify.Tasks.Handlers.Test.FailWithHooks do
   end
 end
 
-defmodule Authify.Tasks.Handlers.Test.SuccessWithFollowUp do
+defmodule Authify.Tasks.TestSuccessWithFollowUp do
   @moduledoc """
-  Test handler that succeeds and schedules a follow-up task.
+  Test task that succeeds and schedules a follow-up task.
   """
   use Authify.Tasks.BasicTask
 
@@ -133,13 +135,13 @@ defmodule Authify.Tasks.Handlers.Test.SuccessWithFollowUp do
 
   @impl true
   def on_success(_task, _results) do
-    {:schedule_task, %{type: "test", action: "succeed", params: %{"follow_up" => true}}}
+    {:schedule_task, %{type: "test_succeed", action: "execute", params: %{"follow_up" => true}}}
   end
 end
 
-defmodule Authify.Tasks.Handlers.Test.Slow do
+defmodule Authify.Tasks.TestSlow do
   @moduledoc """
-  Test handler that takes a long time to execute. Used for timeout tests.
+  Test task that takes a long time to execute. Used for timeout tests.
   """
   use Authify.Tasks.BasicTask
 
@@ -151,9 +153,9 @@ defmodule Authify.Tasks.Handlers.Test.Slow do
   end
 end
 
-defmodule Authify.Tasks.Handlers.Test.NoExclusivity do
+defmodule Authify.Tasks.TestNoExclusivity do
   @moduledoc """
-  Test handler with no exclusivity checking.
+  Test task with no exclusivity checking.
   """
   use Authify.Tasks.BasicTask
 
@@ -166,9 +168,9 @@ defmodule Authify.Tasks.Handlers.Test.NoExclusivity do
   def as_comparable_task(_task), do: nil
 end
 
-defmodule Authify.Tasks.Handlers.Test.SkipDuplicates do
+defmodule Authify.Tasks.TestSkipDuplicates do
   @moduledoc """
-  Test handler that skips when duplicates are found.
+  Test task that skips when duplicates are found.
   """
   use Authify.Tasks.BasicTask
 
@@ -181,11 +183,11 @@ defmodule Authify.Tasks.Handlers.Test.SkipDuplicates do
   def on_duplicate(_existing, _current), do: :skip
 end
 
-# --- WaitTask Test Handlers ---
+# --- WaitTask Test Tasks ---
 
-defmodule Authify.Tasks.Handlers.Test.WaitAlwaysMet do
+defmodule Authify.Tasks.TestWaitAlwaysMet do
   @moduledoc """
-  WaitTask handler where the condition is always met.
+  WaitTask where the condition is always met.
   """
   use Authify.Tasks.WaitTask
 
@@ -201,9 +203,9 @@ defmodule Authify.Tasks.Handlers.Test.WaitAlwaysMet do
   def task_check_interval, do: 10
 end
 
-defmodule Authify.Tasks.Handlers.Test.WaitNeverMet do
+defmodule Authify.Tasks.TestWaitNeverMet do
   @moduledoc """
-  WaitTask handler where the condition is never met.
+  WaitTask where the condition is never met.
   Uses a short expiration for testing.
   """
   use Authify.Tasks.WaitTask
@@ -220,9 +222,9 @@ defmodule Authify.Tasks.Handlers.Test.WaitNeverMet do
   def task_check_interval, do: 5
 end
 
-defmodule Authify.Tasks.Handlers.Test.WaitWithExpiration do
+defmodule Authify.Tasks.TestWaitWithExpiration do
   @moduledoc """
-  WaitTask handler with expiration hook that schedules a follow-up.
+  WaitTask with expiration hook that schedules a follow-up.
   """
   use Authify.Tasks.WaitTask
 
@@ -242,9 +244,9 @@ defmodule Authify.Tasks.Handlers.Test.WaitWithExpiration do
   end
 end
 
-defmodule Authify.Tasks.Handlers.Test.WaitWithFollowUp do
+defmodule Authify.Tasks.TestWaitWithFollowUp do
   @moduledoc """
-  WaitTask handler whose expiration schedules a follow-up task.
+  WaitTask whose expiration schedules a follow-up task.
   """
   use Authify.Tasks.WaitTask
 
@@ -259,13 +261,13 @@ defmodule Authify.Tasks.Handlers.Test.WaitWithFollowUp do
 
   @impl true
   def on_expiration(_task) do
-    {:schedule_task, %{type: "test", action: "succeed", params: %{"reminder" => true}}}
+    {:schedule_task, %{type: "test_succeed", action: "execute", params: %{"reminder" => true}}}
   end
 end
 
-defmodule Authify.Tasks.Handlers.Test.WaitDefaults do
+defmodule Authify.Tasks.TestWaitDefaults do
   @moduledoc """
-  WaitTask handler that uses all default callbacks.
+  WaitTask that uses all default callbacks.
   Used to verify default values for task_expiration, task_check_interval, etc.
   """
   use Authify.Tasks.WaitTask
@@ -274,9 +276,9 @@ defmodule Authify.Tasks.Handlers.Test.WaitDefaults do
   def check_condition(_task), do: :not_met
 end
 
-# --- WorkflowTask Test Handlers ---
+# --- WorkflowTask Test Tasks ---
 
-defmodule Authify.Tasks.Handlers.Test.WorkflowSuccess do
+defmodule Authify.Tasks.TestWorkflowSuccess do
   @moduledoc """
   Workflow with two successful steps that accumulate context.
   """
@@ -284,20 +286,20 @@ defmodule Authify.Tasks.Handlers.Test.WorkflowSuccess do
 
   @impl true
   def workflow_steps,
-    do: [Authify.Tasks.Handlers.Test.WorkflowStepOne, Authify.Tasks.Handlers.Test.WorkflowStepTwo]
+    do: [Authify.Tasks.TestWorkflowStepOne, Authify.Tasks.TestWorkflowStepTwo]
 end
 
-defmodule Authify.Tasks.Handlers.Test.WorkflowFailStop do
+defmodule Authify.Tasks.TestWorkflowFailStop do
   @moduledoc """
   Workflow that stops on first step failure (default behavior).
   """
   use Authify.Tasks.WorkflowTask
 
   @impl true
-  def workflow_steps, do: [Authify.Tasks.Handlers.Test.WorkflowFailStep]
+  def workflow_steps, do: [Authify.Tasks.TestWorkflowFailStep]
 end
 
-defmodule Authify.Tasks.Handlers.Test.WorkflowFailContinue do
+defmodule Authify.Tasks.TestWorkflowFailContinue do
   @moduledoc """
   Workflow that continues to next step after failure.
   """
@@ -306,15 +308,15 @@ defmodule Authify.Tasks.Handlers.Test.WorkflowFailContinue do
   @impl true
   def workflow_steps,
     do: [
-      Authify.Tasks.Handlers.Test.WorkflowFailStep,
-      Authify.Tasks.Handlers.Test.WorkflowStepTwo
+      Authify.Tasks.TestWorkflowFailStep,
+      Authify.Tasks.TestWorkflowStepTwo
     ]
 
   @impl true
   def continue_on_failure?, do: true
 end
 
-defmodule Authify.Tasks.Handlers.Test.WorkflowStepOne do
+defmodule Authify.Tasks.TestWorkflowStepOne do
   @moduledoc """
   First workflow step; succeeds and returns a value.
   """
@@ -326,7 +328,7 @@ defmodule Authify.Tasks.Handlers.Test.WorkflowStepOne do
   end
 end
 
-defmodule Authify.Tasks.Handlers.Test.WorkflowStepTwo do
+defmodule Authify.Tasks.TestWorkflowStepTwo do
   @moduledoc """
   Second workflow step; succeeds and echoes accumulated context.
   """
@@ -338,7 +340,7 @@ defmodule Authify.Tasks.Handlers.Test.WorkflowStepTwo do
   end
 end
 
-defmodule Authify.Tasks.Handlers.Test.WorkflowFailStep do
+defmodule Authify.Tasks.TestWorkflowFailStep do
   @moduledoc """
   Workflow step that fails.
   """
@@ -351,8 +353,9 @@ defmodule Authify.Tasks.Handlers.Test.WorkflowFailStep do
 end
 
 # --- Event Handler Test Modules ---
+# Event handlers live at Authify.Tasks.Event.*
 
-defmodule Authify.Tasks.Handlers.Events.UserCreated do
+defmodule Authify.Tasks.Event.UserCreated do
   @moduledoc """
   Event handler for user creation events.
   In a real scenario, would check org settings and create child tasks.
@@ -369,7 +372,7 @@ defmodule Authify.Tasks.Handlers.Events.UserCreated do
   end
 end
 
-defmodule Authify.Tasks.Handlers.Events.UserDeleted do
+defmodule Authify.Tasks.Event.UserDeleted do
   @moduledoc """
   Event handler for user deletion events.
   """
@@ -381,7 +384,7 @@ defmodule Authify.Tasks.Handlers.Events.UserDeleted do
   end
 end
 
-defmodule Authify.Tasks.Handlers.Events.OrganizationCreated do
+defmodule Authify.Tasks.Event.OrganizationCreated do
   @moduledoc """
   Event handler for organization creation events.
   """
