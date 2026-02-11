@@ -2150,6 +2150,20 @@ defmodule Authify.Accounts do
   end
 
   @doc """
+  Counts expired invitations that are ready for cleanup (expired more than 48 hours ago).
+  This matches the cleanup task's grace period logic.
+  """
+  def count_cleanable_invitations do
+    cutoff = DateTime.utc_now() |> DateTime.add(-48, :hour)
+
+    from(i in Invitation,
+      where: is_nil(i.accepted_at),
+      where: i.expires_at < ^cutoff
+    )
+    |> Repo.aggregate(:count, :id)
+  end
+
+  @doc """
   Counts inactive organizations since a given date.
   """
   def count_inactive_organizations_since(cutoff_date) do

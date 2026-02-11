@@ -2,6 +2,7 @@ defmodule AuthifyWeb.MaintenanceController do
   use AuthifyWeb, :controller
 
   alias Authify.Accounts
+  alias Authify.Tasks
 
   # All actions require being in the global organization
   def action(conn, _) do
@@ -35,11 +36,32 @@ defmodule AuthifyWeb.MaintenanceController do
   end
 
   def cleanup_expired_invitations(conn, _params) do
-    deleted_count = Accounts.cleanup_expired_invitations()
+    # Create and enqueue a cleanup task for async execution
+    case Tasks.create_and_enqueue_task(%{
+           type: "cleanup_expired_invitations",
+           action: "execute",
+           organization_id: nil,
+           status: :pending,
+           metadata: %{
+             triggered_by: "admin_manual",
+             admin_user_id: conn.assigns.current_user.id,
+             triggered_at: DateTime.utc_now()
+           }
+         }) do
+      {:ok, task} ->
+        conn
+        |> put_flash(
+          :info,
+          "Cleanup task created successfully (Task ID: #{task.id}). " <>
+            "View progress in the Tasks section."
+        )
+        |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/maintenance")
 
-    conn
-    |> put_flash(:info, "Successfully cleaned up #{deleted_count} expired invitations.")
-    |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/maintenance")
+      {:error, changeset} ->
+        conn
+        |> put_flash(:error, "Failed to create cleanup task: #{inspect(changeset.errors)}")
+        |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/maintenance")
+    end
   end
 
   def cleanup_inactive_organizations(conn, _params) do
@@ -93,6 +115,7 @@ defmodule AuthifyWeb.MaintenanceController do
 
     %{
       expired_invitations: Accounts.count_expired_invitations(),
+      cleanable_invitations: Accounts.count_cleanable_invitations(),
       inactive_organizations_90d:
         Accounts.count_inactive_organizations_since(DateTime.add(now, -90, :day)),
       orphaned_sessions: get_orphaned_sessions_count(),

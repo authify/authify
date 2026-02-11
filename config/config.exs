@@ -62,7 +62,14 @@ config :authify, Oban,
   engine: Oban.Engines.Dolphin,
   notifier: Oban.Notifiers.PG,
   repo: Authify.Repo,
-  queues: [tasks: 10]
+  queues: [tasks: 10, scheduled: 5],
+  plugins: [
+    {Oban.Plugins.Cron,
+     crontab: [
+       # Daily maintenance at 2 AM UTC - cleanup expired invitations
+       {"0 2 * * *", Authify.Tasks.Workers.Scheduled.CleanupExpiredInvitations}
+     ]}
+  ]
 
 # Hammer rate limiting configuration
 config :hammer,
