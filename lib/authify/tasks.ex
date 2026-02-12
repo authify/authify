@@ -7,7 +7,8 @@ defmodule Authify.Tasks do
   import Ecto.Query, warn: false
 
   alias Authify.Repo
-  alias Authify.Tasks.{StateMachine, Task, TaskLog}
+  alias Authify.Tasks.{BasicTask, StateMachine, Task, TaskLog}
+  alias Authify.Tasks.Telemetry, as: TaskTelemetry
   alias Authify.Tasks.Workers.TaskExecutor
 
   # --- Task CRUD ---
@@ -17,9 +18,14 @@ defmodule Authify.Tasks do
   Defaults to :pending status if not specified.
   """
   def create_task(attrs \\ %{}) do
-    %Task{}
-    |> Task.changeset(attrs)
-    |> Repo.insert()
+    case %Task{} |> Task.changeset(attrs) |> Repo.insert() do
+      {:ok, task} = result ->
+        TaskTelemetry.task_created(task)
+        result
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -81,6 +87,84 @@ defmodule Authify.Tasks do
       {:ok, changeset} -> Repo.update(changeset)
       {:error, _reason} = error -> error
     end
+  end
+
+  # --- Task Cancellation ---
+
+  @doc """
+  Cancels a task and its children recursively. For running tasks, attempts
+  to cancel the Oban job (best-effort process kill). Calls the handler's
+  `before_cancel/1` callback for cleanup.
+
+  Returns `{:ok, task}` on success or `{:error, reason}` on failure.
+  """
+  def cancel_task(%Task{} = task) do
+    with {:ok, cancelling_task} <- transition_task(task, :cancelling) do
+      # Best-effort: cancel the Oban job if one is tracked
+      maybe_cancel_oban_job(cancelling_task)
+
+      # Call handler's before_cancel callback
+      invoke_before_cancel(cancelling_task)
+
+      # Recursively cancel child tasks
+      cancel_children(cancelling_task)
+
+      # Complete the cancellation transition
+      case transition_task(cancelling_task, :cancelled) do
+        {:ok, cancelled_task} = result ->
+          TaskTelemetry.task_cancelled(cancelled_task)
+          result
+
+        error ->
+          error
+      end
+    end
+  end
+
+  defp maybe_cancel_oban_job(%Task{metadata: %{"oban_job_id" => job_id}})
+       when is_integer(job_id) do
+    Oban.cancel_job(job_id)
+  end
+
+  defp maybe_cancel_oban_job(_task), do: :ok
+
+  defp invoke_before_cancel(%Task{} = task) do
+    case BasicTask.handler_module(task) do
+      nil ->
+        :ok
+
+      module ->
+        if Code.ensure_loaded?(module) and function_exported?(module, :before_cancel, 1) do
+          hook_result = module.before_cancel(task)
+          maybe_schedule_cancellation_follow_up(hook_result, task)
+        else
+          :ok
+        end
+    end
+  end
+
+  defp maybe_schedule_cancellation_follow_up({:schedule_task, params}, parent_task) do
+    attrs =
+      params
+      |> Map.put(:parent_id, parent_task.id)
+      |> Map.put_new(:organization_id, parent_task.organization_id)
+      |> Map.put_new(:correlation_id, parent_task.correlation_id)
+
+    case create_task(attrs) do
+      {:ok, follow_up} -> TaskExecutor.schedule_execution(follow_up)
+      {:error, _err} -> :ok
+    end
+  end
+
+  defp maybe_schedule_cancellation_follow_up(_other, _task), do: :ok
+
+  defp cancel_children(%Task{} = parent) do
+    non_terminal = Task.non_terminal_states()
+
+    parent
+    |> list_children()
+    |> Enum.filter(fn child -> child.status in non_terminal end)
+    |> Enum.each(&cancel_task/1)
   end
 
   # --- Task Queries ---

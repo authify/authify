@@ -31,6 +31,7 @@ defmodule Authify.Tasks.StateMachineTest do
     test "allows cancellation from cancellable states" do
       assert StateMachine.valid_transition?(:scheduled, :cancelling)
       assert StateMachine.valid_transition?(:pending, :cancelling)
+      assert StateMachine.valid_transition?(:running, :cancelling)
       assert StateMachine.valid_transition?(:retrying, :cancelling)
       assert StateMachine.valid_transition?(:waiting, :cancelling)
     end
@@ -79,8 +80,9 @@ defmodule Authify.Tasks.StateMachineTest do
       refute StateMachine.valid_transition?(:running, :failed)
     end
 
-    test "rejects running to cancelling (must be done from waiting/retrying)" do
-      refute StateMachine.valid_transition?(:running, :cancelling)
+    test "rejects running directly to terminal states (but allows cancelling)" do
+      refute StateMachine.valid_transition?(:running, :cancelled)
+      refute StateMachine.valid_transition?(:running, :skipped)
     end
   end
 
@@ -136,7 +138,8 @@ defmodule Authify.Tasks.StateMachineTest do
                :failing,
                :retrying,
                :waiting,
-               :timing_out
+               :timing_out,
+               :cancelling
              ]
     end
   end

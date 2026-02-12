@@ -11,7 +11,7 @@ defmodule Authify.Tasks.StateMachine do
     # Active states
     scheduled: [:pending, :running, :cancelling],
     pending: [:running, :skipping, :cancelling],
-    running: [:completing, :failing, :retrying, :waiting, :timing_out],
+    running: [:completing, :failing, :retrying, :waiting, :timing_out, :cancelling],
     retrying: [:running, :failing, :cancelling],
     waiting: [:running, :expiring, :cancelling],
 

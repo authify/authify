@@ -39,23 +39,30 @@ defmodule Authify.Tasks.BasicTask do
   # --- Lifecycle Hooks ---
 
   @doc """
-  Called when a task completes successfully (during the completing → completed transition).
+  Called before a task transitions to completed (during the completing → completed transition).
   Can return `:ok` for no-op or `{:schedule_task, params}` to create a follow-up task.
   """
-  @callback on_success(task :: task(), results :: results()) ::
+  @callback before_complete(task :: task(), results :: results()) ::
               :ok | {:schedule_task, task_params()}
 
   @doc """
-  Called when a task fails permanently (during the failing → failed transition).
+  Called before a task transitions to failed (during the failing → failed transition).
   Can return `:ok` or `{:schedule_task, params}` to create a compensation task.
   """
-  @callback on_failure(task :: task(), reason :: reason()) ::
+  @callback before_fail(task :: task(), reason :: reason()) ::
               :ok | {:schedule_task, task_params()}
 
   @doc """
-  Called when a task is about to be retried. Useful for logging or notifications.
+  Called before a task is retried. Useful for logging or notifications.
   """
-  @callback on_retry(task :: task(), reason :: reason(), retry_count :: non_neg_integer()) :: :ok
+  @callback before_retry(task :: task(), reason :: reason(), retry_count :: non_neg_integer()) ::
+              :ok
+
+  @doc """
+  Called before a task transitions to cancelled (during the cancelling → cancelled transition).
+  Allows cleanup of resources, rollback of partial work, or scheduling of compensation tasks.
+  """
+  @callback before_cancel(task :: task()) :: :ok | {:schedule_task, task_params()}
 
   # --- Exclusivity Checking (Two-Phase Approach) ---
 
@@ -129,13 +136,16 @@ defmodule Authify.Tasks.BasicTask do
       alias Authify.Tasks.Task
 
       @impl true
-      def on_success(_task, _results), do: :ok
+      def before_complete(_task, _results), do: :ok
 
       @impl true
-      def on_failure(_task, _reason), do: :ok
+      def before_fail(_task, _reason), do: :ok
 
       @impl true
-      def on_retry(_task, _reason, _retry_count), do: :ok
+      def before_retry(_task, _reason, _retry_count), do: :ok
+
+      @impl true
+      def before_cancel(_task), do: :ok
 
       @impl true
       def comparable_tasks(task) do
@@ -185,9 +195,10 @@ defmodule Authify.Tasks.BasicTask do
       @impl true
       def should_retry?(_reason), do: true
 
-      defoverridable on_success: 2,
-                     on_failure: 2,
-                     on_retry: 3,
+      defoverridable before_complete: 2,
+                     before_fail: 2,
+                     before_retry: 3,
+                     before_cancel: 1,
                      comparable_tasks: 1,
                      as_comparable_task: 1,
                      on_duplicate: 2,

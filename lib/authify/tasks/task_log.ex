@@ -8,6 +8,7 @@ defmodule Authify.Tasks.TaskLog do
 
   @primary_key {:id, Uniq.UUID, version: 7, autogenerate: true}
   @foreign_key_type Uniq.UUID
+  @derive {Jason.Encoder, except: [:__meta__, :__struct__, :task]}
 
   schema "task_logs" do
     field :log_data, :string

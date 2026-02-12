@@ -86,20 +86,20 @@ defmodule Authify.Tasks.TestWithHooks do
   end
 
   @impl true
-  def on_success(task, results) do
-    send(self(), {:on_success_called, task.id, results})
+  def before_complete(task, results) do
+    send(self(), {:before_complete_called, task.id, results})
     :ok
   end
 
   @impl true
-  def on_failure(task, reason) do
-    send(self(), {:on_failure_called, task.id, reason})
+  def before_fail(task, reason) do
+    send(self(), {:before_fail_called, task.id, reason})
     :ok
   end
 
   @impl true
-  def on_retry(task, reason, retry_count) do
-    send(self(), {:on_retry_called, task.id, reason, retry_count})
+  def before_retry(task, reason, retry_count) do
+    send(self(), {:before_retry_called, task.id, reason, retry_count})
     :ok
   end
 end
@@ -116,8 +116,8 @@ defmodule Authify.Tasks.TestFailWithHooks do
   end
 
   @impl true
-  def on_failure(task, reason) do
-    send(self(), {:on_failure_called, task.id, reason})
+  def before_fail(task, reason) do
+    send(self(), {:before_fail_called, task.id, reason})
     :ok
   end
 end
@@ -134,7 +134,7 @@ defmodule Authify.Tasks.TestSuccessWithFollowUp do
   end
 
   @impl true
-  def on_success(_task, _results) do
+  def before_complete(_task, _results) do
     {:schedule_task, %{type: "test_succeed", action: "execute", params: %{"follow_up" => true}}}
   end
 end
@@ -181,6 +181,42 @@ defmodule Authify.Tasks.TestSkipDuplicates do
 
   @impl true
   def on_duplicate(_existing, _current), do: :skip
+end
+
+defmodule Authify.Tasks.TestCancellable do
+  @moduledoc """
+  Test task with before_cancel callback for verifying cancellation hooks.
+  """
+  use Authify.Tasks.BasicTask
+
+  @impl true
+  def execute(_task) do
+    {:ok, %{"result" => "cancellable"}}
+  end
+
+  @impl true
+  def before_cancel(task) do
+    send(self(), {:before_cancel_called, task.id})
+    :ok
+  end
+end
+
+defmodule Authify.Tasks.TestCancellableWithFollowUp do
+  @moduledoc """
+  Test task whose before_cancel callback schedules a compensation task.
+  """
+  use Authify.Tasks.BasicTask
+
+  @impl true
+  def execute(_task) do
+    {:ok, %{"result" => "cancellable_follow_up"}}
+  end
+
+  @impl true
+  def before_cancel(_task) do
+    {:schedule_task,
+     %{type: "test_succeed", action: "execute", params: %{"compensation" => true}}}
+  end
 end
 
 # --- WaitTask Test Tasks ---

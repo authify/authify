@@ -35,6 +35,7 @@ defmodule Authify.Tasks.WaitTask do
 
   alias Authify.Tasks
   alias Authify.Tasks.Task
+  alias Authify.Tasks.Telemetry, as: TaskTelemetry
   alias Authify.Tasks.Workers.TaskExecutor
 
   @type task :: %Task{}
@@ -126,6 +127,8 @@ defmodule Authify.Tasks.WaitTask do
       maybe_schedule_follow_up(hook_result, task)
       Tasks.transition_task(task, :expired)
     end
+
+    TaskTelemetry.task_expired(task)
 
     # Return a special tuple that TaskExecutor recognizes to skip normal completion
     {:wait, :expired}

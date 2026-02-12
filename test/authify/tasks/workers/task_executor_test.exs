@@ -122,25 +122,25 @@ defmodule Authify.Tasks.Workers.TaskExecutorTest do
   # --- Lifecycle Hooks ---
 
   describe "perform/1 - lifecycle hooks" do
-    test "calls on_success hook on successful completion", %{org: org} do
+    test "calls before_complete hook on successful completion", %{org: org} do
       task = insert_task(org, %{type: "test_with_hooks"})
 
       assert :ok = perform_task(task)
 
-      assert_received {:on_success_called, task_id, %{"result" => "with_hooks"}}
+      assert_received {:before_complete_called, task_id, %{"result" => "with_hooks"}}
       assert task_id == task.id
     end
 
-    test "calls on_failure hook on permanent failure", %{org: org} do
+    test "calls before_fail hook on permanent failure", %{org: org} do
       task = insert_task(org, %{type: "test_fail_with_hooks"})
 
       assert :ok = perform_task(task)
 
-      assert_received {:on_failure_called, task_id, _reason}
+      assert_received {:before_fail_called, task_id, _reason}
       assert task_id == task.id
     end
 
-    test "on_success can schedule a follow-up task", %{org: org} do
+    test "before_complete can schedule a follow-up task", %{org: org} do
       task = insert_task(org, %{type: "test_success_with_follow_up"})
 
       assert :ok = perform_task(task)

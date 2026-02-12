@@ -60,11 +60,8 @@ defmodule AuthifyWeb.TaskLive.Show do
   def handle_event("cancel", _params, socket) do
     task = socket.assigns.task
 
-    case Tasks.transition_task(task, :cancelling) do
-      {:ok, task} ->
-        # Complete the cancellation
-        Tasks.transition_task(task, :cancelled)
-
+    case Tasks.cancel_task(task) do
+      {:ok, _cancelled_task} ->
         {:noreply,
          socket
          |> put_flash(:info, "Task successfully cancelled.")
@@ -104,7 +101,7 @@ defmodule AuthifyWeb.TaskLive.Show do
 
   # Helper functions for template
   def cancellable?(task) do
-    task.status in [:pending, :scheduled, :waiting, :retrying]
+    task.status in [:pending, :scheduled, :running, :waiting, :retrying]
   end
 
   def format_status(status) do

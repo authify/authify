@@ -401,6 +401,12 @@ defmodule AuthifyWeb.Router do
     # Audit Logs (read-only)
     get "/audit-logs", AuditLogsController, :index
     get "/audit-logs/:id", AuditLogsController, :show
+
+    # Task Management
+    get "/tasks", TasksController, :index
+    get "/tasks/:id", TasksController, :show
+    get "/tasks/:id/logs", TasksController, :logs
+    post "/tasks/:id/cancel", TasksController, :cancel
   end
 
   # SCIM 2.0 endpoints for user provisioning (organization-scoped, RFC 7644)

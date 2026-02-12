@@ -24,6 +24,7 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
   alias Authify.Repo
   alias Authify.Tasks
   alias Authify.Tasks.{BasicTask, ExclusivityLock, Task}
+  alias Authify.Tasks.Telemetry, as: TaskTelemetry
 
   @active_states Task.active_states()
   @transitioning_states Task.transitioning_states()
@@ -187,69 +188,90 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
 
   defp run_task(%Task{timeout_seconds: timeout_seconds} = task, handler)
        when is_integer(timeout_seconds) and timeout_seconds > 0 do
-    # Log task start with timeout
+    # Log and emit telemetry for task start
     Tasks.create_task_log(
       task,
       "Task started (timeout: #{timeout_seconds}s, attempt #{task.retry_count + 1}/#{handler.max_retries() + 1})"
     )
 
-    run_task_with_timeout(task, handler, timeout_seconds * 1000)
+    start_time = TaskTelemetry.task_started(task)
+    run_task_with_timeout(task, handler, timeout_seconds * 1000, start_time)
   end
 
   defp run_task(%Task{} = task, handler) do
-    # Log task start without timeout
+    # Log and emit telemetry for task start
     Tasks.create_task_log(
       task,
       "Task started (attempt #{task.retry_count + 1}/#{handler.max_retries() + 1})"
     )
 
+    start_time = TaskTelemetry.task_started(task)
+
     # No timeout configured, execute directly
-    case handler.execute(task) do
+    result =
+      try do
+        handler.execute(task)
+      rescue
+        exception ->
+          {:exception, exception, __STACKTRACE__}
+      end
+
+    case result do
       {:ok, results} ->
-        handle_success(task, handler, results)
+        handle_success(task, handler, results, start_time)
 
       {:error, reason} ->
-        handle_failure(task, handler, reason)
+        handle_failure(task, handler, reason, start_time)
 
       {:wait, _} ->
         # WaitTask returns this when condition is not met
         # The WaitTask behavior handles its own re-scheduling
         :ok
 
-      other ->
-        handle_failure(task, handler, %{type: "unexpected_return", value: inspect(other)})
-    end
-  rescue
-    exception ->
-      reason = %{
-        type: "exception",
-        message: Exception.message(exception),
-        stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-      }
+      {:exception, exception, stacktrace} ->
+        reason = %{
+          type: "exception",
+          message: Exception.message(exception),
+          stacktrace: Exception.format_stacktrace(stacktrace)
+        }
 
-      handle_failure(task, handler, reason)
+        handle_failure(task, handler, reason, start_time)
+
+      other ->
+        handle_failure(
+          task,
+          handler,
+          %{type: "unexpected_return", value: inspect(other)},
+          start_time
+        )
+    end
   end
 
-  defp handle_result(%Task{} = task, handler, result) do
+  defp handle_result(%Task{} = task, handler, result, start_time) do
     case result do
       {:ok, results} ->
-        handle_success(task, handler, results)
+        handle_success(task, handler, results, start_time)
 
       {:error, reason} ->
-        handle_failure(task, handler, reason)
+        handle_failure(task, handler, reason, start_time)
 
       {:wait, _} ->
         # WaitTask returns this when condition is not met
         :ok
 
       other ->
-        handle_failure(task, handler, %{type: "unexpected_return", value: inspect(other)})
+        handle_failure(
+          task,
+          handler,
+          %{type: "unexpected_return", value: inspect(other)},
+          start_time
+        )
     end
   end
 
   # --- Timeout Path ---
 
-  defp run_task_with_timeout(%Task{} = task, handler, timeout_ms) do
+  defp run_task_with_timeout(%Task{} = task, handler, timeout_ms, start_time) do
     task_ref = make_ref()
     parent = self()
 
@@ -274,28 +296,33 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
           stacktrace: Exception.format_stacktrace(stacktrace)
         }
 
-        handle_failure(task, handler, reason)
+        handle_failure(task, handler, reason, start_time)
 
       {^task_ref, :result, result} ->
-        handle_result(task, handler, result)
+        handle_result(task, handler, result, start_time)
 
       {:DOWN, ^monitor_ref, :process, ^pid, :normal} ->
         :ok
 
       {:DOWN, ^monitor_ref, :process, ^pid, reason} ->
-        handle_failure(task, handler, %{
-          type: "process_crash",
-          message: "Task process crashed: #{inspect(reason)}"
-        })
+        handle_failure(
+          task,
+          handler,
+          %{
+            type: "process_crash",
+            message: "Task process crashed: #{inspect(reason)}"
+          },
+          start_time
+        )
     after
       timeout_ms ->
         Process.demonitor(monitor_ref, [:flush])
         Process.exit(pid, :kill)
-        handle_timeout(task, handler)
+        handle_timeout(task, handler, start_time)
     end
   end
 
-  defp handle_timeout(%Task{} = task, _handler) do
+  defp handle_timeout(%Task{} = task, _handler, _start_time) do
     # Log timeout
     Tasks.create_task_log(
       task,
@@ -314,6 +341,7 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
            }),
          {:ok, task} <- Tasks.transition_task(task, :timing_out),
          {:ok, _task} <- Tasks.transition_task(task, :timed_out) do
+      TaskTelemetry.task_timed_out(task)
       :ok
     else
       {:error, err} ->
@@ -324,21 +352,22 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
 
   # --- Success Path ---
 
-  defp handle_success(%Task{} = task, handler, results) do
+  defp handle_success(%Task{} = task, handler, results, start_time) do
     # Log success
     Tasks.create_task_log(task, "Task completed successfully")
 
     # Transition: running → completing
     with {:ok, task} <- Tasks.update_task(task, %{results: results}),
          {:ok, task} <- Tasks.transition_task(task, :completing) do
-      # Run on_success hook
-      hook_result = handler.on_success(task, results)
+      # Run before_complete hook
+      hook_result = handler.before_complete(task, results)
 
       # Handle follow-up task from hook
       maybe_schedule_follow_up(hook_result, task)
 
       # Transition: completing → completed
       Tasks.transition_task(task, :completed)
+      TaskTelemetry.task_completed(task, start_time)
       :ok
     else
       {:error, reason} ->
@@ -349,13 +378,13 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
 
   # --- Failure Path ---
 
-  defp handle_failure(%Task{} = task, handler, reason) do
+  defp handle_failure(%Task{} = task, handler, reason, start_time) do
     task = refresh_task(task)
 
     if should_retry?(task, handler, reason) do
       perform_retry(task, handler, reason)
     else
-      perform_final_failure(task, handler, reason)
+      perform_final_failure(task, handler, reason, start_time)
     end
   end
 
@@ -367,6 +396,7 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
 
   defp perform_retry(%Task{} = task, handler, reason) do
     new_retry_count = task.retry_count + 1
+    TaskTelemetry.task_retried(task, new_retry_count)
     delay = BasicTask.backoff_delay(new_retry_count, handler.retry_strategy())
 
     # Log retry
@@ -377,8 +407,8 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
       "Task failed, will retry in #{delay}s (attempt #{new_retry_count}/#{handler.max_retries()}): #{error_msg}"
     )
 
-    # Call on_retry hook
-    handler.on_retry(task, reason, new_retry_count)
+    # Call before_retry hook
+    handler.before_retry(task, reason, new_retry_count)
 
     scheduled_at =
       DateTime.utc_now()
@@ -407,7 +437,7 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
     end
   end
 
-  defp perform_final_failure(%Task{} = task, handler, reason) do
+  defp perform_final_failure(%Task{} = task, handler, reason, start_time) do
     # Log final failure
     error_msg = get_error_message(reason)
     Tasks.create_task_log(task, "Task failed permanently: #{error_msg}")
@@ -417,12 +447,14 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
              errors: Map.put(task.errors || %{}, "final", normalize_reason(reason))
            }),
          {:ok, task} <- Tasks.transition_task(task, :failing) do
-      # Run on_failure hook
-      hook_result = handler.on_failure(task, reason)
+      # Run before_fail hook
+      hook_result = handler.before_fail(task, reason)
       maybe_schedule_follow_up(hook_result, task)
 
       # Transition: failing → failed
       Tasks.transition_task(task, :failed)
+      error_type = get_error_type(reason)
+      TaskTelemetry.task_failed(task, start_time, error_type)
       :ok
     else
       {:error, err} ->
@@ -483,17 +515,27 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
   Enqueues a task for execution via Oban. Optionally accepts a delay in seconds
   for scheduled/retry execution.
   """
-  def schedule_execution(%Task{id: task_id}, delay_seconds \\ 0) do
+  def schedule_execution(%Task{id: task_id} = task, delay_seconds \\ 0) do
     job_args = %{"task_id" => task_id}
 
-    if delay_seconds > 0 do
-      job_args
-      |> __MODULE__.new(schedule_in: delay_seconds)
-      |> Oban.insert()
-    else
-      job_args
-      |> __MODULE__.new()
-      |> Oban.insert()
+    job_changeset =
+      if delay_seconds > 0 do
+        __MODULE__.new(job_args, schedule_in: delay_seconds)
+      else
+        __MODULE__.new(job_args)
+      end
+
+    case Oban.insert(job_changeset) do
+      {:ok, %Oban.Job{id: job_id}} = result ->
+        # Store Oban job ID in task metadata for cancellation support
+        Tasks.update_task(task, %{
+          metadata: Map.put(task.metadata || %{}, "oban_job_id", job_id)
+        })
+
+        result
+
+      error ->
+        error
     end
   end
 
@@ -528,6 +570,11 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
 
   defp maybe_schedule_follow_up(:ok, _parent_task), do: :ok
   defp maybe_schedule_follow_up(_, _parent_task), do: :ok
+
+  # Extract error type for telemetry tagging
+  defp get_error_type(%{type: type}) when is_binary(type), do: type
+  defp get_error_type(%{"type" => type}) when is_binary(type), do: type
+  defp get_error_type(_reason), do: "unknown"
 
   # Extract a human-readable error message from various error formats
   defp get_error_message(%{message: message}) when is_binary(message), do: message

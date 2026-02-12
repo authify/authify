@@ -59,9 +59,9 @@ defmodule Authify.Tasks.BasicTaskTest do
       handler = Authify.Tasks.TestSucceed
       task = %Authify.Tasks.Task{type: "test_succeed", action: "execute"}
 
-      assert handler.on_success(task, %{}) == :ok
-      assert handler.on_failure(task, :reason) == :ok
-      assert handler.on_retry(task, :reason, 1) == :ok
+      assert handler.before_complete(task, %{}) == :ok
+      assert handler.before_fail(task, :reason) == :ok
+      assert handler.before_retry(task, :reason, 1) == :ok
       assert handler.on_duplicate(task, task) == :wait
       assert handler.on_completing(task, task) == :wait
       assert handler.on_failing(task, task) == :wait

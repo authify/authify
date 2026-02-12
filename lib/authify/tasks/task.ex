@@ -8,6 +8,8 @@ defmodule Authify.Tasks.Task do
 
   @primary_key {:id, Uniq.UUID, version: 7, autogenerate: true}
   @foreign_key_type Uniq.UUID
+  @derive {Jason.Encoder,
+           except: [:__meta__, :__struct__, :organization, :parent, :children, :logs]}
 
   # State categories
   @active_states [:scheduled, :pending, :running, :waiting, :retrying]

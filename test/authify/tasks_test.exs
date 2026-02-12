@@ -279,6 +279,73 @@ defmodule Authify.TasksTest do
     end
   end
 
+  # --- Task Cancellation Tests ---
+
+  describe "cancel_task/1" do
+    test "cancels a pending task" do
+      task = insert_task()
+      assert {:ok, cancelled} = Tasks.cancel_task(task)
+      assert cancelled.status == :cancelled
+    end
+
+    test "cancels a running task" do
+      task = insert_task()
+      {:ok, running} = Tasks.transition_task(task, :running)
+      assert {:ok, cancelled} = Tasks.cancel_task(running)
+      assert cancelled.status == :cancelled
+    end
+
+    test "cancels a waiting task" do
+      task = insert_task()
+      {:ok, running} = Tasks.transition_task(task, :running)
+      {:ok, waiting} = Tasks.transition_task(running, :waiting)
+      assert {:ok, cancelled} = Tasks.cancel_task(waiting)
+      assert cancelled.status == :cancelled
+    end
+
+    test "cancels a retrying task" do
+      task = insert_task()
+      {:ok, running} = Tasks.transition_task(task, :running)
+      {:ok, retrying} = Tasks.transition_task(running, :retrying)
+      assert {:ok, cancelled} = Tasks.cancel_task(retrying)
+      assert cancelled.status == :cancelled
+    end
+
+    test "rejects cancellation of terminal tasks" do
+      task = insert_task()
+      {:ok, running} = Tasks.transition_task(task, :running)
+      {:ok, completing} = Tasks.transition_task(running, :completing)
+      {:ok, completed} = Tasks.transition_task(completing, :completed)
+
+      assert {:error, {:invalid_transition, :completed, :cancelling}} =
+               Tasks.cancel_task(completed)
+    end
+
+    test "cascades cancellation to child tasks" do
+      parent = insert_task()
+      child1 = insert_task(%{parent_id: parent.id, action: "step_1"})
+      child2 = insert_task(%{parent_id: parent.id, action: "step_2"})
+
+      # One child is already completed (should not be cancelled)
+      {:ok, running} = Tasks.transition_task(child2, :running)
+      {:ok, completing} = Tasks.transition_task(running, :completing)
+      {:ok, _completed} = Tasks.transition_task(completing, :completed)
+
+      assert {:ok, _cancelled_parent} = Tasks.cancel_task(parent)
+
+      # Pending child should be cancelled
+      assert Tasks.get_task!(child1.id).status == :cancelled
+      # Completed child should remain completed
+      assert Tasks.get_task!(child2.id).status == :completed
+    end
+
+    test "invokes before_cancel callback" do
+      task = insert_task(%{type: "test_cancellable", action: "execute"})
+      assert {:ok, _cancelled} = Tasks.cancel_task(task)
+      assert_received {:before_cancel_called, _task_id}
+    end
+  end
+
   # --- Task Log Tests ---
 
   describe "create_task_log/2" do

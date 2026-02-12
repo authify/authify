@@ -108,6 +108,10 @@ defmodule AuthifyWeb.API.OpenAPI.Spec do
         description: "SCIM 2.0 client management for outbound user and group provisioning"
       },
       %{
+        name: "Tasks",
+        description: "Task engine management for monitoring and controlling background tasks"
+      },
+      %{
         name: "Audit Logs",
         description: "Organization audit log access and filtering"
       },

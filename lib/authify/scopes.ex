@@ -43,7 +43,10 @@ defmodule Authify.Scopes do
     "organizations:read",
     "organizations:write",
     # Audit log access
-    "audit_logs:read"
+    "audit_logs:read",
+    # Task management
+    "tasks:read",
+    "tasks:write"
   ]
 
   # Profile scopes are only for Personal Access Tokens
@@ -157,6 +160,10 @@ defmodule Authify.Scopes do
       ],
       "Audit Logs" => [
         {"audit_logs:read", "Read audit logs for organization"}
+      ],
+      "Tasks" => [
+        {"tasks:read", "Read task information for organization"},
+        {"tasks:write", "Manage tasks in organization (cancel, etc.)"}
       ],
       "Profile" => [
         {"profile:read", "Read your own profile information"},
