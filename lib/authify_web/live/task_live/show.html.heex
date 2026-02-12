@@ -1,20 +1,33 @@
 <.two_column_layout flash={@flash}>
   <:sidebar>
-    <.organization_sidebar user={@user} organization={@organization} current_page={@current_page} />
+    <.organization_sidebar
+      user={@current_user}
+      organization={@current_organization}
+      current_page={@current_page}
+    />
   </:sidebar>
   <:main>
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
       <h1 class="h2">Task Details</h1>
       <div>
-        <a href={~p"/#{@organization.slug}/tasks"} class="btn btn-secondary">
+        <a href={~p"/#{@current_organization.slug}/tasks"} class="btn btn-secondary">
           <i class="bi bi-arrow-left"></i> Back to Tasks
         </a>
-        <%!-- Cancel button removed - use LiveView version instead --%>
+        <%= if cancellable?(@task) do %>
+          <button
+            type="button"
+            class="btn btn-warning"
+            phx-click="cancel"
+            data-confirm="Are you sure you want to cancel this task?"
+          >
+            <i class="bi bi-x-circle"></i> Cancel Task
+          </button>
+        <% end %>
       </div>
     </div>
 
     <div class="row">
-      <!-- Task Metadata -->
+      <%!-- Task Metadata --%>
       <div class="col-md-6 mb-4">
         <div class="card">
           <div class="card-header">
@@ -69,8 +82,8 @@
           </div>
         </div>
       </div>
-      
-<!-- Timestamps -->
+
+      <%!-- Timestamps --%>
       <div class="col-md-6 mb-4">
         <div class="card">
           <div class="card-header">
@@ -117,8 +130,8 @@
         </div>
       </div>
     </div>
-    
-<!-- Params and Errors -->
+
+    <%!-- Params and Errors --%>
     <div class="row">
       <div class="col-md-6 mb-4">
         <div class="card">
@@ -142,8 +155,8 @@
         </div>
       </div>
     </div>
-    
-<!-- Execution Logs and Results -->
+
+    <%!-- Execution Logs and Results --%>
     <div class="row">
       <div class="col-md-8 mb-4">
         <div class="card">
@@ -188,8 +201,8 @@
         </div>
       </div>
     </div>
-    
-<!-- Children Tasks -->
+
+    <%!-- Children Tasks --%>
     <%= if not Enum.empty?(@task.children) do %>
       <div class="card mb-4">
         <div class="card-header">
@@ -221,7 +234,7 @@
                   <td><small>{format_datetime(child.inserted_at)}</small></td>
                   <td>
                     <a
-                      href={~p"/#{@organization.slug}/tasks/#{child.id}"}
+                      href={~p"/#{@current_organization.slug}/tasks/#{child.id}"}
                       class="btn btn-sm btn-outline-primary"
                     >
                       View
@@ -234,8 +247,8 @@
         </div>
       </div>
     <% end %>
-    
-<!-- Correlated Tasks -->
+
+    <%!-- Correlated Tasks --%>
     <%= if not Enum.empty?(@correlated_tasks) and length(@correlated_tasks) > 1 do %>
       <div class="card mb-4">
         <div class="card-header">
@@ -268,7 +281,7 @@
                   <td>
                     <%= if corr_task.id != @task.id do %>
                       <a
-                        href={~p"/#{@organization.slug}/tasks/#{corr_task.id}"}
+                        href={~p"/#{@current_organization.slug}/tasks/#{corr_task.id}"}
                         class="btn btn-sm btn-outline-primary"
                       >
                         View

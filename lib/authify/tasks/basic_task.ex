@@ -124,6 +124,7 @@ defmodule Authify.Tasks.BasicTask do
       @behaviour Authify.Tasks.BasicTask
 
       import Ecto.Query, warn: false
+      import Authify.Tasks.BasicTask, only: [log: 2]
 
       alias Authify.Tasks.Task
 
@@ -203,6 +204,25 @@ defmodule Authify.Tasks.BasicTask do
   end
 
   # --- Shared Utilities ---
+
+  @doc """
+  Logs a message to a task's execution log.
+
+  This is a convenience wrapper around `Authify.Tasks.create_task_log/2` that
+  can be called from within task handlers.
+
+  ## Examples
+
+      def execute(task) do
+        log(task, "Starting processing...")
+        result = do_work()
+        log(task, "Processing complete: \#{inspect(result)}")
+        {:ok, result}
+      end
+  """
+  def log(%Authify.Tasks.Task{} = task, message) when is_binary(message) do
+    Authify.Tasks.create_task_log(task, message)
+  end
 
   @doc """
   Resolves a task's handler module from its type and action fields.

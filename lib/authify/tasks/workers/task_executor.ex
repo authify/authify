@@ -187,10 +187,22 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
 
   defp run_task(%Task{timeout_seconds: timeout_seconds} = task, handler)
        when is_integer(timeout_seconds) and timeout_seconds > 0 do
+    # Log task start with timeout
+    Tasks.create_task_log(
+      task,
+      "Task started (timeout: #{timeout_seconds}s, attempt #{task.retry_count + 1}/#{handler.max_retries() + 1})"
+    )
+
     run_task_with_timeout(task, handler, timeout_seconds * 1000)
   end
 
   defp run_task(%Task{} = task, handler) do
+    # Log task start without timeout
+    Tasks.create_task_log(
+      task,
+      "Task started (attempt #{task.retry_count + 1}/#{handler.max_retries() + 1})"
+    )
+
     # No timeout configured, execute directly
     case handler.execute(task) do
       {:ok, results} ->
@@ -284,6 +296,12 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
   end
 
   defp handle_timeout(%Task{} = task, _handler) do
+    # Log timeout
+    Tasks.create_task_log(
+      task,
+      "Task execution timed out after #{task.timeout_seconds} seconds"
+    )
+
     reason = %{
       type: "timeout",
       message: "Task execution exceeded timeout of #{task.timeout_seconds} seconds"
@@ -307,6 +325,9 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
   # --- Success Path ---
 
   defp handle_success(%Task{} = task, handler, results) do
+    # Log success
+    Tasks.create_task_log(task, "Task completed successfully")
+
     # Transition: running → completing
     with {:ok, task} <- Tasks.update_task(task, %{results: results}),
          {:ok, task} <- Tasks.transition_task(task, :completing) do
@@ -348,6 +369,14 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
     new_retry_count = task.retry_count + 1
     delay = BasicTask.backoff_delay(new_retry_count, handler.retry_strategy())
 
+    # Log retry
+    error_msg = get_error_message(reason)
+
+    Tasks.create_task_log(
+      task,
+      "Task failed, will retry in #{delay}s (attempt #{new_retry_count}/#{handler.max_retries()}): #{error_msg}"
+    )
+
     # Call on_retry hook
     handler.on_retry(task, reason, new_retry_count)
 
@@ -379,6 +408,10 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
   end
 
   defp perform_final_failure(%Task{} = task, handler, reason) do
+    # Log final failure
+    error_msg = get_error_message(reason)
+    Tasks.create_task_log(task, "Task failed permanently: #{error_msg}")
+
     with {:ok, task} <-
            Tasks.update_task(task, %{
              errors: Map.put(task.errors || %{}, "final", normalize_reason(reason))
@@ -495,4 +528,10 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
 
   defp maybe_schedule_follow_up(:ok, _parent_task), do: :ok
   defp maybe_schedule_follow_up(_, _parent_task), do: :ok
+
+  # Extract a human-readable error message from various error formats
+  defp get_error_message(%{message: message}) when is_binary(message), do: message
+  defp get_error_message(%{"message" => message}) when is_binary(message), do: message
+  defp get_error_message(reason) when is_binary(reason), do: reason
+  defp get_error_message(reason), do: inspect(reason)
 end

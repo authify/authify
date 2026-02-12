@@ -244,10 +244,9 @@ defmodule AuthifyWeb.Router do
     # Audit Logs (admin only)
     resources "/audit_logs", AuditLogsController, only: [:index, :show]
 
-    # Task Management (authify-global only, enforced in controller)
-    resources "/tasks", TasksController, only: [:index, :show] do
-      post "/cancel", TasksController, :cancel
-    end
+    # Task Management (authify-global only, enforced in controller/LiveView)
+    get "/tasks", TasksController, :index
+    live "/tasks/:id", TaskLive.Show, :show
 
     # OAuth Applications management
     resources "/applications", ApplicationsController

@@ -21,11 +21,14 @@ defmodule Authify.Tasks.CleanupExpiredInvitations do
   import Ecto.Query
 
   @impl true
-  def execute(_task) do
+  def execute(task) do
     Logger.info("Starting cleanup of expired invitations")
+    log(task, "Identifying invitations to cleanup...")
 
     # Delete invitations that expired more than 48 hours ago
     cutoff = DateTime.utc_now() |> DateTime.add(-48, :hour)
+
+    log(task, "Cutoff time: #{DateTime.to_iso8601(cutoff)} (48 hours ago)")
 
     deleted_count =
       from(i in Invitation,
@@ -36,6 +39,7 @@ defmodule Authify.Tasks.CleanupExpiredInvitations do
       |> elem(0)
 
     Logger.info("Cleaned up #{deleted_count} expired invitation(s) (older than 48 hours)")
+    log(task, "Cleanup complete: #{deleted_count} invitation(s) deleted")
 
     {:ok, %{deleted_count: deleted_count, cutoff: cutoff, completed_at: DateTime.utc_now()}}
   end

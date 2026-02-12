@@ -5,6 +5,8 @@ defmodule AuthifyWeb.TasksHTML do
 
   use AuthifyWeb, :html
 
+  alias Authify.Security.Sanitizer
+
   embed_templates "tasks_html/*"
 
   @doc """
@@ -58,6 +60,16 @@ defmodule AuthifyWeb.TasksHTML do
   end
 
   @doc """
+  Formats a log timestamp in compact syslog style.
+  """
+  def format_log_timestamp(nil), do: "N/A"
+
+  def format_log_timestamp(datetime) do
+    # Compact syslog-style format: "Feb 11 14:45:23"
+    Calendar.strftime(datetime, "%b %d %H:%M:%S")
+  end
+
+  @doc """
   Truncates a UUID for display.
   """
   def truncate_id(id) when is_binary(id) do
@@ -87,4 +99,10 @@ defmodule AuthifyWeb.TasksHTML do
   def total_pages(total, per_page) do
     ceil(total / per_page)
   end
+
+  @doc """
+  Sanitizes sensitive data from content before displaying in UI.
+  Delegates to Authify.Security.Sanitizer for actual sanitization.
+  """
+  def sanitize_for_display(content), do: Sanitizer.sanitize(content)
 end
