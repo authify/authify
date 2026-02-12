@@ -1,0 +1,301 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar
+      user={@current_user}
+      organization={@current_organization}
+      current_page={@current_page}
+    />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Task Details</h1>
+      <div>
+        <a href={~p"/#{@current_organization.slug}/tasks"} class="btn btn-secondary">
+          <i class="bi bi-arrow-left"></i> Back to Tasks
+        </a>
+        <%= if cancellable?(@task) do %>
+          <button
+            type="button"
+            class="btn btn-warning"
+            phx-click="cancel"
+            data-confirm="Are you sure you want to cancel this task?"
+          >
+            <i class="bi bi-x-circle"></i> Cancel Task
+          </button>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="row">
+      <%!-- Task Metadata --%>
+      <div class="col-md-6 mb-4">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">Metadata</h5>
+          </div>
+          <div class="card-body">
+            <table class="table table-sm">
+              <tr>
+                <th width="30%">ID:</th>
+                <td><code>{@task.id}</code></td>
+              </tr>
+              <tr>
+                <th>Type:</th>
+                <td>{@task.type}</td>
+              </tr>
+              <tr>
+                <th>Action:</th>
+                <td>{@task.action}</td>
+              </tr>
+              <tr>
+                <th>Status:</th>
+                <td>
+                  <span class={status_badge_class(@task.status)}>
+                    {format_status(@task.status)}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <th>Priority:</th>
+                <td>{@task.priority}</td>
+              </tr>
+              <tr>
+                <th>Retry Count:</th>
+                <td>{@task.retry_count} / {@task.max_retries}</td>
+              </tr>
+              <%= if @task.organization do %>
+                <tr>
+                  <th>Organization:</th>
+                  <td>
+                    {@task.organization.name}<br />
+                    <small class="text-muted">{@task.organization.slug}</small>
+                  </td>
+                </tr>
+              <% end %>
+              <%= if @task.correlation_id do %>
+                <tr>
+                  <th>Correlation ID:</th>
+                  <td><code class="small">{@task.correlation_id}</code></td>
+                </tr>
+              <% end %>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <%!-- Timestamps --%>
+      <div class="col-md-6 mb-4">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">Timestamps</h5>
+          </div>
+          <div class="card-body">
+            <table class="table table-sm">
+              <tr>
+                <th width="30%">Created:</th>
+                <td>{format_datetime(@task.inserted_at)}</td>
+              </tr>
+              <%= if @task.scheduled_at do %>
+                <tr>
+                  <th>Scheduled:</th>
+                  <td>{format_datetime(@task.scheduled_at)}</td>
+                </tr>
+              <% end %>
+              <%= if @task.started_at do %>
+                <tr>
+                  <th>Started:</th>
+                  <td>{format_datetime(@task.started_at)}</td>
+                </tr>
+              <% end %>
+              <%= if @task.completed_at do %>
+                <tr>
+                  <th>Completed:</th>
+                  <td>{format_datetime(@task.completed_at)}</td>
+                </tr>
+              <% end %>
+              <%= if @task.failed_at do %>
+                <tr>
+                  <th>Failed:</th>
+                  <td>{format_datetime(@task.failed_at)}</td>
+                </tr>
+              <% end %>
+              <%= if @task.expires_at do %>
+                <tr>
+                  <th>Expires:</th>
+                  <td>{format_datetime(@task.expires_at)}</td>
+                </tr>
+              <% end %>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <%!-- Params and Errors --%>
+    <div class="row">
+      <div class="col-md-6 mb-4">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">Parameters</h5>
+          </div>
+          <div class="card-body">
+            <pre class="mb-0"><code>{format_json(@task.params)}</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6 mb-4">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">Errors</h5>
+          </div>
+          <div class="card-body">
+            <pre class="mb-0"><code>{sanitize_for_display(format_json(@task.errors))}</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <%!-- Execution Logs and Results --%>
+    <div class="row">
+      <div class="col-md-8 mb-4">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+              <i class="bi bi-file-text"></i> Execution Logs
+            </h5>
+            <%= if not Enum.empty?(@task.logs) do %>
+              <span class="badge bg-primary">{length(@task.logs)} log entries</span>
+            <% end %>
+          </div>
+          <div class="card-body">
+            <%= if Enum.empty?(@task.logs) do %>
+              <div class="text-center text-muted py-4">
+                <i class="bi bi-file-text fs-1 mb-2"></i>
+                <p class="mb-0">No logs available or logs may have been cleaned up</p>
+              </div>
+            <% else %>
+              <div class="log-entries font-monospace small">
+                <%= for log <- @task.logs do %>
+                  <div class="log-entry py-1">
+                    <span class="text-muted" style="font-size: 0.75rem;">
+                      {format_log_timestamp(log.inserted_at)}:
+                    </span>
+                    <span>{sanitize_for_display(log.log_data)}</span>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4 mb-4">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">Results</h5>
+          </div>
+          <div class="card-body">
+            <pre class="mb-0"><code>{format_json(@task.results)}</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <%!-- Children Tasks --%>
+    <%= if not Enum.empty?(@task.children) do %>
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Child Tasks</h5>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Type / Action</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <%= for child <- @task.children do %>
+                <tr>
+                  <td><code class="small">{truncate_id(child.id)}</code></td>
+                  <td>
+                    <strong>{child.type}</strong> / {child.action}
+                  </td>
+                  <td>
+                    <span class={status_badge_class(child.status)}>
+                      {format_status(child.status)}
+                    </span>
+                  </td>
+                  <td><small>{format_datetime(child.inserted_at)}</small></td>
+                  <td>
+                    <a
+                      href={~p"/#{@current_organization.slug}/tasks/#{child.id}"}
+                      class="btn btn-sm btn-outline-primary"
+                    >
+                      View
+                    </a>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% end %>
+
+    <%!-- Correlated Tasks --%>
+    <%= if not Enum.empty?(@correlated_tasks) and length(@correlated_tasks) > 1 do %>
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Correlated Tasks ({length(@correlated_tasks)} total)</h5>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Type / Action</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <%= for corr_task <- @correlated_tasks do %>
+                <tr class={if corr_task.id == @task.id, do: "table-active", else: ""}>
+                  <td><code class="small">{truncate_id(corr_task.id)}</code></td>
+                  <td>
+                    <strong>{corr_task.type}</strong> / {corr_task.action}
+                  </td>
+                  <td>
+                    <span class={status_badge_class(corr_task.status)}>
+                      {format_status(corr_task.status)}
+                    </span>
+                  </td>
+                  <td><small>{format_datetime(corr_task.inserted_at)}</small></td>
+                  <td>
+                    <%= if corr_task.id != @task.id do %>
+                      <a
+                        href={~p"/#{@current_organization.slug}/tasks/#{corr_task.id}"}
+                        class="btn btn-sm btn-outline-primary"
+                      >
+                        View
+                      </a>
+                    <% else %>
+                      <span class="badge bg-info">Current</span>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% end %>
+  </:main>
+</.two_column_layout>

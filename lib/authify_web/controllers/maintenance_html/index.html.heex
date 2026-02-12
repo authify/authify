@@ -173,9 +173,12 @@
               <div class="col-6">
                 <div class="text-center">
                   <div class="h4 text-warning">
-                    {@maintenance.cleanup_stats.expired_invitations}
+                    {@maintenance.cleanup_stats.cleanable_invitations}
                   </div>
-                  <div class="small text-muted">Expired Invitations</div>
+                  <div class="small text-muted">Cleanable Invitations</div>
+                  <div class="text-muted" style="font-size: 0.7rem;">
+                    (expired >48hrs ago)
+                  </div>
                 </div>
               </div>
               <div class="col-6">
@@ -225,7 +228,7 @@
                     <i class="bi bi-envelope-x text-warning fs-1 mb-2"></i>
                     <h6 class="card-title">Clean Expired Invitations</h6>
                     <p class="card-text small text-muted">
-                      Remove invitations that have expired and cannot be accepted.
+                      Remove invitations that expired more than 48 hours ago.
                     </p>
                     <.form
                       for={%{}}
@@ -235,9 +238,9 @@
                       <button
                         type="submit"
                         class="btn btn-outline-warning btn-sm w-100"
-                        onclick="return confirm('This will permanently delete all expired invitations. Continue?')"
+                        onclick="return confirm('This will queue a cleanup task to delete invitations that expired more than 48 hours ago. Continue?')"
                       >
-                        <i class="bi bi-trash"></i> Clean Up
+                        <i class="bi bi-list-task"></i> Queue Cleanup Task
                       </button>
                     </.form>
                   </div>
@@ -390,7 +393,8 @@
               <div class="col-md-6">
                 <h6 class="text-muted">Maintenance Guidelines</h6>
                 <ul class="small mb-0">
-                  <li>Run expired invitation cleanup weekly</li>
+                  <li>Automated cleanup runs daily at 2 AM UTC</li>
+                  <li>Manual cleanup can be triggered as needed</li>
                   <li>Monitor inactive organizations monthly</li>
                   <li>Recalculate statistics after major data changes</li>
                   <li>Keep system memory usage below 80%</li>

@@ -11,46 +11,30 @@ defmodule AuthifyWeb.PasswordResetController do
   def create(conn, %{"password_reset" => %{"email" => email}}) do
     case Accounts.get_user_by_email(email) do
       %Accounts.User{} = user ->
-        case Accounts.generate_password_reset_token(user) do
-          {:ok, updated_user, plaintext_token} ->
-            # Preload organization for email
-            user_with_org = Authify.Repo.preload(updated_user, :organization)
+        # Preload organization for event
+        user = Authify.Repo.preload(user, :organization)
 
-            # Build the password reset URL
-            reset_url = build_password_reset_url(user_with_org.organization, plaintext_token)
+        # Emit event to trigger password reset workflow (token generation + email)
+        case Authify.Tasks.EventHandler.handle_event(:password_reset_requested, %{
+               user_id: user.id,
+               organization_id: user.organization_id
+             }) do
+          {:ok, _task} ->
+            require Logger
+            Logger.info("Password reset workflow triggered for user #{user.id}")
 
-            # Send password reset email
-            case Authify.Email.send_password_reset_email(user_with_org, reset_url) do
-              {:ok, _metadata} ->
-                require Logger
-                primary_email = Authify.Accounts.User.get_primary_email_value(user_with_org)
-                Logger.info("Password reset email sent to #{primary_email}")
-
-              {:error, :smtp_not_configured} ->
-                require Logger
-
-                Logger.warning(
-                  "SMTP not configured for organization #{user_with_org.organization.slug}, password reset requested but email not sent"
-                )
-
-              {:error, reason} ->
-                require Logger
-                Logger.error("Failed to send password reset email: #{inspect(reason)}")
-            end
-
-            # Always show generic message (don't reveal if email sent or not)
-            conn
-            |> put_flash(
-              :info,
-              "If an account with that email exists, you will receive password reset instructions."
-            )
-            |> redirect(to: ~p"/login")
-
-          {:error, _changeset} ->
-            conn
-            |> put_flash(:error, "Unable to process password reset request.")
-            |> render(:new)
+          {:error, reason} ->
+            require Logger
+            Logger.error("Failed to trigger password reset workflow: #{inspect(reason)}")
         end
+
+        # Always show generic message (don't reveal if email sent or not)
+        conn
+        |> put_flash(
+          :info,
+          "If an account with that email exists, you will receive password reset instructions."
+        )
+        |> redirect(to: ~p"/login")
 
       nil ->
         # Don't reveal whether user exists - same response as success
@@ -61,23 +45,6 @@ defmodule AuthifyWeb.PasswordResetController do
         )
         |> redirect(to: ~p"/login")
     end
-  end
-
-  # Build the full URL for resetting password
-  defp build_password_reset_url(organization, token) do
-    # Get the effective email link domain for this organization
-    # (uses configured email_link_domain or falls back to default domain)
-    domain = Authify.Organizations.get_email_link_domain(organization)
-
-    # Build the reset URL with proper protocol/port for environment
-    base_url =
-      if Application.get_env(:authify, :env) == :dev do
-        "http://#{domain}:4000"
-      else
-        "https://#{domain}"
-      end
-
-    "#{base_url}/password_reset/#{token}"
   end
 
   def edit(conn, %{"token" => token}) do

@@ -244,6 +244,10 @@ defmodule AuthifyWeb.Router do
     # Audit Logs (admin only)
     resources "/audit_logs", AuditLogsController, only: [:index, :show]
 
+    # Task Management (authify-global only, enforced in controller/LiveView)
+    get "/tasks", TasksController, :index
+    live "/tasks/:id", TaskLive.Show, :show
+
     # OAuth Applications management
     resources "/applications", ApplicationsController
 
@@ -397,6 +401,12 @@ defmodule AuthifyWeb.Router do
     # Audit Logs (read-only)
     get "/audit-logs", AuditLogsController, :index
     get "/audit-logs/:id", AuditLogsController, :show
+
+    # Task Management
+    get "/tasks", TasksController, :index
+    get "/tasks/:id", TasksController, :show
+    get "/tasks/:id/logs", TasksController, :logs
+    post "/tasks/:id/cancel", TasksController, :cancel
   end
 
   # SCIM 2.0 endpoints for user provisioning (organization-scoped, RFC 7644)

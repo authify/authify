@@ -1,0 +1,185 @@
+<.two_column_layout flash={@flash}>
+  <:sidebar>
+    <.organization_sidebar user={@user} organization={@organization} current_page={@current_page} />
+  </:sidebar>
+  <:main>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+      <h1 class="h2">Tasks</h1>
+    </div>
+    
+<!-- Filter Form -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="mb-0">Filters</h5>
+      </div>
+      <div class="card-body">
+        <form method="get" action={~p"/#{@organization.slug}/tasks"}>
+          <div class="row g-3">
+            <!-- Status Filter -->
+            <div class="col-md-3">
+              <label for="status" class="form-label">Status</label>
+              <select name="status" id="status" class="form-select">
+                <option value="">All Statuses</option>
+                <%= for {category, statuses} <- @status_groups do %>
+                  <optgroup label={category}>
+                    <%= for status <- statuses do %>
+                      <option value={status} selected={@filters.status == to_string(status)}>
+                        {format_status(status)}
+                      </option>
+                    <% end %>
+                  </optgroup>
+                <% end %>
+              </select>
+            </div>
+            
+<!-- Type Filter -->
+            <div class="col-md-2">
+              <label for="type" class="form-label">Type</label>
+              <input
+                type="text"
+                name="type"
+                id="type"
+                class="form-control"
+                placeholder="e.g., email"
+                value={@filters.type}
+              />
+            </div>
+            
+<!-- Action Filter -->
+            <div class="col-md-2">
+              <label for="action" class="form-label">Action</label>
+              <input
+                type="text"
+                name="action"
+                id="action"
+                class="form-control"
+                placeholder="e.g., send_invitation"
+                value={@filters.action}
+              />
+            </div>
+            
+<!-- Organization Filter -->
+            <div class="col-md-3">
+              <label for="organization_id" class="form-label">Organization</label>
+              <select name="organization_id" id="organization_id" class="form-select">
+                <option value="">All Organizations</option>
+                <%= for org <- @organizations do %>
+                  <option
+                    value={org.id}
+                    selected={@filters.organization_id == to_string(org.id)}
+                  >
+                    {org.name} ({org.slug})
+                  </option>
+                <% end %>
+              </select>
+            </div>
+            
+<!-- Actions -->
+            <div class="col-md-2 d-flex align-items-end">
+              <button type="submit" class="btn btn-primary w-100">Apply</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+<!-- Task Table -->
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Tasks</h5>
+        <span class="text-muted">{pagination_info(@page, @per_page, @total)}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Type / Action</th>
+              <th>Organization</th>
+              <th>Status</th>
+              <th>Priority</th>
+              <th>Created</th>
+              <th>Started</th>
+              <th>Completed</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <%= if Enum.empty?(@tasks) do %>
+              <tr>
+                <td colspan="9" class="text-center text-muted py-4">
+                  No tasks found matching the current filters.
+                </td>
+              </tr>
+            <% else %>
+              <%= for task <- @tasks do %>
+                <tr>
+                  <td>
+                    <code class="small">{truncate_id(task.id)}</code>
+                  </td>
+                  <td>
+                    <strong>{task.type}</strong> <br />
+                    <small class="text-muted">{task.action}</small>
+                  </td>
+                  <td>
+                    <%= if task.organization do %>
+                      {task.organization.name}<br />
+                      <small class="text-muted">{task.organization.slug}</small>
+                    <% else %>
+                      <span class="text-muted">—</span>
+                    <% end %>
+                  </td>
+                  <td>
+                    <span class={status_badge_class(task.status)}>
+                      {format_status(task.status)}
+                    </span>
+                  </td>
+                  <td>{task.priority}</td>
+                  <td>
+                    <small>{format_datetime(task.inserted_at)}</small>
+                  </td>
+                  <td>
+                    <small>{format_datetime(task.started_at)}</small>
+                  </td>
+                  <td>
+                    <small>{format_datetime(task.completed_at || task.failed_at)}</small>
+                  </td>
+                  <td>
+                    <a
+                      href={~p"/#{@organization.slug}/tasks/#{task.id}"}
+                      class="btn btn-sm btn-outline-primary"
+                    >
+                      View
+                    </a>
+                  </td>
+                </tr>
+              <% end %>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+      
+<!-- Pagination -->
+      <%= if @total > @per_page do %>
+        <div class="card-footer">
+          <nav aria-label="Task pagination">
+            <ul class="pagination pagination-sm mb-0 justify-content-center">
+              <%= for page_num <- 1..total_pages(@total, @per_page) do %>
+                <li class={"page-item #{if page_num == @page, do: "active", else: ""}"}>
+                  <a
+                    class="page-link"
+                    href={
+                      ~p"/#{@organization.slug}/tasks?#{Map.merge(@filters, %{page: page_num})}"
+                    }
+                  >
+                    {page_num}
+                  </a>
+                </li>
+              <% end %>
+            </ul>
+          </nav>
+        </div>
+      <% end %>
+    </div>
+  </:main>
+</.two_column_layout>

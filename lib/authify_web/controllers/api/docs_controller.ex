@@ -33,6 +33,7 @@ defmodule AuthifyWeb.API.DocsController do
     |> Map.merge(Paths.SamlProviders.build())
     |> Map.merge(Paths.ScimClients.build())
     |> Map.merge(Paths.AuditLogs.build())
+    |> Map.merge(Paths.Tasks.build())
     |> Map.merge(Paths.Profile.build())
   end
 
@@ -54,6 +55,7 @@ defmodule AuthifyWeb.API.DocsController do
     |> Map.merge(Schemas.Groups.build())
     |> Map.merge(Schemas.Certificates.build())
     |> Map.merge(Schemas.ScimClients.build())
+    |> Map.merge(Schemas.Tasks.build())
     |> Map.merge(Schemas.Profile.build())
   end
 end

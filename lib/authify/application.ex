@@ -16,11 +16,15 @@ defmodule Authify.Application do
         Authify.RateLimit,
         Authify.Configurations.Cache,
         {Phoenix.PubSub, name: Authify.PubSub},
-        # SCIM Client infrastructure
-        {Task.Supervisor, name: Authify.TaskSupervisor},
-        Authify.SCIMClient.EventHandler,
-        Authify.SCIMClient.RetryScheduler
+        {Oban, Application.fetch_env!(:authify, Oban)}
       ] ++
+        Authify.Tasks.ExclusivityLock.child_specs() ++
+        [
+          # SCIM Client infrastructure
+          {Task.Supervisor, name: Authify.TaskSupervisor},
+          Authify.SCIMClient.EventHandler,
+          Authify.SCIMClient.RetryScheduler
+        ] ++
         prometheus_children() ++
         [
           # Start a worker by calling: Authify.Worker.start_link(arg)

@@ -693,7 +693,7 @@ defmodule Authify.Accounts do
   defp maybe_put_non_nil(map, key, value), do: Map.put(map, key, value)
 
   @doc """
-  Creates a user and sends email verification.
+  Creates a user and emits event to trigger email verification workflow.
 
   This should be used when creating users directly (not through invitation).
   Users created through invitations have already verified their email.
@@ -703,33 +703,21 @@ defmodule Authify.Accounts do
       {:ok, user} ->
         user = Repo.preload(user, [:organization, :emails])
 
-        case generate_email_verification_token(user) do
-          {:ok, email, plaintext_token} ->
-            verification_url =
-              build_email_verification_url(user.organization, plaintext_token)
+        # Emit event to trigger email verification workflow (token generation + email)
+        case Authify.Tasks.EventHandler.handle_event(:email_verification_needed, %{
+               user_id: user.id,
+               organization_id: organization_id
+             }) do
+          {:ok, _task} ->
+            require Logger
+            Logger.info("Email verification workflow triggered for user #{user.id}")
 
-            case Authify.Email.send_email_verification_email(user, verification_url) do
-              {:ok, _metadata} ->
-                require Logger
-                Logger.info("Email verification sent to #{email.value}")
-
-              {:error, :smtp_not_configured} ->
-                require Logger
-
-                Logger.warning(
-                  "SMTP not configured for organization #{user.organization.slug}, user created but verification email not sent"
-                )
-
-              {:error, reason} ->
-                require Logger
-                Logger.error("Failed to send verification email: #{inspect(reason)}")
-            end
-
-            {:ok, user}
-
-          {:error, changeset} ->
-            {:error, changeset}
+          {:error, reason} ->
+            require Logger
+            Logger.error("Failed to trigger email verification workflow: #{inspect(reason)}")
         end
+
+        {:ok, user}
 
       {:error, changeset} ->
         {:error, changeset}
@@ -986,45 +974,31 @@ defmodule Authify.Accounts do
   end
 
   @doc """
-  Generates and sends an email verification token to a specific email address.
+  Emits event to trigger email verification workflow.
 
   ## Parameters
     * `user` - User struct (must have organization preloaded)
     * `email` - UserEmail struct to verify
 
   ## Returns
-    * `{:ok, user_email}` - Token generated and email sent
-    * `{:error, changeset}` - Token generation failed
+    * `{:ok, user_email}` - Event triggered successfully
+    * `{:error, reason}` - Event trigger failed
   """
-  def send_email_verification(%User{} = user, %UserEmail{} = email) do
-    # Generate verification token using the shared function
-    case generate_email_verification_token(email) do
-      {:ok, updated_email, token} ->
-        # Build verification URL
-        verification_url = build_email_verification_url(user.organization, token)
+  def send_email_verification(%User{} = user, %UserEmail{} = _email) do
+    # Emit event to trigger email verification workflow (token generation + email)
+    case Authify.Tasks.EventHandler.handle_event(:email_verification_needed, %{
+           user_id: user.id,
+           organization_id: user.organization_id
+         }) do
+      {:ok, _task} ->
+        require Logger
+        Logger.info("Email verification workflow triggered for user #{user.id}")
+        {:ok, user}
 
-        # Send verification email
-        case Authify.Email.send_email_verification_email(user, verification_url) do
-          {:ok, _metadata} ->
-            require Logger
-            Logger.info("Email verification sent to #{email.value}")
-
-          {:error, :smtp_not_configured} ->
-            require Logger
-
-            Logger.warning(
-              "SMTP not configured for organization #{user.organization.slug}, verification email not sent"
-            )
-
-          {:error, reason} ->
-            require Logger
-            Logger.error("Failed to send verification email: #{inspect(reason)}")
-        end
-
-        {:ok, updated_email}
-
-      {:error, changeset} ->
-        {:error, changeset}
+      {:error, reason} ->
+        require Logger
+        Logger.error("Failed to trigger email verification workflow: #{inspect(reason)}")
+        {:error, reason}
     end
   end
 
@@ -1220,11 +1194,10 @@ defmodule Authify.Accounts do
   end
 
   @doc """
-  Creates an invitation and sends email.
+  Creates an invitation and emits event to trigger email workflow.
 
-  Sends the invitation email using Swoosh.deliver/2 (non-blocking in Elixir).
-  If email sending fails (e.g., SMTP not configured), the invitation is still
-  created successfully but a warning is logged.
+  Emits an `invite_created` event that triggers the invitation workflow,
+  which includes sending the invitation email asynchronously via the task system.
 
   Returns {:ok, invitation} on success or {:error, changeset} on validation failure.
   """
@@ -1233,28 +1206,21 @@ defmodule Authify.Accounts do
 
     case create_invitation(attrs_with_inviter) do
       {:ok, invitation} ->
-        # Preload associations needed for email
+        # Preload associations for organization_id
         invitation = Repo.preload(invitation, [:organization, :invited_by])
 
-        # Build the accept URL using the organization's email link domain
-        accept_url = build_invitation_accept_url(invitation)
-
-        # Send email asynchronously (fire and forget)
-        case Authify.Email.send_invitation_email(invitation, accept_url) do
-          {:ok, _metadata} ->
+        # Emit event to trigger invitation workflow (email sending)
+        case Authify.Tasks.EventHandler.handle_event(:invite_created, %{
+               invitation_id: invitation.id,
+               organization_id: invitation.organization_id
+             }) do
+          {:ok, _task} ->
             require Logger
-            Logger.info("Invitation email sent to #{invitation.email}")
-
-          {:error, :smtp_not_configured} ->
-            require Logger
-
-            Logger.warning(
-              "SMTP not configured for organization #{invitation.organization.slug}, invitation created but email not sent"
-            )
+            Logger.info("Invitation workflow triggered for #{invitation.email}")
 
           {:error, reason} ->
             require Logger
-            Logger.error("Failed to send invitation email: #{inspect(reason)}")
+            Logger.error("Failed to trigger invitation workflow: #{inspect(reason)}")
         end
 
         {:ok, invitation}
@@ -1264,8 +1230,12 @@ defmodule Authify.Accounts do
     end
   end
 
-  # Build the full URL for accepting an invitation
-  defp build_invitation_accept_url(invitation) do
+  @doc """
+  Builds the full URL for accepting an invitation.
+
+  The invitation must have the organization association preloaded.
+  """
+  def build_invitation_accept_url(invitation) do
     organization = invitation.organization
 
     # Get the effective email link domain for this organization
@@ -1730,6 +1700,20 @@ defmodule Authify.Accounts do
   end
 
   @doc """
+  Builds the full URL for resetting a password.
+
+  The user must have the organization association preloaded.
+  """
+  def build_password_reset_url(organization, token) do
+    # Get the effective email link domain for this organization
+    # (uses configured email_link_domain or falls back to default domain)
+    domain = Authify.Organizations.get_email_link_domain(organization)
+
+    # Build the reset URL with proper protocol/port for environment
+    "#{build_base_url(domain)}/password_reset/#{token}"
+  end
+
+  @doc """
   Gets user by password reset token.
   Hashes the provided token and looks up by hash.
   """
@@ -2162,6 +2146,20 @@ defmodule Authify.Accounts do
     cutoff_date = DateTime.utc_now()
 
     from(i in Invitation, where: i.expires_at < ^cutoff_date)
+    |> Repo.aggregate(:count, :id)
+  end
+
+  @doc """
+  Counts expired invitations that are ready for cleanup (expired more than 48 hours ago).
+  This matches the cleanup task's grace period logic.
+  """
+  def count_cleanable_invitations do
+    cutoff = DateTime.utc_now() |> DateTime.add(-48, :hour)
+
+    from(i in Invitation,
+      where: is_nil(i.accepted_at),
+      where: i.expires_at < ^cutoff
+    )
     |> Repo.aggregate(:count, :id)
   end
 

@@ -151,6 +151,15 @@ defmodule AuthifyWeb.NavigationComponents do
                   <i class="bi bi-tools"></i> Maintenance
                 </a>
               </li>
+              <li class="nav-item">
+                <a
+                  class={["nav-link", if(@current_page == "tasks", do: "active", else: "")]}
+                  aria-current={if @current_page == "tasks", do: "page", else: false}
+                  href={"/#{@organization.slug}/tasks"}
+                >
+                  <i class="bi bi-list-task"></i> Tasks
+                </a>
+              </li>
             <% else %>
               <!-- Regular Organization Admin Menu Items -->
               <li class="nav-item">

@@ -149,6 +149,59 @@ defmodule Authify.Telemetry do
       counter("authify.invitation.accepted.count",
         tags: [:organization],
         description: "Invitations accepted"
+      ),
+
+      # Business Metrics - Tasks
+      task_metrics(buckets)
+    ]
+    |> List.flatten()
+  end
+
+  defp task_metrics(buckets) do
+    [
+      counter("authify.task.created.count",
+        tags: [:type, :action],
+        description: "Tasks created"
+      ),
+      counter("authify.task.started.count",
+        tags: [:type, :action],
+        description: "Tasks started"
+      ),
+      counter("authify.task.completed.count",
+        tags: [:type, :action],
+        description: "Tasks completed"
+      ),
+      distribution("authify.task.completed.duration",
+        unit: {:native, :millisecond},
+        tags: [:type, :action],
+        description: "Task completion duration",
+        reporter_options: [buckets: buckets]
+      ),
+      counter("authify.task.failed.count",
+        tags: [:type, :action, :error_type],
+        description: "Tasks failed"
+      ),
+      distribution("authify.task.failed.duration",
+        unit: {:native, :millisecond},
+        tags: [:type, :action],
+        description: "Task failure duration",
+        reporter_options: [buckets: buckets]
+      ),
+      counter("authify.task.cancelled.count",
+        tags: [:type, :action],
+        description: "Tasks cancelled"
+      ),
+      counter("authify.task.retried.count",
+        tags: [:type, :action],
+        description: "Tasks retried"
+      ),
+      counter("authify.task.timed_out.count",
+        tags: [:type, :action],
+        description: "Tasks timed out"
+      ),
+      counter("authify.task.expired.count",
+        tags: [:type, :action],
+        description: "Tasks expired (wait condition not met)"
       )
     ]
   end
@@ -159,7 +212,8 @@ defmodule Authify.Telemetry do
       {__MODULE__, :measure_users, []},
       {__MODULE__, :measure_organizations, []},
       {__MODULE__, :measure_oauth_apps, []},
-      {__MODULE__, :measure_saml_providers, []}
+      {__MODULE__, :measure_saml_providers, []},
+      {__MODULE__, :measure_tasks, []}
     ]
   end
 
@@ -228,6 +282,32 @@ defmodule Authify.Telemetry do
     :telemetry.execute(
       [:authify, :saml, :providers],
       %{total: total_providers, active: active_providers},
+      %{}
+    )
+  end
+
+  def measure_tasks do
+    import Ecto.Query
+
+    active_states = Authify.Tasks.Task.active_states()
+
+    active_tasks =
+      Authify.Repo.aggregate(
+        from(t in Authify.Tasks.Task, where: t.status in ^active_states),
+        :count,
+        :id
+      )
+
+    pending_tasks =
+      Authify.Repo.aggregate(
+        from(t in Authify.Tasks.Task, where: t.status == :pending),
+        :count,
+        :id
+      )
+
+    :telemetry.execute(
+      [:authify, :tasks],
+      %{active: active_tasks, pending: pending_tasks},
       %{}
     )
   end
