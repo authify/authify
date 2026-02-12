@@ -1,11 +1,9 @@
 defmodule AuthifyWeb.TasksHTML do
   @moduledoc """
-  HTML views for task management display.
+  HTML views for task list display (index only; detail view uses LiveView).
   """
 
   use AuthifyWeb, :html
-
-  alias Authify.Security.Sanitizer
 
   embed_templates "tasks_html/*"
 
@@ -41,16 +39,6 @@ defmodule AuthifyWeb.TasksHTML do
   end
 
   @doc """
-  Formats JSON data for display.
-  """
-  def format_json(nil), do: "{}"
-  def format_json(data) when data == %{}, do: "{}"
-
-  def format_json(data) when is_map(data) do
-    Jason.encode!(data, pretty: true)
-  end
-
-  @doc """
   Formats a datetime for display.
   """
   def format_datetime(nil), do: "—"
@@ -60,27 +48,10 @@ defmodule AuthifyWeb.TasksHTML do
   end
 
   @doc """
-  Formats a log timestamp in compact syslog style.
-  """
-  def format_log_timestamp(nil), do: "N/A"
-
-  def format_log_timestamp(datetime) do
-    # Compact syslog-style format: "Feb 11 14:45:23"
-    Calendar.strftime(datetime, "%b %d %H:%M:%S")
-  end
-
-  @doc """
   Truncates a UUID for display.
   """
   def truncate_id(id) when is_binary(id) do
     String.slice(id, 0, 8) <> "..."
-  end
-
-  @doc """
-  Returns true if the task can be cancelled (in active or waiting states).
-  """
-  def cancellable?(task) do
-    task.status in [:pending, :scheduled, :waiting, :retrying]
   end
 
   @doc """
@@ -99,10 +70,4 @@ defmodule AuthifyWeb.TasksHTML do
   def total_pages(total, per_page) do
     ceil(total / per_page)
   end
-
-  @doc """
-  Sanitizes sensitive data from content before displaying in UI.
-  Delegates to Authify.Security.Sanitizer for actual sanitization.
-  """
-  def sanitize_for_display(content), do: Sanitizer.sanitize(content)
 end

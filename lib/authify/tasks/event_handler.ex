@@ -18,9 +18,9 @@ defmodule Authify.Tasks.EventHandler do
   Event mappings are defined as a module attribute:
 
       @event_tasks %{
-        user_created: Authify.Tasks.Event.UserCreated,
         invite_created: Authify.Tasks.Event.InviteCreated,
-        password_reset_requested: Authify.Tasks.Event.PasswordResetRequested
+        password_reset_requested: Authify.Tasks.Event.PasswordResetRequested,
+        email_verification_needed: Authify.Tasks.Event.EmailVerificationNeeded
       }
 
   ## Usage
@@ -81,9 +81,6 @@ defmodule Authify.Tasks.EventHandler do
 
   # Event name to handler module mapping
   @event_tasks %{
-    user_created: Authify.Tasks.Event.UserCreated,
-    user_deleted: Authify.Tasks.Event.UserDeleted,
-    organization_created: Authify.Tasks.Event.OrganizationCreated,
     invite_created: Authify.Tasks.Event.InviteCreated,
     password_reset_requested: Authify.Tasks.Event.PasswordResetRequested,
     email_verification_needed: Authify.Tasks.Event.EmailVerificationNeeded
@@ -102,13 +99,13 @@ defmodule Authify.Tasks.EventHandler do
 
   ## Parameters
 
-    * `event_name` - Atom identifying the event (e.g., `:user_created`)
+    * `event_name` - Atom identifying the event (e.g., `:invite_created`)
     * `params` - Map containing event data (must include `organization_id`)
 
   ## Examples
 
-      iex> EventHandler.handle_event(:user_created, %{
-      ...>   user_id: "123",
+      iex> EventHandler.handle_event(:invite_created, %{
+      ...>   invitation_id: "123",
       ...>   organization_id: 1
       ...> })
       {:ok, %Task{}}

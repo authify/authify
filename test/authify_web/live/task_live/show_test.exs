@@ -20,6 +20,7 @@ defmodule AuthifyWeb.TaskLive.ShowTest do
   end
 
   describe "Task Show LiveView" do
+    @tag :capture_log
     test "displays task details", %{conn: conn, org: org, admin: admin} do
       # Create a task
       {:ok, task} =
@@ -67,6 +68,7 @@ defmodule AuthifyWeb.TaskLive.ShowTest do
       assert has_element?(view, ".badge", "2 log entries")
     end
 
+    @tag :capture_log
     test "shows empty state when no logs exist", %{conn: conn, org: org, admin: admin} do
       # Create a task without logs
       {:ok, task} =

@@ -15,8 +15,8 @@ defmodule Authify.Tasks.BasicTaskTest do
     end
 
     test "resolves event handler module from event type" do
-      assert BasicTask.handler_module("event", "user_created") ==
-               Authify.Tasks.Event.UserCreated
+      assert BasicTask.handler_module("event", "test_event") ==
+               Authify.Tasks.Event.TestEvent
     end
 
     test "returns nil for non-existent handler modules" do

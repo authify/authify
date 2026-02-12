@@ -354,44 +354,16 @@ end
 
 # --- Event Handler Test Modules ---
 # Event handlers live at Authify.Tasks.Event.*
+# Only generic test stubs here; real handlers are in lib/authify/tasks/event/
 
-defmodule Authify.Tasks.Event.UserCreated do
+defmodule Authify.Tasks.Event.TestEvent do
   @moduledoc """
-  Event handler for user creation events.
-  In a real scenario, would check org settings and create child tasks.
+  Generic test event handler for verifying event module resolution.
   """
   use Authify.Tasks.BasicTask
 
   @impl true
   def execute(task) do
-    # In a real implementation, would:
-    # 1. Load organization settings
-    # 2. Conditionally create child tasks (audit, welcome email, CRM sync, etc.)
-    # For testing, just succeed
-    {:ok, %{event: "user_created", user_id: task.params["user_id"]}}
-  end
-end
-
-defmodule Authify.Tasks.Event.UserDeleted do
-  @moduledoc """
-  Event handler for user deletion events.
-  """
-  use Authify.Tasks.BasicTask
-
-  @impl true
-  def execute(task) do
-    {:ok, %{event: "user_deleted", user_id: task.params["user_id"]}}
-  end
-end
-
-defmodule Authify.Tasks.Event.OrganizationCreated do
-  @moduledoc """
-  Event handler for organization creation events.
-  """
-  use Authify.Tasks.BasicTask
-
-  @impl true
-  def execute(task) do
-    {:ok, %{event: "organization_created", organization_id: task.organization_id}}
+    {:ok, %{event: "test_event", params: task.params}}
   end
 end

@@ -44,60 +44,6 @@ defmodule AuthifyWeb.TasksController do
     )
   end
 
-  def show(conn, %{"id" => id}) do
-    user = conn.assigns.current_user
-    organization = conn.assigns.current_organization
-
-    task = Tasks.get_task!(id)
-
-    # Load associations
-    task = Authify.Repo.preload(task, [:organization, :parent, :children, :logs])
-
-    # Get correlated tasks if correlation_id is set
-    correlated_tasks =
-      if task.correlation_id do
-        Tasks.list_correlated_tasks(task.correlation_id)
-      else
-        []
-      end
-
-    render(conn, :show,
-      user: user,
-      organization: organization,
-      task: task,
-      correlated_tasks: correlated_tasks,
-      current_page: "tasks"
-    )
-  end
-
-  def cancel(conn, %{"tasks_id" => id}) do
-    organization = conn.assigns.current_organization
-    task = Tasks.get_task!(id)
-
-    case Tasks.transition_task(task, :cancelling) do
-      {:ok, task} ->
-        # Complete the cancellation
-        Tasks.transition_task(task, :cancelled)
-
-        conn
-        |> put_flash(:info, "Task successfully cancelled.")
-        |> redirect(to: ~p"/#{organization.slug}/tasks/#{id}")
-
-      {:error, {:invalid_transition, from_state, _to_state}} ->
-        conn
-        |> put_flash(
-          :error,
-          "Cannot cancel task in #{from_state} state. Only active or waiting tasks can be cancelled."
-        )
-        |> redirect(to: ~p"/#{organization.slug}/tasks/#{id}")
-
-      {:error, _reason} ->
-        conn
-        |> put_flash(:error, "Failed to cancel task. Please try again.")
-        |> redirect(to: ~p"/#{organization.slug}/tasks/#{id}")
-    end
-  end
-
   # --- Private Functions ---
 
   defp require_global_admin(conn, _opts) do
