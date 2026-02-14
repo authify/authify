@@ -84,7 +84,8 @@ defmodule AuthifyWeb.ApplicationsController do
   def edit(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
     application = OAuth.get_oauth_application!(id, organization)
-    changeset = OAuth.change_application(application)
+    # Use form_changeset instead of changeset to avoid applying default scopes
+    changeset = OAuth.change_application_form(application)
 
     render(conn, :edit,
       application: application,

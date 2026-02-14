@@ -65,7 +65,7 @@
 
               <div class="row">
                 <div class="col-6">
-                  <form method="post" action="/oauth/consent">
+                  <form method="post" action={"#{~p"/#{@organization.slug}/oauth/consent"}"}>
                     <input
                       type="hidden"
                       name="_csrf_token"
@@ -94,7 +94,7 @@
                   </form>
                 </div>
                 <div class="col-6">
-                  <form method="post" action="/oauth/consent">
+                  <form method="post" action={"#{~p"/#{@organization.slug}/oauth/consent"}"}>
                     <input
                       type="hidden"
                       name="_csrf_token"

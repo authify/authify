@@ -80,6 +80,63 @@ defmodule AuthifyWeb.ApplicationsControllerTest do
       conn = get(conn, ~p"/#{organization.slug}/applications/#{application}/edit")
       assert html_response(conn, 200) =~ "Edit #{application.name}"
     end
+
+    test "displays correct scopes when editing application with custom scopes", %{
+      conn: conn,
+      organization: organization
+    } do
+      # Create an application with just "email" scope
+      {:ok, app} =
+        Authify.OAuth.create_application(%{
+          name: "Test Scopes App",
+          redirect_uris: "https://example.com/callback",
+          scopes: "email",
+          organization_id: organization.id
+        })
+
+      # Load the edit form
+      conn = get(conn, ~p"/#{organization.slug}/applications/#{app.id}/edit")
+      html = html_response(conn, 200)
+
+      # The form should display only "email", not "openid profile email"
+      # Check that the scopes input has the correct value
+      assert html =~ ~r/id="application_scopes"[^>]*value="email"/
+      refute html =~ ~r/id="application_scopes"[^>]*value="[^"]*openid[^"]*"/
+    end
+
+    test "preserves custom scopes when updating application", %{
+      conn: conn,
+      organization: organization
+    } do
+      # Create an application with just "email" scope
+      {:ok, app} =
+        Authify.OAuth.create_application(%{
+          name: "Test Preserve Scopes",
+          redirect_uris: "https://example.com/callback",
+          scopes: "email",
+          organization_id: organization.id
+        })
+
+      # Verify initial scopes
+      loaded_app = Authify.OAuth.get_oauth_application!(app.id, organization)
+      assert Authify.OAuth.Application.scopes_list(loaded_app) == ["email"]
+
+      # Update the application name without changing scopes
+      conn =
+        put(conn, ~p"/#{organization.slug}/applications/#{app.id}",
+          application: %{
+            name: "Updated Name",
+            redirect_uris: "https://example.com/callback",
+            scopes: "email"
+          }
+        )
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/applications/#{app.id}"
+
+      # Verify scopes are still just "email"
+      updated_app = Authify.OAuth.get_oauth_application!(app.id, organization)
+      assert Authify.OAuth.Application.scopes_list(updated_app) == ["email"]
+    end
   end
 
   describe "update" do

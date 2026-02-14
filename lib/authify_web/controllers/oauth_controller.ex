@@ -259,6 +259,8 @@ defmodule AuthifyWeb.OAuthController do
   end
 
   defp render_consent_screen(conn, application, redirect_uri, scopes, params) do
+    organization = conn.assigns.current_organization
+
     render(conn, :consent, %{
       application: application,
       redirect_uri: redirect_uri,
@@ -266,6 +268,7 @@ defmodule AuthifyWeb.OAuthController do
       state: params["state"],
       code_challenge: params["code_challenge"],
       code_challenge_method: params["code_challenge_method"],
+      organization: organization,
       layout: false
     })
   end
