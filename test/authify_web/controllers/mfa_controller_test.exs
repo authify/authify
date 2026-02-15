@@ -382,7 +382,8 @@ defmodule AuthifyWeb.MfaControllerTest do
 
       assert html_response(conn, 200) =~ "Multi-Factor Authentication"
       assert html_response(conn, 200) =~ "Not Enabled"
-      assert html_response(conn, 200) =~ "Setup Multi-Factor Authentication"
+      assert html_response(conn, 200) =~ "Setup Authenticator App (TOTP)"
+      assert html_response(conn, 200) =~ "Register Security Key (WebAuthn)"
     end
 
     test "shows MFA status and management options for user with TOTP", %{

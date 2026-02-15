@@ -192,6 +192,7 @@ defmodule AuthifyWeb.Router do
     # WebAuthn credential management
     get "/profile/webauthn", WebAuthnController, :index
     get "/profile/webauthn/setup", WebAuthnController, :setup
+    get "/profile/webauthn/setup-complete", WebAuthnController, :setup_complete
     post "/profile/webauthn/register/begin", WebAuthnController, :register_begin
     post "/profile/webauthn/register/complete", WebAuthnController, :register_complete
     patch "/profile/webauthn/:id/rename", WebAuthnController, :rename

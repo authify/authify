@@ -248,7 +248,33 @@ defmodule Authify.MFA.WebAuthn do
       when is_binary(credential_id) or is_integer(credential_id) do
     case get_credential(credential_id) do
       {:ok, credential} ->
-        Repo.delete(credential)
+        user = Repo.get!(User, credential.user_id)
+
+        Repo.transaction(fn ->
+          # Delete the credential
+          {:ok, deleted_credential} = Repo.delete(credential)
+
+          # Check if user has other MFA methods
+          # (TOTP or other WebAuthn credentials)
+          has_totp = User.totp_enabled?(user)
+          remaining_webauthn = list_credentials(user) |> length()
+
+          # Only clear backup codes and revoke devices if no MFA methods remain
+          unless has_totp or remaining_webauthn > 0 do
+            # Clear backup codes
+            user
+            |> Ecto.Changeset.change(%{
+              totp_backup_codes: nil,
+              totp_backup_codes_generated_at: nil
+            })
+            |> Repo.update!()
+
+            # Revoke all trusted devices
+            Authify.MFA.revoke_all_trusted_devices(user)
+          end
+
+          deleted_credential
+        end)
 
       error ->
         error
@@ -259,12 +285,36 @@ defmodule Authify.MFA.WebAuthn do
   Revokes all WebAuthn credentials for a user.
   """
   def revoke_all_credentials(%User{} = user) do
-    {count, _} =
-      WebAuthnCredential
-      |> where([c], c.user_id == ^user.id)
-      |> Repo.delete_all()
+    Repo.transaction(fn ->
+      # Delete all WebAuthn credentials
+      {count, _} =
+        WebAuthnCredential
+        |> where([c], c.user_id == ^user.id)
+        |> Repo.delete_all()
 
-    {:ok, count}
+      # Check if user has other MFA methods (TOTP)
+      has_other_mfa = User.totp_enabled?(user)
+
+      # Only clear backup codes and revoke devices if no other MFA methods remain
+      unless has_other_mfa do
+        # Clear backup codes
+        user
+        |> Ecto.Changeset.change(%{
+          totp_backup_codes: nil,
+          totp_backup_codes_generated_at: nil
+        })
+        |> Repo.update!()
+
+        # Revoke all trusted devices
+        Authify.MFA.revoke_all_trusted_devices(user)
+      end
+
+      count
+    end)
+    |> case do
+      {:ok, count} -> {:ok, count}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   @doc """

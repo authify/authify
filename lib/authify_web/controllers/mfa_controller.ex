@@ -119,36 +119,62 @@ defmodule AuthifyWeb.MfaController do
       |> delete_session(:mfa_pending_user_id)
       |> delete_session(:mfa_pending_organization_id)
 
+    # Check if new backup codes were generated
+    # If backup_codes is empty, user already had codes from another MFA method
+    has_new_codes = not Enum.empty?(backup_codes)
+
     if mfa_setup_required do
-      # Mandatory setup complete - sign user in and show backup codes
-      conn
-      |> Authify.Guardian.Plug.sign_in(updated_user)
-      |> put_session(:current_organization_id, organization.id)
-      |> put_flash(
-        :info,
-        "Multi-factor authentication has been successfully enabled! Please save your backup codes before continuing."
-      )
-      |> render(:backup_codes,
-        user: updated_user,
-        organization: organization,
-        backup_codes: backup_codes,
-        show_download: true,
-        mandatory_setup: true
-      )
+      # Mandatory setup complete - sign user in
+      conn =
+        conn
+        |> Authify.Guardian.Plug.sign_in(updated_user)
+        |> put_session(:current_organization_id, organization.id)
+
+      if has_new_codes do
+        # Show backup codes for first MFA method
+        conn
+        |> put_flash(
+          :info,
+          "Multi-factor authentication has been successfully enabled! Please save your backup codes before continuing."
+        )
+        |> render(:backup_codes,
+          user: updated_user,
+          organization: organization,
+          backup_codes: backup_codes,
+          show_download: true,
+          mandatory_setup: true
+        )
+      else
+        # User already had codes, just redirect to dashboard
+        conn
+        |> put_flash(:info, "TOTP has been successfully enabled!")
+        |> redirect(to: get_dashboard_path_for_user(updated_user, organization))
+      end
     else
-      # Voluntary setup - show backup codes
-      conn
-      |> put_flash(
-        :info,
-        "Multi-factor authentication has been successfully enabled! Please save your backup codes."
-      )
-      |> render(:backup_codes,
-        user: updated_user,
-        organization: organization,
-        backup_codes: backup_codes,
-        show_download: true,
-        mandatory_setup: false
-      )
+      # Voluntary setup
+      if has_new_codes do
+        # Show backup codes for first MFA method
+        conn
+        |> put_flash(
+          :info,
+          "Multi-factor authentication has been successfully enabled! Please save your backup codes."
+        )
+        |> render(:backup_codes,
+          user: updated_user,
+          organization: organization,
+          backup_codes: backup_codes,
+          show_download: true,
+          mandatory_setup: false
+        )
+      else
+        # User already had codes from another MFA method, redirect to MFA settings
+        conn
+        |> put_flash(
+          :info,
+          "TOTP has been successfully enabled! Your existing backup codes can still be used."
+        )
+        |> redirect(to: ~p"/#{organization.slug}/profile/mfa")
+      end
     end
   end
 

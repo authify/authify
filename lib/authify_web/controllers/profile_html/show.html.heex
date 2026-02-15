@@ -184,7 +184,7 @@
                 <i class="bi bi-key-fill"></i> Personal Access Tokens
               </a>
 
-              <%= if Authify.Accounts.User.totp_enabled?(@user) do %>
+              <%= if Authify.Accounts.User.mfa_enabled?(@user) do %>
                 <a
                   href={~p"/#{@current_organization.slug}/profile/mfa"}
                   class="btn btn-outline-secondary"
@@ -193,7 +193,7 @@
                 </a>
               <% else %>
                 <a
-                  href={~p"/#{@current_organization.slug}/profile/mfa/setup"}
+                  href={~p"/#{@current_organization.slug}/profile/mfa"}
                   class="btn btn-outline-secondary"
                 >
                   <i class="bi bi-shield-plus"></i> Setup MFA

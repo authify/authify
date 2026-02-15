@@ -11,7 +11,7 @@ defmodule AuthifyWeb.WebAuthnController do
 
   import AuthifyWeb.Helpers.ConnHelpers, only: [get_client_ip: 1, get_user_agent: 1]
 
-  alias Authify.{Accounts, Repo}
+  alias Authify.{Accounts, MFA, Repo}
   alias Authify.Accounts.User
   alias Authify.MFA.WebAuthn
 
@@ -90,18 +90,8 @@ defmodule AuthifyWeb.WebAuthnController do
 
       case WebAuthn.complete_registration(current_user, attestation_response, challenge, opts) do
         {:ok, credential} ->
-          # Clear challenge from session
           conn = delete_session(conn, :webauthn_registration_challenge)
-
-          json(conn, %{
-            success: true,
-            message: "Security key registered successfully",
-            credential: %{
-              id: credential.id,
-              name: credential.name,
-              type: credential.credential_type
-            }
-          })
+          handle_successful_registration(conn, current_user, credential)
 
         {:error, reason} ->
           conn
@@ -121,6 +111,37 @@ defmodule AuthifyWeb.WebAuthnController do
   # ============================================================================
   # Credential Management
   # ============================================================================
+
+  @doc """
+  Display backup codes after WebAuthn setup (first MFA method).
+  """
+  def setup_complete(conn, _params) do
+    current_user = conn.assigns.current_user
+    organization = conn.assigns.current_organization
+
+    # Get backup codes from session
+    backup_codes = get_session(conn, :webauthn_setup_backup_codes)
+    setup_completed = get_session(conn, :webauthn_setup_completed)
+
+    if backup_codes && setup_completed do
+      # Clear session
+      conn =
+        conn
+        |> delete_session(:webauthn_setup_backup_codes)
+        |> delete_session(:webauthn_setup_completed)
+
+      render(conn, :backup_codes,
+        user: current_user,
+        organization: organization,
+        backup_codes: backup_codes,
+        show_download: true
+      )
+    else
+      conn
+      |> put_flash(:error, "No backup codes to display.")
+      |> redirect(to: ~p"/#{organization.slug}/profile/mfa")
+    end
+  end
 
   @doc """
   List all WebAuthn credentials for the current user.
@@ -246,6 +267,53 @@ defmodule AuthifyWeb.WebAuthnController do
   # ============================================================================
   # Private Helpers
   # ============================================================================
+
+  defp handle_successful_registration(conn, current_user, credential) do
+    organization = conn.assigns.current_organization
+    current_user = Repo.get!(User, current_user.id)
+
+    if needs_backup_codes?(current_user) do
+      handle_registration_with_backup_codes(conn, organization, credential)
+    else
+      json(conn, build_success_response(credential))
+    end
+  end
+
+  defp needs_backup_codes?(user) do
+    has_totp = User.totp_enabled?(user)
+    webauthn_count = length(WebAuthn.list_credentials(user))
+    !has_totp && webauthn_count == 1 && MFA.backup_codes_count(user) == 0
+  end
+
+  defp handle_registration_with_backup_codes(conn, organization, credential) do
+    case MFA.regenerate_backup_codes(Repo.get!(User, conn.assigns.current_user.id)) do
+      {:ok, _updated_user, backup_codes} ->
+        conn
+        |> put_session(:webauthn_setup_backup_codes, backup_codes)
+        |> put_session(:webauthn_setup_completed, true)
+        |> json(
+          Map.merge(build_success_response(credential), %{
+            show_backup_codes: true,
+            backup_codes_url: ~p"/#{organization.slug}/profile/webauthn/setup-complete"
+          })
+        )
+
+      {:error, _reason} ->
+        json(conn, build_success_response(credential))
+    end
+  end
+
+  defp build_success_response(credential) do
+    %{
+      success: true,
+      message: "Security key registered successfully",
+      credential: %{
+        id: credential.id,
+        name: credential.name,
+        type: credential.credential_type
+      }
+    }
+  end
 
   defp format_error(:invalid_challenge), do: "Invalid or expired challenge"
   defp format_error(:challenge_already_used), do: "Challenge has already been used"
