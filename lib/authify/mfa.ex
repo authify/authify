@@ -37,17 +37,31 @@ defmodule Authify.MFA do
       # Encrypt the secret for storage
       encrypted_secret = Encryption.encrypt(plaintext_secret)
 
-      # Generate backup codes
-      {plaintext_codes, hashed_codes} = generate_backup_codes()
+      # Only generate backup codes if user doesn't have any
+      # (e.g., this is their first MFA method or they have 0 codes remaining)
+      {plaintext_codes, changeset_updates} =
+        if backup_codes_count(user) == 0 do
+          {plaintext_codes, hashed_codes} = generate_backup_codes()
 
-      # Update user with encrypted secret and backup codes
-      user
-      |> Ecto.Changeset.change(%{
+          codes_updates = %{
+            totp_backup_codes: Jason.encode!(hashed_codes),
+            totp_backup_codes_generated_at: DateTime.utc_now() |> DateTime.truncate(:second)
+          }
+
+          {plaintext_codes, codes_updates}
+        else
+          # User already has backup codes from another MFA method, don't overwrite
+          {[], %{}}
+        end
+
+      # Update user with encrypted secret and optionally backup codes
+      base_updates = %{
         totp_secret: encrypted_secret,
-        totp_enabled_at: DateTime.utc_now() |> DateTime.truncate(:second),
-        totp_backup_codes: Jason.encode!(hashed_codes),
-        totp_backup_codes_generated_at: DateTime.utc_now() |> DateTime.truncate(:second)
-      })
+        totp_enabled_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      }
+
+      user
+      |> Ecto.Changeset.change(Map.merge(base_updates, changeset_updates))
       |> Repo.update()
       |> case do
         {:ok, updated_user} -> {:ok, updated_user, plaintext_codes}
@@ -81,23 +95,41 @@ defmodule Authify.MFA do
   def verify_totp(%User{totp_secret: nil}, _code), do: {:error, :totp_not_enabled}
 
   @doc """
-  Disables TOTP for a user by clearing TOTP data and revoking all trusted devices.
+  Disables TOTP for a user by clearing TOTP data.
+  Only clears backup codes and revokes trusted devices if no other MFA methods remain.
   """
   def disable_totp(%User{} = user) do
     Repo.transaction(fn ->
-      # Clear TOTP data
+      # Check if user has other MFA methods (WebAuthn)
+      has_other_mfa = User.webauthn_enabled?(user)
+
+      # Build changeset - always clear TOTP-specific fields
+      changeset_updates = %{
+        totp_secret: nil,
+        totp_enabled_at: nil
+      }
+
+      # Only clear backup codes if no other MFA methods remain
+      changeset_updates =
+        if has_other_mfa do
+          changeset_updates
+        else
+          Map.merge(changeset_updates, %{
+            totp_backup_codes: nil,
+            totp_backup_codes_generated_at: nil
+          })
+        end
+
+      # Update user
       updated_user =
         user
-        |> Ecto.Changeset.change(%{
-          totp_secret: nil,
-          totp_enabled_at: nil,
-          totp_backup_codes: nil,
-          totp_backup_codes_generated_at: nil
-        })
+        |> Ecto.Changeset.change(changeset_updates)
         |> Repo.update!()
 
-      # Revoke all trusted devices
-      revoke_all_trusted_devices(user)
+      # Only revoke all trusted devices if no other MFA methods remain
+      unless has_other_mfa do
+        revoke_all_trusted_devices(user)
+      end
 
       updated_user
     end)

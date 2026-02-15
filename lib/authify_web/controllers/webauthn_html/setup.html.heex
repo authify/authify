@@ -256,11 +256,17 @@
           csrfToken: document.querySelector('meta[name="csrf-token"]').content
         });
 
-        await registration.register(authenticatorType, credentialName);
+        const result = await registration.register(authenticatorType, credentialName);
 
         statusDiv.innerHTML = '<div class="alert alert-success">Security key registered successfully! Redirecting...</div>';
+
+        // Check if backup codes need to be shown
+        const redirectUrl = result.show_backup_codes && result.backup_codes_url
+          ? result.backup_codes_url
+          : '<%= ~p"/#{@organization.slug}/profile/mfa" %>';
+
         setTimeout(() => {
-          window.location.href = '<%= ~p"/#{@organization.slug}/profile/mfa" %>';
+          window.location.href = redirectUrl;
         }, 1500);
 
       } catch (error) {

@@ -45,14 +45,22 @@
                 <span class="badge bg-secondary fs-6">Not Enabled</span>
               </p>
               <p class="text-muted mb-3">
-                Add an extra layer of security to your account with multi-factor authentication.
+                Add an extra layer of security to your account with multi-factor authentication. Choose your preferred method below:
               </p>
-              <a
-                href={~p"/#{@organization.slug}/profile/mfa/setup"}
-                class="btn btn-primary"
-              >
-                <i class="bi bi-shield-plus"></i> Setup Multi-Factor Authentication
-              </a>
+              <div class="d-grid gap-2 d-md-flex">
+                <a
+                  href={~p"/#{@organization.slug}/profile/mfa/setup"}
+                  class="btn btn-primary"
+                >
+                  <i class="bi bi-phone"></i> Setup Authenticator App (TOTP)
+                </a>
+                <a
+                  href={~p"/#{@organization.slug}/profile/webauthn/setup"}
+                  class="btn btn-primary"
+                >
+                  <i class="bi bi-shield-check"></i> Register Security Key (WebAuthn)
+                </a>
+              </div>
             <% end %>
           </div>
         </div>
@@ -193,7 +201,7 @@
           </div>
         </div>
 
-        <%= if Authify.Accounts.User.totp_enabled?(@user) do %>
+        <%= if Authify.Accounts.User.mfa_enabled?(@user) do %>
           <!-- Backup Codes Card -->
           <div class="card mt-3">
             <div class="card-header">
@@ -317,7 +325,7 @@
           </div>
         </div>
 
-        <%= if Authify.Accounts.User.totp_enabled?(@user) do %>
+        <%= if Authify.Accounts.User.mfa_enabled?(@user) do %>
           <div class="card mt-3">
             <div class="card-header">
               <h6 class="card-title mb-0">
