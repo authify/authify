@@ -957,4 +957,271 @@ defmodule AuthifyWeb.OAuthControllerTest do
       assert response(conn, 429)
     end
   end
+
+  describe "OAuth authorization with grants" do
+    setup do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      application = application_fixture(organization: organization)
+
+      %{organization: organization, user: user, application: application}
+    end
+
+    test "auto-approves when user has existing grant with matching scopes", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      # First, create a grant by approving consent
+      {:ok, _grant} =
+        Authify.OAuth.create_or_update_user_grant(user, application, ["openid", "profile"])
+
+      # Now try to authorize again
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid profile"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      # Should redirect immediately with authorization code (no consent screen)
+      assert redirected_to(conn) =~ "https://example.com/callback"
+      assert redirected_to(conn) =~ "code="
+      refute html_response(conn, 302) =~ "Authorize Application"
+    end
+
+    test "auto-approves when user granted more scopes than requested", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      # Create grant with more scopes
+      {:ok, _grant} =
+        Authify.OAuth.create_or_update_user_grant(user, application, [
+          "openid",
+          "profile",
+          "email",
+          "groups"
+        ])
+
+      # Request subset of scopes
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid profile"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      # Should auto-approve
+      assert redirected_to(conn) =~ "https://example.com/callback"
+      assert redirected_to(conn) =~ "code="
+    end
+
+    test "shows consent when user has no grant", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid profile"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      # Should show consent screen
+      assert html_response(conn, 200) =~ "Authorize Application"
+      assert html_response(conn, 200) =~ application.name
+    end
+
+    test "shows consent when user has grant but insufficient scopes", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      # Grant only "openid"
+      {:ok, _grant} = Authify.OAuth.create_or_update_user_grant(user, application, ["openid"])
+
+      # Request more scopes
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid profile email"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      # Should show consent screen for new scopes
+      assert html_response(conn, 200) =~ "Authorize Application"
+    end
+
+    test "forces consent when prompt=consent parameter present", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      # Create grant
+      {:ok, _grant} =
+        Authify.OAuth.create_or_update_user_grant(user, application, ["openid", "profile"])
+
+      # Request with prompt=consent
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid profile",
+        "prompt" => "consent"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      # Should show consent screen despite having grant
+      assert html_response(conn, 200) =~ "Authorize Application"
+    end
+
+    test "returns error when prompt=none and no grant exists", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid profile",
+        "prompt" => "none"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      # Should redirect with error
+      assert redirected_to(conn) =~ "https://example.com/callback"
+      assert redirected_to(conn) =~ "error=consent_required"
+    end
+
+    test "creates grant when user approves consent", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      # No grant exists initially
+      assert is_nil(Authify.OAuth.get_user_grant(user, application))
+
+      conn = log_in_user(conn, user)
+
+      # Approve consent
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "scope" => "openid profile email",
+        "approve" => "true"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      # Grant should now exist
+      grant = Authify.OAuth.get_user_grant(user, application)
+      assert grant
+      assert grant.scopes == "openid profile email"
+      assert is_nil(grant.revoked_at)
+
+      # Authorization should succeed
+      assert redirected_to(conn) =~ "https://example.com/callback"
+      assert redirected_to(conn) =~ "code="
+    end
+
+    test "updates grant scopes when user approves with different scopes", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      # Create initial grant with limited scopes
+      {:ok, grant} =
+        Authify.OAuth.create_or_update_user_grant(user, application, ["openid"])
+
+      conn = log_in_user(conn, user)
+
+      # Approve with more scopes
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "scope" => "openid profile email",
+        "approve" => "true"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      # Grant should be updated
+      updated_grant = Authify.OAuth.get_user_grant(user, application)
+      assert updated_grant.id == grant.id
+      assert updated_grant.scopes == "openid profile email"
+
+      # Authorization should succeed
+      assert redirected_to(conn) =~ "https://example.com/callback"
+    end
+
+    test "un-revokes grant when user re-approves after revocation", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      # Create and revoke grant
+      {:ok, grant} =
+        Authify.OAuth.create_or_update_user_grant(user, application, ["openid"])
+
+      {:ok, _revoked} = Authify.OAuth.revoke_user_grant(grant)
+
+      # Grant should be revoked
+      assert is_nil(Authify.OAuth.get_user_grant(user, application))
+
+      # Approve consent again
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "scope" => "openid profile",
+        "approve" => "true"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      # Grant should be un-revoked
+      renewed_grant = Authify.OAuth.get_user_grant(user, application)
+      assert renewed_grant
+      assert renewed_grant.id == grant.id
+      assert is_nil(renewed_grant.revoked_at)
+
+      # Authorization should succeed
+      assert redirected_to(conn) =~ "https://example.com/callback"
+    end
+  end
 end

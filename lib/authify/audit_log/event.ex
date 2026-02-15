@@ -18,6 +18,7 @@ defmodule Authify.AuditLog.Event do
     password_reset_requested password_reset_completed password_changed
     email_verification_resent email_added email_deleted primary_email_changed
     oauth_authorization_requested oauth_authorization_granted oauth_authorization_denied
+    oauth_authorization_auto_approved
     oauth_consent_given oauth_token_granted oauth_token_denied oauth_token_refreshed
     saml_sso_requested saml_assertion_issued saml_slo_requested saml_slo_completed
     user_created user_updated user_deleted user_enabled user_disabled

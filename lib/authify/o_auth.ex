@@ -7,7 +7,7 @@ defmodule Authify.OAuth do
   alias Authify.Repo
 
   alias Authify.Accounts.{Organization, User}
-  alias Authify.OAuth.{AccessToken, Application, AuthorizationCode, RefreshToken}
+  alias Authify.OAuth.{AccessToken, Application, AuthorizationCode, RefreshToken, UserGrant}
 
   @doc """
   Returns the list of applications for an organization.
@@ -719,5 +719,167 @@ defmodule Authify.OAuth do
     |> Ecto.Changeset.change()
     |> RefreshToken.revoke()
     |> Repo.update()
+  end
+
+  # User Grants - Persistent Consent Tracking
+
+  @doc """
+  Creates or updates a user grant for an application.
+
+  If a grant already exists, updates its scopes and un-revokes it if necessary.
+  If no grant exists, creates a new one.
+
+  ## Examples
+
+      iex> create_or_update_user_grant(user, application, ["openid", "profile"])
+      {:ok, %UserGrant{}}
+
+      iex> create_or_update_user_grant(user, application, "openid profile email")
+      {:ok, %UserGrant{}}
+  """
+  def create_or_update_user_grant(%User{} = user, %Application{} = application, scopes) do
+    scopes_string = normalize_scopes(scopes)
+
+    case get_user_grant_including_revoked(user, application) do
+      nil ->
+        %UserGrant{}
+        |> UserGrant.changeset(%{
+          user_id: user.id,
+          application_id: application.id,
+          scopes: scopes_string
+        })
+        |> Repo.insert()
+
+      existing_grant ->
+        existing_grant
+        |> UserGrant.changeset(%{scopes: scopes_string, revoked_at: nil})
+        |> Repo.update()
+    end
+  end
+
+  @doc """
+  Gets an active (non-revoked) user grant for a user and application.
+
+  Returns nil if no active grant exists or if the grant has been revoked.
+
+  ## Examples
+
+      iex> get_user_grant(user, application)
+      %UserGrant{}
+
+      iex> get_user_grant(user, application)
+      nil
+  """
+  def get_user_grant(%User{id: user_id}, %Application{id: app_id}) do
+    UserGrant
+    |> where([ug], ug.user_id == ^user_id and ug.application_id == ^app_id)
+    |> where([ug], is_nil(ug.revoked_at))
+    |> Repo.one()
+    |> case do
+      nil -> nil
+      grant -> Repo.preload(grant, [:user, :application])
+    end
+  end
+
+  @doc """
+  Gets a user grant by ID.
+
+  Useful for looking up grants when you have the grant ID (e.g., from a URL parameter).
+
+  ## Examples
+
+      iex> get_user_grant!(123, user)
+      %UserGrant{}
+  """
+  def get_user_grant!(grant_id, %User{id: user_id}) do
+    UserGrant
+    |> where([ug], ug.id == ^grant_id and ug.user_id == ^user_id)
+    |> Repo.one!()
+    |> Repo.preload([:user, :application])
+  end
+
+  def get_user_grant!(grant_id, %Organization{id: org_id}) do
+    UserGrant
+    |> join(:inner, [ug], u in User, on: ug.user_id == u.id)
+    |> where([ug, u], ug.id == ^grant_id and u.organization_id == ^org_id)
+    |> Repo.one!()
+    |> Repo.preload([:user, :application])
+  end
+
+  @doc """
+  Lists all active grants for a user.
+
+  Returns grants ordered by most recently updated first.
+
+  ## Examples
+
+      iex> list_user_grants(user)
+      [%UserGrant{}, ...]
+  """
+  def list_user_grants(%User{id: user_id}) do
+    UserGrant
+    |> where([ug], ug.user_id == ^user_id)
+    |> where([ug], is_nil(ug.revoked_at))
+    |> order_by([ug], desc: ug.updated_at)
+    |> Repo.all()
+    |> Repo.preload([:application])
+  end
+
+  @doc """
+  Validates that a user has granted sufficient scopes for the request.
+
+  Returns:
+  - `{:ok, grant}` if valid grant exists with all requested scopes
+  - `{:error, :insufficient_grant}` if grant exists but doesn't cover all scopes
+  - `{:error, :no_grant}` if no grant exists
+
+  ## Examples
+
+      iex> validate_user_grant(user, app, ["openid", "profile"])
+      {:ok, %UserGrant{}}
+
+      iex> validate_user_grant(user, app, ["openid", "profile", "email"])
+      {:error, :insufficient_grant}
+  """
+  def validate_user_grant(%User{} = user, %Application{} = app, requested_scopes) do
+    case get_user_grant(user, app) do
+      nil ->
+        {:error, :no_grant}
+
+      grant ->
+        if UserGrant.scopes_match?(grant, requested_scopes) do
+          {:ok, grant}
+        else
+          {:error, :insufficient_grant}
+        end
+    end
+  end
+
+  @doc """
+  Revokes a user grant.
+
+  This marks the grant as revoked but does not delete it, maintaining an audit trail.
+
+  ## Examples
+
+      iex> revoke_user_grant(grant)
+      {:ok, %UserGrant{}}
+  """
+  def revoke_user_grant(%UserGrant{} = grant) do
+    grant
+    |> Ecto.Changeset.change()
+    |> UserGrant.revoke()
+    |> Repo.update()
+  end
+
+  # Private helper to normalize scopes to a space-separated string
+  defp normalize_scopes(scopes) when is_list(scopes), do: Enum.join(scopes, " ")
+  defp normalize_scopes(scopes) when is_binary(scopes), do: scopes
+
+  # Private helper to get grant regardless of revocation status
+  defp get_user_grant_including_revoked(%User{id: user_id}, %Application{id: app_id}) do
+    UserGrant
+    |> where([ug], ug.user_id == ^user_id and ug.application_id == ^app_id)
+    |> Repo.one()
   end
 end

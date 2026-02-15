@@ -19,24 +19,42 @@ defmodule AuthifyWeb.OAuthController do
          {:ok, scopes} <- validate_scopes(application, params["scope"]),
          :ok <- validate_response_type(params["response_type"]),
          :ok <- validate_pkce_for_application(application, params) do
-      if Authify.Guardian.Plug.current_resource(conn) do
-        # User is already authenticated, show consent screen
-        # Pass PKCE params through to consent
-        render_consent_screen(conn, application, redirect_uri, scopes, params)
-      else
-        # User not authenticated, redirect to login with return URL
-        login_url =
-          "/login?" <>
-            URI.encode_query(%{
-              "return_to" => current_url(conn)
-            })
-
-        redirect(conn, to: login_url)
-      end
+      handle_authorization_request(conn, organization, application, redirect_uri, scopes, params)
     else
       {:error, error} ->
         render_error(conn, error, params["redirect_uri"], params["state"])
     end
+  end
+
+  defp handle_authorization_request(conn, organization, application, redirect_uri, scopes, params) do
+    if user = Authify.Guardian.Plug.current_resource(conn) do
+      # User is already authenticated, check for existing grant
+      case maybe_auto_approve(
+             conn,
+             user,
+             organization,
+             application,
+             redirect_uri,
+             scopes,
+             params
+           ) do
+        {:auto_approve, redirect_url} ->
+          # User has granted these scopes before, skip consent
+          redirect(conn, external: redirect_url)
+
+        :show_consent ->
+          # No grant or insufficient scopes, show consent screen
+          render_consent_screen(conn, application, redirect_uri, scopes, params)
+      end
+    else
+      # User not authenticated, redirect to login with return URL
+      redirect_to_login(conn)
+    end
+  end
+
+  defp redirect_to_login(conn) do
+    login_url = "/login?" <> URI.encode_query(%{"return_to" => current_url(conn)})
+    redirect(conn, to: login_url)
   end
 
   @doc """
@@ -97,21 +115,48 @@ defmodule AuthifyWeb.OAuthController do
       pkce_params: pkce_params
     } = result
 
-    AuditLogger.log_authorization_success(
-      conn,
-      organization,
-      user,
-      application,
-      auth_code,
-      scopes,
-      redirect_uri,
-      pkce_params
-    )
+    # Create or update user grant for this application
+    case OAuth.create_or_update_user_grant(user, application, scopes) do
+      {:ok, _grant} ->
+        AuditLogger.log_authorization_success(
+          conn,
+          organization,
+          user,
+          application,
+          auth_code,
+          scopes,
+          redirect_uri,
+          pkce_params
+        )
 
-    redirect_url =
-      build_redirect_url(redirect_uri, %{"code" => auth_code.code}, params["state"])
+        redirect_url =
+          build_redirect_url(redirect_uri, %{"code" => auth_code.code}, params["state"])
 
-    redirect(conn, external: redirect_url)
+        redirect(conn, external: redirect_url)
+
+      {:error, _changeset} ->
+        # Failed to save grant, but continue with authorization
+        # Log error but don't block the OAuth flow
+        require Logger
+
+        Logger.warning("Failed to create user grant for user=#{user.id} app=#{application.id}")
+
+        AuditLogger.log_authorization_success(
+          conn,
+          organization,
+          user,
+          application,
+          auth_code,
+          scopes,
+          redirect_uri,
+          pkce_params
+        )
+
+        redirect_url =
+          build_redirect_url(redirect_uri, %{"code" => auth_code.code}, params["state"])
+
+        redirect(conn, external: redirect_url)
+    end
   end
 
   defp handle_consent_denial(conn, organization, params) do
@@ -271,6 +316,89 @@ defmodule AuthifyWeb.OAuthController do
       organization: organization,
       layout: false
     })
+  end
+
+  defp maybe_auto_approve(conn, user, organization, application, redirect_uri, scopes, params) do
+    # Check for prompt parameter (OAuth2 standard)
+    case params["prompt"] do
+      "consent" ->
+        # Force consent screen even if grant exists
+        :show_consent
+
+      "none" ->
+        # Silent authentication - must have grant or fail
+        case OAuth.validate_user_grant(user, application, scopes) do
+          {:ok, _grant} ->
+            create_auth_code_and_redirect(
+              conn,
+              organization,
+              user,
+              application,
+              redirect_uri,
+              scopes,
+              params
+            )
+
+          _ ->
+            # Return error without showing consent (per OAuth spec)
+            {:auto_approve,
+             build_redirect_url(redirect_uri, %{"error" => "consent_required"}, params["state"])}
+        end
+
+      _ ->
+        # Default behavior: auto-approve if grant exists with sufficient scopes
+        case OAuth.validate_user_grant(user, application, scopes) do
+          {:ok, _grant} ->
+            create_auth_code_and_redirect(
+              conn,
+              organization,
+              user,
+              application,
+              redirect_uri,
+              scopes,
+              params
+            )
+
+          _ ->
+            :show_consent
+        end
+    end
+  end
+
+  defp create_auth_code_and_redirect(
+         conn,
+         organization,
+         user,
+         application,
+         redirect_uri,
+         scopes,
+         params
+       ) do
+    pkce_params = extract_pkce_params(params)
+
+    case OAuth.create_authorization_code(application, user, redirect_uri, scopes, pkce_params) do
+      {:ok, auth_code} ->
+        # Log auto-approved authorization
+        AuditLogger.log_authorization_auto_approved(
+          conn,
+          organization,
+          user,
+          application,
+          auth_code,
+          scopes,
+          redirect_uri,
+          pkce_params
+        )
+
+        redirect_url =
+          build_redirect_url(redirect_uri, %{"code" => auth_code.code}, params["state"])
+
+        {:auto_approve, redirect_url}
+
+      {:error, _} ->
+        # Failed to create auth code, show consent screen
+        :show_consent
+    end
   end
 
   defp extract_pkce_params(params) do
