@@ -4,6 +4,7 @@ defmodule AuthifyWeb.ProfileController do
 
   alias Authify.Accounts
   alias Authify.Accounts.{PersonalAccessToken, User, UserEmail}
+  alias Authify.OAuth
   alias AuthifyWeb.Helpers.AuditHelper
 
   def show(conn, _params) do
@@ -464,6 +465,54 @@ defmodule AuthifyWeb.ProfileController do
         |> redirect(
           to: ~p"/#{conn.assigns.current_organization.slug}/profile/personal-access-tokens"
         )
+    end
+  end
+
+  # OAuth consent/authorization management actions
+
+  def authorized_applications(conn, _params) do
+    current_user = conn.assigns.current_user
+    organization = conn.assigns.current_organization
+
+    grants = OAuth.list_user_grants(current_user)
+
+    render(conn, :authorized_applications,
+      user: current_user,
+      organization: organization,
+      grants: grants
+    )
+  end
+
+  def revoke_authorization(conn, %{"id" => id}) do
+    current_user = conn.assigns.current_user
+    organization = conn.assigns.current_organization
+    grant_id = String.to_integer(id)
+
+    grant = OAuth.get_user_grant!(grant_id, current_user)
+
+    case OAuth.revoke_user_grant(grant) do
+      {:ok, revoked_grant} ->
+        AuditHelper.log_event_async(
+          conn,
+          :oauth_authorization_revoked,
+          "oauth_user_grant",
+          revoked_grant.id,
+          "success",
+          %{
+            application_id: revoked_grant.application_id,
+            application_name: revoked_grant.application.name,
+            scopes: revoked_grant.scopes
+          }
+        )
+
+        conn
+        |> put_flash(:info, "Authorization for \"#{grant.application.name}\" has been revoked.")
+        |> redirect(to: ~p"/#{organization.slug}/profile/authorized-applications")
+
+      {:error, _changeset} ->
+        conn
+        |> put_flash(:error, "Unable to revoke authorization. Please try again.")
+        |> redirect(to: ~p"/#{organization.slug}/profile/authorized-applications")
     end
   end
 end

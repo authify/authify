@@ -72,12 +72,6 @@
                 <% else %>
                   <span class="badge bg-warning ms-2">Unverified</span>
                 <% end %>
-                <a
-                  href={~p"/#{@current_organization.slug}/profile/emails"}
-                  class="btn btn-sm btn-outline-secondary ms-2"
-                >
-                  <i class="bi bi-gear"></i> Manage Emails
-                </a>
               </dd>
 
               <dt class="col-sm-3">Account Status</dt>
@@ -89,13 +83,15 @@
 
               <dt class="col-sm-3">Multi-Factor Auth</dt>
               <dd class="col-sm-9">
-                <%= if Authify.Accounts.User.totp_enabled?(@user) do %>
+                <%= if Authify.Accounts.User.mfa_enabled?(@user) do %>
                   <span class="badge bg-success">
                     <i class="bi bi-shield-check"></i> Enabled
                   </span>
-                  <small class="text-muted ms-2">
-                    Since {Calendar.strftime(@user.totp_enabled_at, "%B %d, %Y")}
-                  </small>
+                  <%= if @user.totp_enabled_at do %>
+                    <small class="text-muted ms-2">
+                      Since {Calendar.strftime(@user.totp_enabled_at, "%B %d, %Y")}
+                    </small>
+                  <% end %>
                 <% else %>
                   <span class="badge bg-secondary">
                     <i class="bi bi-shield-slash"></i> Not Enabled
@@ -178,10 +174,24 @@
               </a>
 
               <a
+                href={~p"/#{@current_organization.slug}/profile/emails"}
+                class="btn btn-outline-secondary"
+              >
+                <i class="bi bi-envelope"></i> Manage Emails
+              </a>
+
+              <a
                 href={~p"/#{@current_organization.slug}/profile/personal-access-tokens"}
                 class="btn btn-outline-secondary"
               >
                 <i class="bi bi-key-fill"></i> Personal Access Tokens
+              </a>
+
+              <a
+                href={~p"/#{@current_organization.slug}/profile/authorized-applications"}
+                class="btn btn-outline-secondary"
+              >
+                <i class="bi bi-shield-check"></i> Authorized Applications
               </a>
 
               <%= if Authify.Accounts.User.mfa_enabled?(@user) do %>
