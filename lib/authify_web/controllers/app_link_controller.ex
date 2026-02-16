@@ -15,21 +15,27 @@ defmodule AuthifyWeb.AppLinkController do
     with {app_id, ""} <- Integer.parse(app_id),
          {:ok, app} <- safe_get_oauth_application(app_id, organization),
          true <- user_has_access_to_app?(user, organization, app_id, "oauth2") do
-      # Generate OAuth authorization URL
-      redirect_uri = List.first(OAuth.Application.redirect_uris_list(app))
-      state = generate_state_token()
+      # If homepage_url is set, redirect directly to the app
+      # Otherwise, initiate OAuth flow
+      if app.homepage_url && String.trim(app.homepage_url) != "" do
+        redirect(conn, external: app.homepage_url)
+      else
+        # Generate OAuth authorization URL (original behavior)
+        redirect_uri = List.first(OAuth.Application.redirect_uris_list(app))
+        state = generate_state_token()
 
-      auth_url =
-        "/#{organization.slug}/oauth/authorize?" <>
-          URI.encode_query(%{
-            "client_id" => app.client_id,
-            "response_type" => "code",
-            "scope" => "openid profile email",
-            "redirect_uri" => redirect_uri,
-            "state" => state
-          })
+        auth_url =
+          "/#{organization.slug}/oauth/authorize?" <>
+            URI.encode_query(%{
+              "client_id" => app.client_id,
+              "response_type" => "code",
+              "scope" => "openid profile email",
+              "redirect_uri" => redirect_uri,
+              "state" => state
+            })
 
-      redirect(conn, to: auth_url)
+        redirect(conn, to: auth_url)
+      end
     else
       _ ->
         conn

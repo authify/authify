@@ -64,6 +64,29 @@ https://app.example.com/oauth/callback"
   </div>
 
   <div class="mb-3">
+    <label for="application_homepage_url" class="form-label">Homepage URL</label>
+    <input
+      type="url"
+      name="application[homepage_url]"
+      id="application_homepage_url"
+      class="form-control"
+      placeholder="https://example.com"
+      value={
+        Map.get(@changeset.changes, :homepage_url) ||
+          Map.get(@changeset.data, :homepage_url) || ""
+      }
+    />
+    <div class="form-text">
+      Optional. The main URL for this application. When users click "Open" from their dashboard,
+      they'll be directed here. <strong>Tip:</strong> Set this to your OAuth callback path
+      (e.g., <code>https://app.example.com/auth/authify</code>) for seamless auto-login.
+    </div>
+    <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :homepage_url) || []) do %>
+      <div class="invalid-feedback d-block">{msg}</div>
+    <% end %>
+  </div>
+
+  <div class="mb-3">
     <label for="application_scopes" class="form-label">
       OAuth2/OIDC Scopes
       <button
