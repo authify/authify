@@ -155,7 +155,7 @@ defmodule AuthifyWeb.SAMLProvidersHTML do
         ><%= Map.get(@changeset.changes, :attribute_mapping) || Map.get(@changeset.data, :attribute_mapping) || Authify.SAML.ServiceProvider.default_attribute_mapping() %></textarea>
         <div class="form-text">
           Maps SAML attribute names to user field templates using mustache-style
-          <code>{{"{{ }}"}}</code>
+          <code>&#123;&#123; &#125;&#125;</code>
           syntax.
           Available fields: <code>email</code>, <code>username</code>, <code>first_name</code>, <code>last_name</code>, <code>groups</code>.
         </div>
