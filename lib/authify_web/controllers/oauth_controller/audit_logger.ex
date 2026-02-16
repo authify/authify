@@ -135,6 +135,50 @@ defmodule AuthifyWeb.OAuthController.AuditLogger do
   end
 
   @doc """
+  Logs an auto-approved OAuth authorization (existing grant, skipped consent).
+
+  ## Parameters
+    * `conn` - The Plug connection
+    * `organization` - The organization context
+    * `user` - The authorizing user
+    * `application` - The OAuth application
+    * `auth_code` - The generated authorization code
+    * `scopes` - The approved scopes
+    * `redirect_uri` - The redirect URI
+    * `pkce_params` - Map of PKCE parameters (code_challenge, etc.)
+  """
+  def log_authorization_auto_approved(
+        conn,
+        organization,
+        user,
+        application,
+        auth_code,
+        scopes,
+        redirect_uri,
+        pkce_params
+      ) do
+    AuditLog.log_event_async(:oauth_authorization_auto_approved, %{
+      organization_id: organization.id,
+      actor_type: "user",
+      actor_id: user.id,
+      actor_name: "#{user.first_name} #{user.last_name}",
+      resource_type: "oauth_authorization",
+      resource_id: auth_code.id,
+      outcome: "success",
+      ip_address: extract_ip(conn),
+      user_agent: extract_user_agent(conn),
+      metadata: %{
+        application_id: application.id,
+        application_name: application.name,
+        scopes: scopes,
+        redirect_uri: redirect_uri,
+        pkce_used: Map.has_key?(pkce_params, :code_challenge),
+        auto_approved: true
+      }
+    })
+  end
+
+  @doc """
   Logs a denied OAuth authorization (user rejected consent).
 
   ## Parameters

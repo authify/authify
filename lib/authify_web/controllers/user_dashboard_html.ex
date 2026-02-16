@@ -36,4 +36,17 @@ defmodule AuthifyWeb.UserDashboardHTML do
         end
     end
   end
+
+  def time_ago(datetime) do
+    seconds = DateTime.diff(DateTime.utc_now(), datetime)
+
+    cond do
+      seconds < 60 -> "just now"
+      seconds < 3600 -> "#{div(seconds, 60)}m ago"
+      seconds < 86_400 -> "#{div(seconds, 3600)}h ago"
+      seconds < 604_800 -> "#{div(seconds, 86_400)}d ago"
+      seconds < 2_592_000 -> "#{div(seconds, 604_800)}w ago"
+      true -> Calendar.strftime(datetime, "%b %d, %Y")
+    end
+  end
 end

@@ -129,6 +129,73 @@ defmodule Authify.OAuth.ApplicationTypeTest do
     end
   end
 
+  describe "homepage_url validation" do
+    setup do
+      organization = organization_fixture()
+      %{organization: organization}
+    end
+
+    test "accepts valid homepage_url", %{organization: organization} do
+      attrs = %{
+        name: "Test App",
+        redirect_uris: "https://example.com/callback",
+        homepage_url: "https://example.com",
+        organization_id: organization.id
+      }
+
+      assert {:ok, application} = OAuth.create_application(attrs)
+      assert application.homepage_url == "https://example.com"
+    end
+
+    test "accepts nil homepage_url", %{organization: organization} do
+      attrs = %{
+        name: "Test App",
+        redirect_uris: "https://example.com/callback",
+        organization_id: organization.id
+      }
+
+      assert {:ok, application} = OAuth.create_application(attrs)
+      assert is_nil(application.homepage_url)
+    end
+
+    test "accepts empty string homepage_url (converts to nil)", %{organization: organization} do
+      attrs = %{
+        name: "Test App",
+        redirect_uris: "https://example.com/callback",
+        homepage_url: "",
+        organization_id: organization.id
+      }
+
+      assert {:ok, application} = OAuth.create_application(attrs)
+      # Empty strings are converted to nil by Ecto
+      assert is_nil(application.homepage_url)
+    end
+
+    test "rejects invalid homepage_url", %{organization: organization} do
+      attrs = %{
+        name: "Test App",
+        redirect_uris: "https://example.com/callback",
+        homepage_url: "not-a-valid-url",
+        organization_id: organization.id
+      }
+
+      assert {:error, changeset} = OAuth.create_application(attrs)
+      assert "must be a valid HTTP or HTTPS URL" in errors_on(changeset).homepage_url
+    end
+
+    test "allows homepage_url with path", %{organization: organization} do
+      attrs = %{
+        name: "Test App",
+        redirect_uris: "https://example.com/callback",
+        homepage_url: "https://example.com/auth/authify",
+        organization_id: organization.id
+      }
+
+      assert {:ok, application} = OAuth.create_application(attrs)
+      assert application.homepage_url == "https://example.com/auth/authify"
+    end
+  end
+
   describe "fixtures" do
     test "application_fixture creates oauth2_app by default" do
       application = application_fixture()

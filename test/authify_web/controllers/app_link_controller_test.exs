@@ -79,7 +79,29 @@ defmodule AuthifyWeb.AppLinkControllerTest do
   end
 
   describe "GET /user/apps/oauth2/:app_id" do
-    test "redirects to OAuth authorization when user has access", %{
+    test "redirects to homepage_url when set and user has access", %{
+      conn: conn,
+      user: user,
+      group: group,
+      oauth_app: oauth_app,
+      organization: org
+    } do
+      # Update app with homepage_url
+      {:ok, updated_app} =
+        OAuth.update_application(oauth_app, %{
+          "homepage_url" => "https://myapp.example.com/dashboard"
+        })
+
+      # Add user to group
+      {:ok, _} = Accounts.add_user_to_group(user, group)
+
+      conn = get(conn, ~p"/#{org.slug}/user/apps/oauth2/#{updated_app.id}")
+
+      # Should redirect to homepage_url
+      assert redirected_to(conn) == "https://myapp.example.com/dashboard"
+    end
+
+    test "redirects to OAuth authorization when homepage_url not set and user has access", %{
       conn: conn,
       user: user,
       group: group,
@@ -94,6 +116,29 @@ defmodule AuthifyWeb.AppLinkControllerTest do
       redirect_url = redirected_to(conn)
       assert redirect_url =~ "/#{org.slug}/oauth/authorize"
       assert redirect_url =~ "client_id=#{URI.encode_www_form(oauth_app.client_id)}"
+    end
+
+    test "redirects to OAuth authorization when homepage_url is empty string", %{
+      conn: conn,
+      user: user,
+      group: group,
+      oauth_app: oauth_app,
+      organization: org
+    } do
+      # Update app with empty homepage_url
+      {:ok, updated_app} =
+        OAuth.update_application(oauth_app, %{
+          "homepage_url" => ""
+        })
+
+      # Add user to group
+      {:ok, _} = Accounts.add_user_to_group(user, group)
+
+      conn = get(conn, ~p"/#{org.slug}/user/apps/oauth2/#{updated_app.id}")
+
+      redirect_url = redirected_to(conn)
+      assert redirect_url =~ "/#{org.slug}/oauth/authorize"
+      assert redirect_url =~ "client_id=#{URI.encode_www_form(updated_app.client_id)}"
     end
 
     test "redirects to user dashboard when user lacks access", %{

@@ -51,12 +51,28 @@
                   </p>
 
                   <div class="mt-auto">
-                    <a
-                      href={app_link_url(app, :oauth2, @organization)}
-                      class="btn btn-primary w-100"
-                    >
-                      Connect <i class="fas fa-external-link-alt ms-1"></i>
-                    </a>
+                    <%= if Map.has_key?(@user_grants, app.id) do %>
+                      <%!-- User has authorized this app --%>
+                      <a
+                        href={app_link_url(app, :oauth2, @organization)}
+                        class="btn btn-success w-100"
+                      >
+                        <i class="bi bi-check-circle me-1"></i> Open
+                      </a>
+                      <div class="text-center mt-2">
+                        <small class="text-muted">
+                          Authorized {time_ago(@user_grants[app.id].updated_at)}
+                        </small>
+                      </div>
+                    <% else %>
+                      <%!-- User has not authorized this app --%>
+                      <a
+                        href={app_link_url(app, :oauth2, @organization)}
+                        class="btn btn-primary w-100"
+                      >
+                        <i class="bi bi-link-45deg me-1"></i> Connect
+                      </a>
+                    <% end %>
                   </div>
                 </div>
               </div>

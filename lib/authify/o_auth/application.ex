@@ -24,6 +24,7 @@ defmodule Authify.OAuth.Application do
     field :client_id, :string
     field :client_secret, Authify.Encrypted.Binary
     field :redirect_uris, :string
+    field :homepage_url, :string
     field :description, :string
     field :is_active, :boolean, default: true
     field :application_type, :string, default: "oauth2_app"
@@ -55,6 +56,7 @@ defmodule Authify.OAuth.Application do
       :client_id,
       :client_secret,
       :redirect_uris,
+      :homepage_url,
       :description,
       :is_active,
       :application_type,
@@ -68,6 +70,7 @@ defmodule Authify.OAuth.Application do
     |> validate_inclusion(:application_type, ["oauth2_app", "management_api_app"])
     |> validate_inclusion(:client_type, ["confidential", "public"])
     |> validate_redirect_uris()
+    |> validate_homepage_url()
     |> validate_grant_types()
     |> validate_application_type_requirements(attrs)
     |> enforce_public_client_pkce()
@@ -81,6 +84,7 @@ defmodule Authify.OAuth.Application do
     |> cast(attrs, [
       :name,
       :redirect_uris,
+      :homepage_url,
       :description,
       :is_active,
       :client_type,
@@ -91,6 +95,7 @@ defmodule Authify.OAuth.Application do
     |> validate_length(:name, min: 1, max: 255)
     |> validate_inclusion(:client_type, ["confidential", "public"])
     |> validate_redirect_uris()
+    |> validate_homepage_url()
     |> validate_grant_types()
     |> put_scopes_for_update(application, attrs)
     |> enforce_public_client_pkce()
@@ -102,6 +107,7 @@ defmodule Authify.OAuth.Application do
     |> cast(attrs, [
       :name,
       :redirect_uris,
+      :homepage_url,
       :description,
       :is_active,
       :client_type,
@@ -132,6 +138,23 @@ defmodule Authify.OAuth.Application do
           changeset
         else
           add_error(changeset, :redirect_uris, "contains invalid URIs")
+        end
+    end
+  end
+
+  defp validate_homepage_url(changeset) do
+    case get_field(changeset, :homepage_url) do
+      nil ->
+        changeset
+
+      "" ->
+        changeset
+
+      url ->
+        if valid_uri?(url) do
+          changeset
+        else
+          add_error(changeset, :homepage_url, "must be a valid HTTP or HTTPS URL")
         end
     end
   end
