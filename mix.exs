@@ -68,7 +68,7 @@ defmodule Authify.MixProject do
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.1.0"},
       {:req, "~> 0.5"},
-      {:scalar_plug, "~> 0.1.0"},
+      {:scalar_plug, "~> 0.2.0"},
       {:swoosh, "~> 1.16"},
       {:sweet_xml, "~> 0.7"},
       {:telemetry_metrics, "~> 1.0"},
