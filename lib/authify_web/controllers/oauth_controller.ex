@@ -1,6 +1,8 @@
 defmodule AuthifyWeb.OAuthController do
   use AuthifyWeb, :controller
 
+  require Logger
+
   alias Authify.Accounts
   alias Authify.Accounts.User
   alias Authify.OAuth
@@ -137,8 +139,6 @@ defmodule AuthifyWeb.OAuthController do
       {:error, _changeset} ->
         # Failed to save grant, but continue with authorization
         # Log error but don't block the OAuth flow
-        require Logger
-
         Logger.warning("Failed to create user grant for user=#{user.id} app=#{application.id}")
 
         AuditLogger.log_authorization_success(
@@ -449,7 +449,9 @@ defmodule AuthifyWeb.OAuthController do
         pkce_used: !is_nil(params["code_verifier"])
       )
 
-      response = build_token_response_with_refresh_and_id(access_token, refresh_token)
+      response =
+        build_token_response_with_refresh_and_id(access_token, refresh_token, organization)
+
       json(conn, response)
     else
       {:error, error} ->
@@ -465,10 +467,10 @@ defmodule AuthifyWeb.OAuthController do
     end
   end
 
-  defp build_token_response_with_refresh_and_id(access_token, refresh_token) do
+  defp build_token_response_with_refresh_and_id(access_token, refresh_token, organization) do
     build_token_response(access_token)
     |> maybe_add_refresh_token(refresh_token)
-    |> maybe_add_id_token(access_token)
+    |> maybe_add_id_token(access_token, organization)
   end
 
   defp maybe_add_refresh_token(response, nil), do: response
@@ -477,10 +479,16 @@ defmodule AuthifyWeb.OAuthController do
     Map.put(response, :refresh_token, refresh_token.token)
   end
 
-  defp maybe_add_id_token(response, access_token) do
+  defp maybe_add_id_token(response, access_token, organization) do
     if "openid" in OAuth.AccessToken.scopes_list(access_token) do
-      id_token = generate_id_token(access_token)
-      Map.put(response, :id_token, id_token)
+      case generate_id_token(access_token, organization) do
+        {:ok, id_token} ->
+          Map.put(response, :id_token, id_token)
+
+        {:error, reason} ->
+          Logger.error("ID token signing failed: #{inspect(reason)}")
+          response
+      end
     else
       response
     end
@@ -534,7 +542,7 @@ defmodule AuthifyWeb.OAuthController do
         "refresh_token"
       )
 
-      response = build_refresh_token_response(access_token, new_refresh_token)
+      response = build_refresh_token_response(access_token, new_refresh_token, organization)
       json(conn, response)
     else
       {:error, error} ->
@@ -543,7 +551,7 @@ defmodule AuthifyWeb.OAuthController do
     end
   end
 
-  defp build_refresh_token_response(access_token, new_refresh_token) do
+  defp build_refresh_token_response(access_token, new_refresh_token, organization) do
     %{
       access_token: access_token.token,
       token_type: "Bearer",
@@ -551,7 +559,7 @@ defmodule AuthifyWeb.OAuthController do
       scope: access_token.scopes,
       refresh_token: new_refresh_token.token
     }
-    |> maybe_add_id_token(access_token)
+    |> maybe_add_id_token(access_token, organization)
   end
 
   defp handle_refresh_token_error(conn, :invalid_client) do
@@ -676,49 +684,75 @@ defmodule AuthifyWeb.OAuthController do
     end
   end
 
-  defp generate_id_token(access_token) do
+  defp generate_id_token(access_token, organization) do
+    with {:ok, certificate} <- Accounts.get_or_generate_oauth_signing_certificate(organization),
+         {:ok, private_key} <- load_private_key(certificate) do
+      sign_id_token(access_token, organization, certificate, private_key)
+    end
+  end
+
+  defp load_private_key(certificate) do
+    pem = certificate.private_key
+
+    case :public_key.pem_decode(pem) do
+      [entry | _] -> {:ok, :public_key.pem_entry_decode(entry)}
+      [] -> {:error, :no_pem_entries}
+    end
+  rescue
+    error -> {:error, {:pem_decode_failed, error}}
+  end
+
+  defp sign_id_token(access_token, organization, certificate, private_key) do
     user = access_token.user
     scopes = OAuth.AccessToken.scopes_list(access_token)
+    org_base_url = "#{AuthifyWeb.Endpoint.url()}/#{organization.slug}"
 
-    claims = %{
-      "iss" => AuthifyWeb.Endpoint.url(),
-      "sub" => to_string(user.id),
-      "aud" => access_token.application.client_id,
-      "exp" => DateTime.to_unix(access_token.expires_at),
-      "iat" => DateTime.to_unix(access_token.inserted_at),
-      "auth_time" => DateTime.to_unix(access_token.inserted_at)
-    }
-
-    # Add additional claims based on scopes
-    claims =
-      if "profile" in scopes do
-        Map.merge(claims, %{
-          "name" => Accounts.User.full_name(user),
-          "preferred_username" => User.get_primary_email_value(user)
-        })
-      else
-        claims
-      end
+    header = %{"alg" => "RS256", "typ" => "JWT", "kid" => to_string(certificate.id)}
 
     claims =
-      if "email" in scopes do
-        Map.merge(claims, %{
-          "email" => User.get_primary_email_value(user),
-          "email_verified" => true
-        })
-      else
-        claims
-      end
+      %{
+        "iss" => org_base_url,
+        "sub" => to_string(user.id),
+        "aud" => access_token.application.client_id,
+        "exp" => DateTime.to_unix(access_token.expires_at),
+        "iat" => DateTime.to_unix(access_token.inserted_at),
+        "auth_time" => DateTime.to_unix(access_token.inserted_at)
+      }
+      |> maybe_add_profile_claims(user, scopes)
+      |> maybe_add_email_claims(user, scopes)
 
-    # For simplicity, return unsigned JWT. In production, this should be signed
-    header = %{"alg" => "none", "typ" => "JWT"}
+    encoded_header = Base.url_encode64(Jason.encode!(header), padding: false)
+    encoded_claims = Base.url_encode64(Jason.encode!(claims), padding: false)
+    signing_input = "#{encoded_header}.#{encoded_claims}"
 
-    header_json = Jason.encode!(header)
-    claims_json = Jason.encode!(claims)
+    signature = :public_key.sign(signing_input, :sha256, private_key)
+    encoded_sig = Base.url_encode64(signature, padding: false)
 
-    Base.url_encode64(header_json, padding: false) <>
-      "." <>
-      Base.url_encode64(claims_json, padding: false) <> "."
+    {:ok, "#{signing_input}.#{encoded_sig}"}
+  rescue
+    error -> {:error, {:signing_failed, error}}
+  end
+
+  defp maybe_add_profile_claims(claims, user, scopes) do
+    if "profile" in scopes do
+      Map.merge(claims, %{
+        "name" => Accounts.User.full_name(user),
+        "preferred_username" => User.get_primary_email_value(user)
+      })
+    else
+      claims
+    end
+  end
+
+  defp maybe_add_email_claims(claims, user, scopes) do
+    if "email" in scopes do
+      Map.merge(claims, %{
+        "email" => User.get_primary_email_value(user),
+        "email_verified" => true
+      })
+    else
+      claims
+    end
   end
 
   defp get_bearer_token(conn) do

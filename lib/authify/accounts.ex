@@ -1419,6 +1419,36 @@ defmodule Authify.Accounts do
     |> Repo.one()
   end
 
+  @doc """
+  Gets the active OAuth signing certificate for an organization.
+  """
+  def get_active_oauth_signing_certificate(organization) do
+    from(c in Certificate,
+      where:
+        c.organization_id == ^organization.id and c.usage == "oauth_signing" and
+          c.is_active == true,
+      limit: 1
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Gets the active OAuth signing certificate, auto-generating one if none exists.
+  """
+  def get_or_generate_oauth_signing_certificate(organization) do
+    case get_active_oauth_signing_certificate(organization) do
+      nil ->
+        generate_certificate(organization, %{
+          "usage" => "oauth_signing",
+          "is_active" => true,
+          "validity_days" => 365
+        })
+
+      cert ->
+        {:ok, cert}
+    end
+  end
+
   defp create_self_signed_certificate(_private_key, subject, validity_days) do
     # Generate RSA private key using X509 library
     private_key = X509.PrivateKey.new_rsa(2048)
