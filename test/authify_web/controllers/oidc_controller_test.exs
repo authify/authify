@@ -2,7 +2,8 @@ defmodule AuthifyWeb.OIDCControllerTest do
   use AuthifyWeb.ConnCase
 
   import Authify.AccountsFixtures
-  import Authify.SAMLFixtures
+
+  alias Authify.Accounts
 
   describe "discovery" do
     test "returns organization-scoped OIDC configuration", %{conn: conn} do
@@ -30,7 +31,7 @@ defmodule AuthifyWeb.OIDCControllerTest do
   end
 
   describe "jwks" do
-    test "returns empty JWKS when no active certificate exists", %{conn: conn} do
+    test "returns empty JWKS when no OAuth signing cert exists", %{conn: conn} do
       organization = organization_fixture()
       conn = get(conn, ~p"/#{organization.slug}/.well-known/jwks")
       response = json_response(conn, 200)
@@ -38,15 +39,15 @@ defmodule AuthifyWeb.OIDCControllerTest do
       assert response["keys"] == []
     end
 
-    test "returns JWK from active signing certificate", %{conn: conn} do
+    test "returns JWK with RSA key from active OAuth signing certificate", %{conn: conn} do
       organization = organization_fixture()
 
-      # Create an active signing certificate
-      certificate_fixture(%{
-        organization_id: organization.id,
-        purpose: "signing",
-        is_active: true
-      })
+      # Generate an active OAuth signing certificate
+      {:ok, cert} =
+        Accounts.generate_certificate(organization, %{
+          "usage" => "oauth_signing",
+          "is_active" => true
+        })
 
       conn = get(conn, ~p"/#{organization.slug}/.well-known/jwks")
       response = json_response(conn, 200)
@@ -58,45 +59,40 @@ defmodule AuthifyWeb.OIDCControllerTest do
       assert jwk["kty"] == "RSA"
       assert jwk["use"] == "sig"
       assert jwk["alg"] == "RS256"
+      assert jwk["kid"] == to_string(cert.id)
       assert is_binary(jwk["n"])
       assert is_binary(jwk["e"])
-      assert is_binary(jwk["kid"])
     end
 
-    test "does not return expired certificates", %{conn: conn} do
+    test "does not expose SAML signing certificates in JWKS", %{conn: conn} do
       organization = organization_fixture()
 
-      # Create an expired certificate
-      expired_time = DateTime.add(DateTime.utc_now(), -1, :day)
-
-      certificate_fixture(%{
-        organization_id: organization.id,
-        purpose: "signing",
-        is_active: true,
-        expires_at: expired_time
-      })
+      # Generate a SAML signing cert — should NOT appear in JWKS
+      {:ok, _saml_cert} =
+        Accounts.generate_saml_signing_certificate(organization, %{
+          "is_active" => true
+        })
 
       conn = get(conn, ~p"/#{organization.slug}/.well-known/jwks")
       response = json_response(conn, 200)
 
-      # Should be empty since certificate is expired
+      # SAML cert is not an OAuth signing cert, so JWKS should be empty
       assert response["keys"] == []
     end
 
-    test "does not return inactive certificates", %{conn: conn} do
+    test "returns empty JWKS when OAuth signing cert is inactive", %{conn: conn} do
       organization = organization_fixture()
 
-      # Create an inactive certificate
-      certificate_fixture(%{
-        organization_id: organization.id,
-        purpose: "signing",
-        is_active: false
-      })
+      # Generate an inactive OAuth signing cert
+      {:ok, _cert} =
+        Accounts.generate_certificate(organization, %{
+          "usage" => "oauth_signing",
+          "is_active" => false
+        })
 
       conn = get(conn, ~p"/#{organization.slug}/.well-known/jwks")
       response = json_response(conn, 200)
 
-      # Should be empty since certificate is not active
       assert response["keys"] == []
     end
   end

@@ -1,7 +1,7 @@
 defmodule AuthifyWeb.OIDCController do
   use AuthifyWeb, :controller
 
-  alias Authify.SAML
+  alias Authify.Accounts
 
   @doc """
   OIDC Discovery endpoint.
@@ -46,7 +46,7 @@ defmodule AuthifyWeb.OIDCController do
   def jwks(conn, _params) do
     organization = conn.assigns[:current_organization]
 
-    case SAML.get_active_certificate(organization, "signing") do
+    case Accounts.get_active_oauth_signing_certificate(organization) do
       nil ->
         # No active certificate, return empty keyset
         json(conn, %{keys: []})

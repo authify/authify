@@ -4,6 +4,7 @@ defmodule AuthifyWeb.OAuthControllerTest do
   import Authify.AccountsFixtures
   import Authify.OAuthFixtures
 
+  alias Authify.Accounts
   alias Authify.Accounts.User
 
   describe "authorize" do
@@ -778,7 +779,7 @@ defmodule AuthifyWeb.OAuthControllerTest do
       conn = post(conn, ~p"/#{organization.slug}/oauth/token", params)
       response = json_response(conn, 200)
 
-      # Decode ID token (without verification for testing)
+      # Decode ID token (without signature verification for testing)
       id_token = response["id_token"]
       [_header, payload, _signature] = String.split(id_token, ".")
 
@@ -799,6 +800,194 @@ defmodule AuthifyWeb.OAuthControllerTest do
       assert payload_json["exp"]
       # Issued at time
       assert payload_json["iat"]
+    end
+
+    test "ID token is RS256-signed with three segments", %{
+      conn: conn,
+      application: application,
+      user: user,
+      organization: organization
+    } do
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid"]
+        )
+
+      params = %{
+        "grant_type" => "authorization_code",
+        "client_id" => application.client_id,
+        "client_secret" => application.client_secret,
+        "code" => auth_code.code
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/token", params)
+      response = json_response(conn, 200)
+
+      id_token = response["id_token"]
+
+      # Must have exactly three dot-separated segments (header.claims.signature)
+      segments = String.split(id_token, ".")
+      assert length(segments) == 3
+
+      [encoded_header, _encoded_claims, encoded_sig] = segments
+
+      header_json =
+        encoded_header
+        |> Base.url_decode64!(padding: false)
+        |> Jason.decode!()
+
+      # Header must declare RS256, not "none"
+      assert header_json["alg"] == "RS256"
+      assert header_json["typ"] == "JWT"
+      assert is_binary(header_json["kid"])
+
+      # Signature segment must be non-empty (unlike alg:none)
+      assert byte_size(encoded_sig) > 0
+    end
+
+    test "ID token kid matches the org's active OAuth signing cert", %{
+      conn: conn,
+      application: application,
+      user: user,
+      organization: organization
+    } do
+      # Ensure an OAuth signing cert is pre-created so we know its id
+      {:ok, cert} =
+        Accounts.get_or_generate_oauth_signing_certificate(organization)
+
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid"]
+        )
+
+      params = %{
+        "grant_type" => "authorization_code",
+        "client_id" => application.client_id,
+        "client_secret" => application.client_secret,
+        "code" => auth_code.code
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/token", params)
+      response = json_response(conn, 200)
+
+      [encoded_header | _] = String.split(response["id_token"], ".")
+
+      header_json =
+        encoded_header
+        |> Base.url_decode64!(padding: false)
+        |> Jason.decode!()
+
+      assert header_json["kid"] == to_string(cert.id)
+    end
+
+    test "ID token iss matches the org-scoped URL", %{
+      conn: conn,
+      application: application,
+      user: user,
+      organization: organization
+    } do
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid"]
+        )
+
+      params = %{
+        "grant_type" => "authorization_code",
+        "client_id" => application.client_id,
+        "client_secret" => application.client_secret,
+        "code" => auth_code.code
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/token", params)
+      response = json_response(conn, 200)
+
+      [_header, encoded_claims | _] = String.split(response["id_token"], ".")
+
+      claims =
+        encoded_claims
+        |> Base.url_decode64!(padding: false)
+        |> Jason.decode!()
+
+      expected_iss = "#{AuthifyWeb.Endpoint.url()}/#{organization.slug}"
+      assert claims["iss"] == expected_iss
+    end
+
+    test "token response without openid scope has no id_token", %{
+      conn: conn,
+      application: application,
+      user: user,
+      organization: organization
+    } do
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["profile", "email"]
+        )
+
+      params = %{
+        "grant_type" => "authorization_code",
+        "client_id" => application.client_id,
+        "client_secret" => application.client_secret,
+        "code" => auth_code.code
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/token", params)
+      response = json_response(conn, 200)
+
+      refute Map.has_key?(response, "id_token")
+    end
+
+    test "refresh token grant produces a signed id_token when openid scope is present", %{
+      conn: conn,
+      application: application,
+      user: user,
+      organization: organization
+    } do
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "profile"]
+        )
+
+      {:ok, result} = Authify.OAuth.exchange_authorization_code(auth_code, application)
+      refresh_token = result.refresh_token
+
+      params = %{
+        "grant_type" => "refresh_token",
+        "client_id" => application.client_id,
+        "client_secret" => application.client_secret,
+        "refresh_token" => refresh_token.plaintext_token
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/token", params)
+      response = json_response(conn, 200)
+
+      assert is_binary(response["id_token"])
+
+      segments = String.split(response["id_token"], ".")
+      assert length(segments) == 3
+
+      [encoded_header | _] = segments
+
+      header_json =
+        encoded_header
+        |> Base.url_decode64!(padding: false)
+        |> Jason.decode!()
+
+      assert header_json["alg"] == "RS256"
     end
 
     test "userinfo endpoint returns proper OIDC claims", %{

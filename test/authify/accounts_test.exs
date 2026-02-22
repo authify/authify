@@ -1172,5 +1172,57 @@ defmodule Authify.AccountsTest do
       assert result.id == active_cert.id
       assert result.is_active == true
     end
+
+    test "get_active_oauth_signing_certificate/1 returns nil when no cert exists", %{
+      organization: organization
+    } do
+      assert Accounts.get_active_oauth_signing_certificate(organization) == nil
+    end
+
+    test "get_active_oauth_signing_certificate/1 returns the active cert when one exists", %{
+      organization: organization
+    } do
+      # Create an inactive OAuth signing cert first (with explicit unique name)
+      {:ok, inactive_cert} =
+        Accounts.generate_certificate(organization, %{
+          "usage" => "oauth_signing",
+          "name" => "Inactive OAuth Cert"
+        })
+
+      assert Accounts.get_active_oauth_signing_certificate(organization) == nil
+
+      # Activate the cert
+      {:ok, cert} = Accounts.update_certificate(inactive_cert, %{"is_active" => true})
+
+      result = Accounts.get_active_oauth_signing_certificate(organization)
+      assert result.id == cert.id
+      assert result.is_active == true
+      assert result.usage == "oauth_signing"
+    end
+
+    test "get_or_generate_oauth_signing_certificate/1 auto-generates when no cert exists", %{
+      organization: organization
+    } do
+      assert Accounts.get_active_oauth_signing_certificate(organization) == nil
+
+      assert {:ok, cert} = Accounts.get_or_generate_oauth_signing_certificate(organization)
+      assert cert.usage == "oauth_signing"
+      assert cert.is_active == true
+      assert is_binary(cert.certificate)
+      assert is_binary(cert.private_key)
+    end
+
+    test "get_or_generate_oauth_signing_certificate/1 returns existing active cert", %{
+      organization: organization
+    } do
+      {:ok, existing} =
+        Accounts.generate_certificate(organization, %{
+          "usage" => "oauth_signing",
+          "is_active" => true
+        })
+
+      assert {:ok, cert} = Accounts.get_or_generate_oauth_signing_certificate(organization)
+      assert cert.id == existing.id
+    end
   end
 end
