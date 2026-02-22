@@ -499,30 +499,41 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
       refute config_a["authorization_endpoint"] == config_b["authorization_endpoint"]
     end
 
-    @tag :skip
-    test "JWKS endpoint is organization-scoped", %{
+    test "JWKS endpoint is organization-scoped with per-org keys", %{
       conn: conn,
       org_a: org_a,
       org_b: org_b
     } do
-      # Skipped: Organization-scoped JWKS endpoint not yet implemented.
-      # See: https://github.com/authify/authify/issues/1
+      # Trigger cert auto-generation for both orgs by hitting the token endpoint,
+      # or just call the helper directly to ensure certs exist
+      {:ok, cert_a} = Authify.Accounts.get_or_generate_oauth_signing_certificate(org_a)
+      {:ok, cert_b} = Authify.Accounts.get_or_generate_oauth_signing_certificate(org_b)
+
       # Get JWKS for org A
-      conn_a = get(conn, "/#{org_a.slug}/.well-known/jwks.json")
+      conn_a = get(conn, ~p"/#{org_a.slug}/.well-known/jwks")
       jwks_a = json_response(conn_a, 200)
 
       # Get JWKS for org B
-      conn_b = get(build_conn(), "/#{org_b.slug}/.well-known/jwks.json")
+      conn_b = get(build_conn(), ~p"/#{org_b.slug}/.well-known/jwks")
       jwks_b = json_response(conn_b, 200)
 
-      # Both should return valid JWKS structure
-      assert jwks_a["keys"]
-      assert jwks_b["keys"]
+      # Both return valid JWKS structure with exactly one key each
+      assert [key_a] = jwks_a["keys"]
+      assert [key_b] = jwks_b["keys"]
 
-      # Keys should be the same for now (using same signing key)
-      # In production, you might want org-specific keys
-      assert is_list(jwks_a["keys"])
-      assert is_list(jwks_b["keys"])
+      # Each key is RSA / RS256
+      assert key_a["kty"] == "RSA"
+      assert key_a["alg"] == "RS256"
+      assert key_b["kty"] == "RSA"
+      assert key_b["alg"] == "RS256"
+
+      # Each key's kid matches that org's signing cert
+      assert key_a["kid"] == to_string(cert_a.id)
+      assert key_b["kid"] == to_string(cert_b.id)
+
+      # The two orgs have different keys (true isolation)
+      refute key_a["kid"] == key_b["kid"]
+      refute key_a["n"] == key_b["n"]
     end
   end
 
