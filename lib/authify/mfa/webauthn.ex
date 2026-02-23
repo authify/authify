@@ -495,13 +495,11 @@ defmodule Authify.MFA.WebAuthn do
     # Extract response data
     client_data_json = assertion_response["response"]["clientDataJSON"]
     authenticator_data = assertion_response["response"]["authenticatorData"]
-    _signature = assertion_response["response"]["signature"]
+    signature_b64 = assertion_response["response"]["signature"]
 
     # Decode client data
-    client_data =
-      client_data_json
-      |> Base.url_decode64!(padding: false)
-      |> Jason.decode!()
+    client_data_json_bytes = Base.url_decode64!(client_data_json, padding: false)
+    client_data = Jason.decode!(client_data_json_bytes)
 
     # Verify challenge matches
     response_challenge = client_data["challenge"]
@@ -531,11 +529,8 @@ defmodule Authify.MFA.WebAuthn do
         end
 
       if sign_count_valid do
-        # Decrypt public key
-        case Encryption.decrypt(credential.public_key) do
-          {:ok, _public_key_cbor} ->
-            # TODO: Verify signature using public key (requires additional crypto library)
-            # For now, we'll update the sign count
+        case verify_signature(credential, auth_data_binary, client_data_json_bytes, signature_b64) do
+          :ok ->
             updated_credential =
               credential
               |> Ecto.Changeset.change(%{sign_count: new_sign_count})
@@ -543,14 +538,33 @@ defmodule Authify.MFA.WebAuthn do
 
             {:ok, updated_credential}
 
-          {:error, _reason} ->
-            {:error, :decryption_failed}
+          {:error, _reason} = err ->
+            err
         end
       else
         {:error, :invalid_sign_count}
       end
     else
       {:error, :challenge_mismatch}
+    end
+  end
+
+  defp verify_signature(credential, auth_data_binary, client_data_json_bytes, signature_b64) do
+    case Encryption.decrypt(credential.public_key) do
+      {:ok, public_key_cbor} ->
+        with {:ok, {cose_key, _}} <- CBOR.decode(public_key_cbor),
+             {:ok, signature} <- Base.url_decode64(signature_b64, padding: false),
+             client_data_hash = :crypto.hash(:sha256, client_data_json_bytes),
+             verification_data = auth_data_binary <> client_data_hash,
+             :ok <- Wax.CoseKey.verify(verification_data, cose_key, signature) do
+          :ok
+        else
+          {:error, _reason} -> {:error, :invalid_signature}
+          :error -> {:error, :invalid_signature}
+        end
+
+      {:error, _reason} ->
+        {:error, :decryption_failed}
     end
   end
 
