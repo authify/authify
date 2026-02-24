@@ -213,6 +213,26 @@
                       class="form-check-input"
                       type="checkbox"
                       role="switch"
+                      id="oauth_21_strict_mode"
+                      name="settings[oauth_21_strict_mode]"
+                      value="true"
+                      checked={@settings[:oauth_21_strict_mode] == true}
+                    />
+                    <label class="form-check-label" for="oauth_21_strict_mode">
+                      <strong>Enable OAuth 2.1 Strict Mode</strong>
+                    </label>
+                  </div>
+                  <small class="text-muted ms-4">
+                    Require PKCE for all authorization code flow clients, including confidential clients. Enables strict OAuth 2.1 compliance. Disabled by default for backwards compatibility.
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
                       id="allow_webauthn"
                       name="settings[allow_webauthn]"
                       value="true"
@@ -775,7 +795,8 @@
               <p class="small mb-2">Organization configuration controls features and branding:</p>
               <ul class="small mb-0">
                 <li>
-                  <strong>Feature Toggles</strong> - Enable/disable invitations, SAML, OAuth
+                  <strong>Feature Toggles</strong>
+                  - Enable/disable invitations, SAML, OAuth, and OAuth 2.1 strict mode
                 </li>
                 <%= if @is_super_admin do %>
                   <li>
