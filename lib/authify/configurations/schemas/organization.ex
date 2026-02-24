@@ -41,6 +41,17 @@ defmodule Authify.Configurations.Schemas.Organization do
           validation_fn: nil
         },
         %{
+          name: :oauth_21_strict_mode,
+          description:
+            "Enable strict OAuth 2.1 compliance mode. When enabled, PKCE is required for all " <>
+              "authorization code flow clients (including confidential clients). Defaults to " <>
+              "false for backwards compatibility.",
+          value_type: :boolean,
+          default_value: false,
+          required: false,
+          validation_fn: nil
+        },
+        %{
           name: :allow_webauthn,
           description:
             "Enable WebAuthn/FIDO2 authentication (security keys, passkeys, biometrics) for this organization",
