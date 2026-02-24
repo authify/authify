@@ -5,6 +5,7 @@ defmodule AuthifyWeb.OAuthController do
 
   alias Authify.Accounts
   alias Authify.Accounts.User
+  alias Authify.Configurations
   alias Authify.OAuth
   alias AuthifyWeb.OAuthController.AuditLogger
 
@@ -20,7 +21,7 @@ defmodule AuthifyWeb.OAuthController do
          {:ok, redirect_uri} <- validate_redirect_uri(application, params["redirect_uri"]),
          {:ok, scopes} <- validate_scopes(application, params["scope"]),
          :ok <- validate_response_type(params["response_type"]),
-         :ok <- validate_pkce_for_application(application, params) do
+         :ok <- validate_pkce_for_application(application, params, organization) do
       handle_authorization_request(conn, organization, application, redirect_uri, scopes, params)
     else
       {:error, error} ->
@@ -278,9 +279,13 @@ defmodule AuthifyWeb.OAuthController do
   defp validate_response_type("code"), do: :ok
   defp validate_response_type(_), do: {:error, "unsupported_response_type"}
 
-  defp validate_pkce_for_application(application, params) do
+  defp validate_pkce_for_application(application, params, organization) do
     code_challenge = params["code_challenge"]
-    requires_pkce = OAuth.Application.requires_pkce?(application)
+    # PKCE is required when the application requires it, the client is public,
+    # or the org has OAuth 2.1 strict mode enabled (PKCE for all clients)
+    requires_pkce =
+      OAuth.Application.requires_pkce?(application) ||
+        Configurations.oauth_21_strict_mode?(organization)
 
     cond do
       # PKCE required but not provided

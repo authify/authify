@@ -1413,4 +1413,108 @@ defmodule AuthifyWeb.OAuthControllerTest do
       assert redirected_to(conn) =~ "https://example.com/callback"
     end
   end
+
+  describe "OAuth 2.1 strict compliance mode" do
+    setup do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      application = application_fixture(organization: organization)
+
+      %{organization: organization, user: user, application: application}
+    end
+
+    test "PKCE is optional for confidential clients by default (compatibility mode)", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      # Confidential client, no PKCE — should show consent screen, not error
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid profile"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+      assert html_response(conn, 200) =~ "Authorize Application"
+    end
+
+    test "PKCE is required for all clients when oauth_21_mode is enabled", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      # Enable OAuth 2.1 strict mode for this org
+      {:ok, _} =
+        Authify.Configurations.set_organization_setting(organization, :oauth_21_strict_mode, true)
+
+      conn = log_in_user(conn, user)
+
+      # Confidential client without PKCE — must now be rejected
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid profile"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+      assert redirected_to(conn) =~ "error=invalid_request"
+    end
+
+    test "PKCE succeeds for confidential client when oauth_21_mode is enabled", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      {:ok, _} =
+        Authify.Configurations.set_organization_setting(organization, :oauth_21_strict_mode, true)
+
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid profile",
+        "code_challenge" => "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+        "code_challenge_method" => "S256"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+      assert html_response(conn, 200) =~ "Authorize Application"
+    end
+
+    test "oauth_21_mode does not affect other organizations", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      # A second org with strict mode on
+      other_org = organization_fixture()
+
+      {:ok, _} =
+        Authify.Configurations.set_organization_setting(other_org, :oauth_21_strict_mode, true)
+
+      # Original org is still in compatibility mode — no PKCE required
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid profile"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+      assert html_response(conn, 200) =~ "Authorize Application"
+    end
+  end
 end

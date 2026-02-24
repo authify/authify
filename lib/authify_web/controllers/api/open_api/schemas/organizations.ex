@@ -157,6 +157,13 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Organizations do
                   type: "boolean",
                   description: "Enable OAuth2/OIDC identity provider"
                 },
+                oauth_21_strict_mode: %{
+                  type: "boolean",
+                  description:
+                    "Enable strict OAuth 2.1 compliance mode. When true, PKCE is required " <>
+                      "for all authorization code flow clients, including confidential clients. " <>
+                      "Defaults to false for backwards compatibility."
+                },
                 allow_webauthn: %{
                   type: "boolean",
                   description:

@@ -193,6 +193,16 @@ defmodule Authify.Configurations do
   end
 
   @doc """
+  Returns true if the organization has OAuth 2.1 strict compliance mode enabled.
+
+  When true, PKCE is required for all authorization code flow clients,
+  including confidential clients. Defaults to false for backwards compatibility.
+  """
+  def oauth_21_strict_mode?(org) do
+    get_organization_setting(org, :oauth_21_strict_mode) == true
+  end
+
+  @doc """
   Gets an organization-specific setting value.
   """
   def get_organization_setting(org, setting_name) do
