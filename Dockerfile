@@ -13,7 +13,7 @@
 #
 ARG ELIXIR_VERSION=1.19.5
 ARG OTP_VERSION=28.3
-ARG DEBIAN_VERSION=trixie-20251229-slim
+ARG DEBIAN_VERSION=trixie-20260223-slim
 
 ARG BUILDER_IMAGE="hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_VERSION}"
 ARG RUNNER_IMAGE="debian:${DEBIAN_VERSION}"
@@ -25,7 +25,7 @@ RUN apt-get update -y && apt-get install -y build-essential git curl \
     && apt-get clean && rm -f /var/lib/apt/lists/*_*
 
 # Install Node.js for asset compilation
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean && rm -f /var/lib/apt/lists/*_*
 
