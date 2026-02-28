@@ -220,13 +220,10 @@ defmodule AuthifyWeb.OAuthController do
           {:ok, access_token} ->
             scopes = OAuth.AccessToken.scopes_list(access_token)
 
-            # Preload groups if groups scope is requested
-            user =
-              if "groups" in scopes do
-                Authify.Repo.preload(access_token.user, :groups)
-              else
-                access_token.user
-              end
+            # Preload associations needed for the requested scopes
+            user = access_token.user
+            user = if "groups" in scopes, do: Authify.Repo.preload(user, :groups), else: user
+            user = if "profile" in scopes, do: Authify.Repo.preload(user, :emails), else: user
 
             claims = OAuth.generate_userinfo_claims(user, scopes)
             json(conn, claims)

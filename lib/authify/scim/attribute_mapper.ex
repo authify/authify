@@ -32,6 +32,9 @@ defmodule Authify.SCIM.AttributeMapper do
     "emails" => :email,
     "emails.value" => :email,
     "active" => :active,
+    "title" => :title,
+    "phoneNumbers.value" => :phone_number,
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department" => :team,
     "meta.created" => :scim_created_at,
     "meta.lastModified" => :scim_updated_at
   }

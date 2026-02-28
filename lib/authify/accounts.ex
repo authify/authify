@@ -418,9 +418,13 @@ defmodule Authify.Accounts do
         default_primary: true
       )
 
+    user_editable = ~w(first_name last_name username theme_preference
+                       avatar_url locale zoneinfo phone_number website)
+    filtered_attrs = Map.take(normalized_attrs, user_editable)
+
     user
     |> Repo.preload(:emails)
-    |> User.changeset(normalized_attrs)
+    |> User.changeset(filtered_attrs)
     |> Repo.update()
   end
 

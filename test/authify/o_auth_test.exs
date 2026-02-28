@@ -1,6 +1,7 @@
 defmodule Authify.OAuthTest do
   use Authify.DataCase
 
+  alias Authify.Accounts
   alias Authify.OAuth
   import Authify.AccountsFixtures
   import Authify.OAuthFixtures
@@ -271,6 +272,94 @@ defmodule Authify.OAuthTest do
       {:ok, _} = OAuth.revoke_user_grant(grant)
 
       assert {:error, :no_grant} = OAuth.validate_user_grant(user, app, ["openid"])
+    end
+  end
+
+  describe "generate_userinfo_claims/2 with extended profile fields" do
+    setup do
+      org = organization_fixture()
+      user = user_for_organization_fixture(org)
+
+      {:ok, user} =
+        Accounts.update_user(user, %{
+          "locale" => "en-GB",
+          "zoneinfo" => "Europe/London",
+          "website" => "https://example.co.uk",
+          "team" => "DevOps",
+          "title" => "DevOps Engineer",
+          "avatar_url" => "https://cdn.example.com/avatar.jpg",
+          "phone_number" => "+441234567890",
+          "phone_number_verified" => true
+        })
+
+      %{user: user}
+    end
+
+    test "profile scope includes picture, locale, zoneinfo, website, team, title", %{user: user} do
+      claims = OAuth.generate_userinfo_claims(user, ["profile"])
+
+      assert claims["locale"] == "en-GB"
+      assert claims["zoneinfo"] == "Europe/London"
+      assert claims["website"] == "https://example.co.uk"
+      assert claims["team"] == "DevOps"
+      assert claims["title"] == "DevOps Engineer"
+      assert claims["picture"] == "https://cdn.example.com/avatar.jpg"
+    end
+
+    test "phone scope includes phone_number and phone_number_verified", %{user: user} do
+      claims = OAuth.generate_userinfo_claims(user, ["phone"])
+
+      assert claims["phone_number"] == "+441234567890"
+      assert claims["phone_number_verified"] == true
+    end
+
+    test "profile scope omits nil fields" do
+      org = organization_fixture()
+      sparse_user = user_for_organization_fixture(org)
+
+      claims = OAuth.generate_userinfo_claims(sparse_user, ["profile"])
+
+      refute Map.has_key?(claims, "locale")
+      refute Map.has_key?(claims, "zoneinfo")
+      refute Map.has_key?(claims, "website")
+      refute Map.has_key?(claims, "team")
+      refute Map.has_key?(claims, "title")
+    end
+
+    test "phone scope omits phone_number when nil" do
+      org = organization_fixture()
+      sparse_user = user_for_organization_fixture(org)
+
+      claims = OAuth.generate_userinfo_claims(sparse_user, ["phone"])
+
+      refute Map.has_key?(claims, "phone_number")
+    end
+
+    test "phone scope returns phone_number_verified false when unset" do
+      org = organization_fixture()
+
+      {:ok, user_with_phone} =
+        Accounts.update_user(user_for_organization_fixture(org), %{
+          "phone_number" => "+10000000000"
+        })
+
+      claims = OAuth.generate_userinfo_claims(user_with_phone, ["phone"])
+
+      assert claims["phone_number"] == "+10000000000"
+      assert claims["phone_number_verified"] == false
+    end
+
+    test "profile scope falls back to Gravatar URL when avatar_url is nil" do
+      org = organization_fixture()
+      user = user_for_organization_fixture(org)
+      user = Authify.Repo.preload(user, :emails)
+
+      assert is_nil(user.avatar_url)
+
+      claims = OAuth.generate_userinfo_claims(user, ["profile"])
+
+      assert is_binary(claims["picture"])
+      assert String.starts_with?(claims["picture"], "https://www.gravatar.com/avatar/")
     end
   end
 end

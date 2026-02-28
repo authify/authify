@@ -27,6 +27,17 @@ defmodule AuthifyWeb.OIDCControllerTest do
       assert "openid" in response["scopes_supported"]
       assert "profile" in response["scopes_supported"]
       assert "email" in response["scopes_supported"]
+      assert "phone" in response["scopes_supported"]
+
+      # Extended profile claims
+      assert "picture" in response["claims_supported"]
+      assert "locale" in response["claims_supported"]
+      assert "zoneinfo" in response["claims_supported"]
+      assert "website" in response["claims_supported"]
+      assert "phone_number" in response["claims_supported"]
+      assert "phone_number_verified" in response["claims_supported"]
+      assert "team" in response["claims_supported"]
+      assert "title" in response["claims_supported"]
     end
   end
 

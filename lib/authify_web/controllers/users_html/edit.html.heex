@@ -101,6 +101,168 @@
               </div>
 
               <div class="mb-3">
+                <label for="user_avatar_url" class="form-label">Avatar URL</label>
+                <input
+                  type="url"
+                  name="user[avatar_url]"
+                  id="user_avatar_url"
+                  class="form-control"
+                  placeholder="https://example.com/avatar.png"
+                  value={
+                    Map.get(@changeset.changes, :avatar_url) ||
+                      Map.get(@changeset.data, :avatar_url) || ""
+                  }
+                />
+                <div class="form-text">
+                  <small>Leave blank to use Gravatar based on primary email.</small>
+                </div>
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :avatar_url) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_phone_number" class="form-label">Phone Number</label>
+                <input
+                  type="tel"
+                  name="user[phone_number]"
+                  id="user_phone_number"
+                  class="form-control"
+                  placeholder="+12125551234"
+                  value={
+                    Map.get(@changeset.changes, :phone_number) ||
+                      Map.get(@changeset.data, :phone_number) || ""
+                  }
+                />
+                <div class="form-text">
+                  <small>
+                    E.164 format: <code>+</code>
+                    country code and number, no spaces (e.g. <code>+12125551234</code>).
+                  </small>
+                </div>
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :phone_number) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label d-flex align-items-center gap-2">
+                  Phone Verified <% pv =
+                    case Map.get(@changeset.changes, :phone_number_verified) do
+                      nil -> Map.get(@changeset.data, :phone_number_verified) || false
+                      v -> v
+                    end %>
+                  <div class="form-check form-switch mb-0">
+                    <input type="hidden" name="user[phone_number_verified]" value="false" />
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      name="user[phone_number_verified]"
+                      id="user_phone_number_verified"
+                      value="true"
+                      checked={pv}
+                    />
+                  </div>
+                </label>
+                <div class="form-text">
+                  <small>
+                    Mark phone as verified. Automatically reset to unverified if phone number changes without this being set.
+                  </small>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_website" class="form-label">Website</label>
+                <input
+                  type="url"
+                  name="user[website]"
+                  id="user_website"
+                  class="form-control"
+                  placeholder="https://example.com"
+                  value={
+                    Map.get(@changeset.changes, :website) ||
+                      Map.get(@changeset.data, :website) || ""
+                  }
+                />
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :website) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_locale" class="form-label">Locale</label>
+                <% current_locale =
+                  Map.get(@changeset.changes, :locale) ||
+                    Map.get(@changeset.data, :locale) || "" %>
+                <select name="user[locale]" id="user_locale" class="form-select">
+                  <option value="">— Select a locale —</option>
+                  <%= for {label, value} <- @locale_options do %>
+                    <option value={value} selected={current_locale == value}>{label}</option>
+                  <% end %>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_zoneinfo" class="form-label">Timezone</label>
+                <% current_tz =
+                  Map.get(@changeset.changes, :zoneinfo) ||
+                    Map.get(@changeset.data, :zoneinfo) || "" %>
+                <select name="user[zoneinfo]" id="user_zoneinfo" class="form-select">
+                  <option value="">— Select a timezone —</option>
+                  <%= for {label, value} <- @timezone_options do %>
+                    <option value={value} selected={current_tz == value}>{label}</option>
+                  <% end %>
+                </select>
+                <div class="form-text">
+                  <small>
+                    Offsets shown reflect standard time and do not account for daylight saving time.
+                  </small>
+                </div>
+              </div>
+
+              <hr class="my-4" />
+              <h6 class="text-muted mb-3">
+                <i class="bi bi-shield-lock"></i> Admin-only Fields
+              </h6>
+
+              <div class="mb-3">
+                <label for="user_title" class="form-label">Title</label>
+                <input
+                  type="text"
+                  name="user[title]"
+                  id="user_title"
+                  class="form-control"
+                  placeholder="Senior Engineer"
+                  value={
+                    Map.get(@changeset.changes, :title) ||
+                      Map.get(@changeset.data, :title) || ""
+                  }
+                />
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :title) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_team" class="form-label">Team</label>
+                <input
+                  type="text"
+                  name="user[team]"
+                  id="user_team"
+                  class="form-control"
+                  placeholder="Platform"
+                  value={
+                    Map.get(@changeset.changes, :team) ||
+                      Map.get(@changeset.data, :team) || ""
+                  }
+                />
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :team) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
                 <label for="user_email" class="form-label">Email Address</label>
                 <input
                   type="email"
@@ -141,10 +303,10 @@
           <div class="card-body">
             <p class="small mb-2">Editing user information:</p>
             <ul class="small mb-0">
-              <li>Update user's name and username</li>
+              <li>Update name, username, and contact details</li>
               <li>Email changes require verification</li>
+              <li>Title, team, and phone verified are admin-only</li>
               <li>Use other actions to change role or password</li>
-              <li>User will see updated information immediately</li>
             </ul>
           </div>
         </div>

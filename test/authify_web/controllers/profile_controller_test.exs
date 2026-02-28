@@ -69,6 +69,65 @@ defmodule AuthifyWeb.ProfileControllerTest do
     end
   end
 
+  describe "extended profile fields" do
+    test "user can update locale, zoneinfo, phone_number, website, avatar_url", %{
+      conn: conn,
+      user: user
+    } do
+      conn =
+        patch(conn, ~p"/#{user.organization.slug}/profile", %{
+          "user" => %{
+            "locale" => "de-DE",
+            "zoneinfo" => "Europe/Berlin",
+            "phone_number" => "+4930123456",
+            "website" => "https://example.de",
+            "avatar_url" => "https://cdn.example.de/avatar.jpg"
+          }
+        })
+
+      assert redirected_to(conn) == ~p"/#{user.organization.slug}/profile"
+
+      updated = Authify.Accounts.get_user!(user.id)
+      assert updated.locale == "de-DE"
+      assert updated.zoneinfo == "Europe/Berlin"
+      assert updated.phone_number == "+4930123456"
+      assert updated.website == "https://example.de"
+      assert updated.avatar_url == "https://cdn.example.de/avatar.jpg"
+    end
+
+    test "user cannot set team or title via self-service profile update", %{
+      conn: conn,
+      user: user
+    } do
+      conn =
+        patch(conn, ~p"/#{user.organization.slug}/profile", %{
+          "user" => %{
+            "first_name" => "Charlie",
+            "team" => "HACKED",
+            "title" => "CEO"
+          }
+        })
+
+      assert redirected_to(conn) == ~p"/#{user.organization.slug}/profile"
+
+      updated = Authify.Accounts.get_user!(user.id)
+      assert updated.first_name == "Charlie"
+      assert is_nil(updated.team)
+      assert is_nil(updated.title)
+    end
+
+    test "profile update rejects invalid avatar_url", %{conn: conn, user: user} do
+      conn =
+        patch(conn, ~p"/#{user.organization.slug}/profile", %{
+          "user" => %{
+            "avatar_url" => "not-a-url"
+          }
+        })
+
+      assert html_response(conn, 200) =~ "must be a valid URL"
+    end
+  end
+
   describe "password" do
     test "successful password update logs audit event", %{conn: conn, user: user} do
       params = %{

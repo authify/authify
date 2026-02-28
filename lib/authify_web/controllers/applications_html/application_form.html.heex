@@ -356,17 +356,30 @@ https://app.example.com/oauth/callback"
             </tr>
             <tr>
               <td><code>profile</code></td>
-              <td>Access to user's basic profile information</td>
+              <td>Access to the user's basic profile information</td>
               <td>
-                <code>name</code>, <code>preferred_username</code>
+                <code>name</code>, <code>preferred_username</code>, <code>picture</code>, <code>locale</code>, <code>zoneinfo</code>, <code>website</code>, <code>team</code>,
+                <code>title</code>
               </td>
             </tr>
             <tr>
               <td><code>email</code></td>
-              <td>Access to user's email address</td>
+              <td>Access to the user's email address</td>
               <td>
                 <code>email</code>, <code>email_verified</code>
               </td>
+            </tr>
+            <tr>
+              <td><code>phone</code></td>
+              <td>Access to the user's phone number</td>
+              <td>
+                <code>phone_number</code>, <code>phone_number_verified</code>
+              </td>
+            </tr>
+            <tr>
+              <td><code>groups</code></td>
+              <td>Access to the groups the user belongs to</td>
+              <td><code>groups</code> (array of group names)</td>
             </tr>
           </tbody>
         </table>
@@ -378,6 +391,10 @@ https://app.example.com/oauth/callback"
             <li>
               <strong>Web Applications (SSO):</strong>
               <code>openid profile email</code>
+            </li>
+            <li>
+              <strong>With phone &amp; group info:</strong>
+              <code>openid profile email phone groups</code>
             </li>
             <li>
               <strong>Mobile Apps:</strong>

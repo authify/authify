@@ -88,6 +88,27 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Users do
         first_name: %{type: "string", nullable: true, description: "User first name"},
         last_name: %{type: "string", nullable: true, description: "User last name"},
         active: %{type: "boolean", description: "Whether the user is active"},
+        avatar_url: %{
+          type: "string",
+          format: "uri",
+          nullable: true,
+          description: "Custom avatar URL"
+        },
+        locale: %{type: "string", nullable: true, description: "Preferred locale (e.g. en-US)"},
+        zoneinfo: %{
+          type: "string",
+          nullable: true,
+          description: "IANA timezone identifier"
+        },
+        phone_number: %{type: "string", nullable: true, description: "Phone number"},
+        phone_number_verified: %{
+          type: "boolean",
+          default: false,
+          description: "Whether phone number has been verified"
+        },
+        website: %{type: "string", format: "uri", nullable: true, description: "Website URL"},
+        team: %{type: "string", nullable: true, description: "Team or department"},
+        title: %{type: "string", nullable: true, description: "Job title"},
         inserted_at: %{type: "string", format: "date-time", description: "Creation timestamp"},
         updated_at: %{type: "string", format: "date-time", description: "Last update timestamp"}
       }
@@ -176,7 +197,13 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Users do
           properties: %{
             first_name: %{type: "string"},
             last_name: %{type: "string"},
-            active: %{type: "boolean"}
+            active: %{type: "boolean"},
+            title: %{type: "string", description: "Job title (admin-settable)"},
+            team: %{type: "string", description: "Team or department (admin-settable)"},
+            phone_number_verified: %{
+              type: "boolean",
+              description: "Phone verification status (admin-settable)"
+            }
           }
         }
       },

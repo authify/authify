@@ -68,6 +68,16 @@ defmodule Authify.Accounts.User do
     field :totp_backup_codes, :string
     field :totp_backup_codes_generated_at, :utc_datetime
 
+    # Extended profile fields
+    field :avatar_url, :string
+    field :locale, :string
+    field :zoneinfo, :string
+    field :phone_number, :string
+    field :phone_number_verified, :boolean, default: false
+    field :website, :string
+    field :team, :string
+    field :title, :string
+
     # SCIM provisioning fields
     field :external_id, :string
     field :scim_created_at, :utc_datetime
@@ -90,7 +100,15 @@ defmodule Authify.Accounts.User do
     :role,
     :active,
     :theme_preference,
-    :external_id
+    :external_id,
+    :avatar_url,
+    :locale,
+    :zoneinfo,
+    :phone_number,
+    :phone_number_verified,
+    :website,
+    :team,
+    :title
   ]
   @password_fields [:password, :password_confirmation]
 
@@ -103,6 +121,11 @@ defmodule Authify.Accounts.User do
     |> validate_password()
     |> validate_theme_preference()
     |> validate_external_id()
+    |> validate_url_field(:avatar_url)
+    |> validate_url_field(:website)
+    |> normalize_phone_number()
+    |> validate_phone_number()
+    |> maybe_reset_phone_verified()
     |> foreign_key_constraint(:organization_id, name: "users_organization_id_fkey")
   end
 
@@ -407,6 +430,59 @@ defmodule Authify.Accounts.User do
     end
   end
 
+  defp validate_url_field(changeset, field) do
+    case get_change(changeset, field) do
+      nil ->
+        changeset
+
+      "" ->
+        changeset
+
+      _ ->
+        validate_format(changeset, field, ~r/\Ahttps?:\/\/.+\z/,
+          message: "must be a valid URL starting with http:// or https://"
+        )
+    end
+  end
+
+  defp normalize_phone_number(changeset) do
+    case get_change(changeset, :phone_number) do
+      nil ->
+        changeset
+
+      "" ->
+        changeset
+
+      value ->
+        normalized = String.replace(value, ~r/[\s\-\.\(\)]/, "")
+        put_change(changeset, :phone_number, normalized)
+    end
+  end
+
+  defp validate_phone_number(changeset) do
+    case get_change(changeset, :phone_number) do
+      nil ->
+        changeset
+
+      "" ->
+        changeset
+
+      _ ->
+        validate_format(changeset, :phone_number, ~r/\A\+[1-9]\d{6,14}\z/,
+          message: "must be in E.164 format (e.g. +12125551234)"
+        )
+    end
+  end
+
+  defp maybe_reset_phone_verified(changeset) do
+    if get_change(changeset, :phone_number) &&
+         not Map.has_key?(changeset.changes, :phone_number_verified) do
+      put_change(changeset, :phone_number_verified, false)
+    else
+      changeset
+    end
+  end
+
   defp put_password_hash(
          %Ecto.Changeset{valid?: true, changes: %{password: password}} = changeset
        ) do
@@ -414,6 +490,50 @@ defmodule Authify.Accounts.User do
   end
 
   defp put_password_hash(changeset), do: changeset
+
+  @doc """
+  Returns the avatar URL for a user.
+
+  Returns the custom avatar_url if set, otherwise falls back to a Gravatar URL
+  derived from the user's primary email address. Works with both preloaded and
+  unloaded email associations (performs a DB query when emails are not preloaded).
+  """
+  def avatar_url(%__MODULE__{avatar_url: url}) when is_binary(url) and url != "", do: url
+
+  def avatar_url(%__MODULE__{} = user) do
+    email =
+      case primary_email_from_loaded(user) do
+        nil -> get_primary_email_value_safe(user)
+        email -> email
+      end
+
+    case email do
+      nil ->
+        nil
+
+      email ->
+        hash =
+          :crypto.hash(:md5, String.downcase(String.trim(email)))
+          |> Base.encode16(case: :lower)
+
+        "https://www.gravatar.com/avatar/#{hash}?s=200&d=identicon"
+    end
+  end
+
+  defp primary_email_from_loaded(%__MODULE__{emails: emails}) when is_list(emails) do
+    case Enum.find(emails, & &1.primary) do
+      nil -> nil
+      email -> email.value
+    end
+  end
+
+  defp primary_email_from_loaded(_), do: nil
+
+  defp get_primary_email_value_safe(user) do
+    get_primary_email_value(user)
+  rescue
+    _ -> nil
+  end
 
   def apply_scim_timestamps(changeset, attrs \\ %{}) do
     changeset

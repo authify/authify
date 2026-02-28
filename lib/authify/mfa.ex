@@ -479,6 +479,27 @@ defmodule Authify.MFA do
     end)
   end
 
+  @doc """
+  Admin reset of all MFA methods - clears TOTP, all WebAuthn credentials, and
+  trusted devices. Use this in preference to `admin_reset_totp/2` when a user
+  may have WebAuthn enrolled.
+
+  WebAuthn credentials are revoked first so that the subsequent `disable_totp`
+  call (which checks for remaining MFA methods) correctly cleans up backup codes
+  and trusted devices.
+  """
+  def admin_reset_mfa(%User{} = user, admin_user) do
+    # Revoke WebAuthn credentials first so disable_totp sees no remaining MFA
+    # and performs a full cleanup of backup codes and trusted devices.
+    {:ok, _count} = Authify.MFA.WebAuthn.revoke_all_credentials(user)
+
+    if User.totp_enabled?(user) do
+      admin_reset_totp(user, admin_user)
+    else
+      {:ok, user}
+    end
+  end
+
   # Helper Functions
 
   defp extract_device_name(nil), do: "Unknown Device"

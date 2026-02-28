@@ -512,6 +512,58 @@ defmodule AuthifyWeb.UsersControllerTest do
     end
   end
 
+  describe "edit user (admin form)" do
+    test "admin can set team and title on a user", %{conn: conn} do
+      organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+      regular_user = user_for_organization_fixture(organization)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      conn =
+        put(conn, ~p"/#{organization.slug}/users/#{regular_user.id}", %{
+          "user" => %{
+            "first_name" => regular_user.first_name,
+            "last_name" => regular_user.last_name,
+            "team" => "Infrastructure",
+            "title" => "Site Reliability Engineer"
+          }
+        })
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/users/#{regular_user.id}"
+
+      updated = Accounts.get_user!(regular_user.id)
+      assert updated.team == "Infrastructure"
+      assert updated.title == "Site Reliability Engineer"
+    end
+
+    test "admin edit form GET renders with title and team fields", %{conn: conn} do
+      organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+      regular_user = user_for_organization_fixture(organization)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      conn = get(conn, ~p"/#{organization.slug}/users/#{regular_user.id}/edit")
+
+      body = html_response(conn, 200)
+      assert body =~ "user_title"
+      assert body =~ "user_team"
+    end
+  end
+
   describe "reset_mfa" do
     test "admin can reset MFA for a user with TOTP enabled", %{conn: conn} do
       organization = organization_fixture()
