@@ -96,6 +96,48 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Profile do
           default: "auto",
           description: "User's theme preference"
         },
+        avatar_url: %{
+          type: "string",
+          format: "uri",
+          nullable: true,
+          description: "Custom avatar URL. Falls back to Gravatar when absent."
+        },
+        locale: %{
+          type: "string",
+          nullable: true,
+          description: "Preferred locale (BCP 47, e.g. en-US)"
+        },
+        zoneinfo: %{
+          type: "string",
+          nullable: true,
+          description: "IANA timezone identifier (e.g. America/New_York)"
+        },
+        phone_number: %{
+          type: "string",
+          nullable: true,
+          description: "Phone number"
+        },
+        phone_number_verified: %{
+          type: "boolean",
+          default: false,
+          description: "Whether the phone number has been verified"
+        },
+        website: %{
+          type: "string",
+          format: "uri",
+          nullable: true,
+          description: "Personal or professional website URL"
+        },
+        team: %{
+          type: "string",
+          nullable: true,
+          description: "Team or department (admin-managed)"
+        },
+        title: %{
+          type: "string",
+          nullable: true,
+          description: "Job title (admin-managed)"
+        },
         organization_id: %{type: "integer", description: "Organization ID"},
         inserted_at: %{type: "string", format: "date-time", description: "Creation timestamp"},
         updated_at: %{type: "string", format: "date-time", description: "Last update timestamp"}
@@ -142,6 +184,22 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Profile do
               type: "string",
               enum: ["auto", "light", "dark"],
               description: "Theme preference"
+            },
+            avatar_url: %{
+              type: "string",
+              format: "uri",
+              description: "Custom avatar URL (must start with http:// or https://)"
+            },
+            locale: %{type: "string", description: "Preferred locale (e.g. en-US)"},
+            zoneinfo: %{
+              type: "string",
+              description: "IANA timezone identifier (e.g. America/New_York)"
+            },
+            phone_number: %{type: "string", description: "Phone number"},
+            website: %{
+              type: "string",
+              format: "uri",
+              description: "Personal or professional website URL"
             }
           }
         }

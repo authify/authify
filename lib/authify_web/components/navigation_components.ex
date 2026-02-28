@@ -230,12 +230,23 @@ defmodule AuthifyWeb.NavigationComponents do
         </ul>
 
         <div class="mt-auto pt-3 border-top">
-          <div class="px-3 pb-2">
-            <small class="text-muted">Signed in as</small>
-            <br />
-            <strong>{Authify.Accounts.User.full_name(@user)}</strong>
-            <br />
-            <small class="text-muted">{Authify.Accounts.User.get_primary_email_value(@user)}</small>
+          <div class="px-3 pb-2 d-flex align-items-center gap-2">
+            <img
+              src={Authify.Accounts.User.avatar_url(@user)}
+              alt="Profile photo"
+              class="rounded-circle flex-shrink-0"
+              width="36"
+              height="36"
+            />
+            <div class="overflow-hidden">
+              <small class="text-muted d-block">Signed in as</small>
+              <strong class="d-block text-truncate">
+                {Authify.Accounts.User.full_name(@user)}
+              </strong>
+              <small class="text-muted text-truncate d-block">
+                {Authify.Accounts.User.get_primary_email_value(@user)}
+              </small>
+            </div>
           </div>
           <ul class="nav flex-column">
             <%= if Authify.Accounts.User.active_member_of?(@user, @organization.id) do %>

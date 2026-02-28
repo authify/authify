@@ -29,144 +29,256 @@
       <!-- User Information -->
       <div class="col-md-8">
         <div class="card">
-          <div class="card-header">
+          <div class="card-header d-flex align-items-center gap-3">
+            <img
+              src={Authify.Accounts.User.avatar_url(@target_user)}
+              alt="Avatar"
+              class="rounded-circle flex-shrink-0"
+              width="48"
+              height="48"
+            />
             <h5 class="card-title mb-0">User Information</h5>
           </div>
           <div class="card-body">
-            <div class="row">
-              <div class="col-md-6">
-                <h6 class="text-muted">Full Name</h6>
-                <p>{Authify.Accounts.User.full_name(@target_user)}</p>
-              </div>
-              <div class="col-md-6">
-                <h6 class="text-muted">Email</h6>
-                <p>
-                  {@target_user_email}
-                  <%= if @target_user_email_verified do %>
-                    <span class="badge bg-success ms-2" title="Email verified">
+            <dl class="row gx-3 gy-2 mb-0">
+              <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">Full Name</dt>
+              <dd class="col-md-4 col-sm-9 mb-0">
+                {Authify.Accounts.User.full_name(@target_user)}
+              </dd>
+              <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">Email</dt>
+              <dd class="col-md-4 col-sm-9 mb-0">
+                {@target_user_email}
+                <%= if @target_user_email_verified do %>
+                  <span class="badge bg-success ms-2" title="Email verified">
+                    <i class="bi bi-check-circle"></i> Verified
+                  </span>
+                <% else %>
+                  <span class="badge bg-warning ms-2" title="Email not verified">
+                    <i class="bi bi-exclamation-circle"></i> Unverified
+                  </span>
+                <% end %>
+              </dd>
+
+              <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">Username</dt>
+              <dd class="col-md-10 col-sm-9 mb-0">
+                <%= if @target_user.username do %>
+                  <code>{@target_user.username}</code>
+                <% else %>
+                  <span class="text-muted fst-italic">Not set</span>
+                <% end %>
+              </dd>
+
+              <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">Status</dt>
+              <dd class="col-md-4 col-sm-9 mb-0">
+                <%= if @target_user.active do %>
+                  <span class="badge bg-success">
+                    <i class="bi bi-person-check"></i> Active
+                  </span>
+                <% else %>
+                  <span class="badge bg-danger">
+                    <i class="bi bi-person-slash"></i> Disabled
+                  </span>
+                <% end %>
+              </dd>
+              <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">
+                Organization
+              </dt>
+              <dd class="col-md-4 col-sm-9 mb-0">
+                <%= if @target_user.organization do %>
+                  <%= if @is_global_view do %>
+                    <a
+                      href={
+                        ~p"/#{@current_organization.slug}/organizations/#{@target_user.organization.id}"
+                      }
+                      class="text-decoration-none"
+                    >
+                      {@target_user.organization.name}
+                    </a>
+                  <% else %>
+                    {@target_user.organization.name}
+                  <% end %>
+                <% else %>
+                  <span class="text-muted">No organization</span>
+                <% end %>
+              </dd>
+
+              <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">Role</dt>
+              <dd class="col-md-4 col-sm-9 mb-0">
+                <span class={"badge #{if @target_user.role == "admin", do: "bg-primary", else: "bg-secondary"}"}>
+                  {String.capitalize(@target_user.role)}
+                </span>
+                <%= if @is_global_view and @target_user.organization && @target_user.organization.slug == "authify-global" do %>
+                  <span class="badge bg-warning ms-1">Global Admin</span>
+                <% end %>
+              </dd>
+              <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">Joined</dt>
+              <dd class="col-md-4 col-sm-9 mb-0">
+                {Calendar.strftime(@target_user.inserted_at, "%B %d, %Y at %I:%M %p")}
+              </dd>
+            </dl>
+          </div>
+        </div>
+        <!-- Profile Details -->
+        <div class="card mt-3">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-person-vcard"></i> Profile Details
+            </h5>
+          </div>
+          <div class="card-body">
+            <dl class="row gx-3 gy-2 mb-0">
+              <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">Title</dt>
+              <dd class="col-md-4 col-sm-9 mb-0">
+                <%= if @target_user.title do %>
+                  {@target_user.title}
+                <% else %>
+                  <span class="text-muted fst-italic">Not set</span>
+                <% end %>
+              </dd>
+              <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">Team</dt>
+              <dd class="col-md-4 col-sm-9 mb-0">
+                <%= if @target_user.team do %>
+                  {@target_user.team}
+                <% else %>
+                  <span class="text-muted fst-italic">Not set</span>
+                <% end %>
+              </dd>
+
+              <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">Phone</dt>
+              <dd class="col-md-4 col-sm-9 mb-0">
+                <%= if @target_user.phone_number do %>
+                  <span class="font-monospace">{@target_user.phone_number}</span>
+                  <%= if @target_user.phone_number_verified do %>
+                    <span class="badge bg-success ms-1" title="Phone verified">
                       <i class="bi bi-check-circle"></i> Verified
                     </span>
                   <% else %>
-                    <span class="badge bg-warning ms-2" title="Email not verified">
-                      <i class="bi bi-exclamation-circle"></i> Unverified
-                    </span>
+                    <span class="badge bg-warning ms-1">Unverified</span>
                   <% end %>
-                </p>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-md-6">
-                <h6 class="text-muted">Username</h6>
-                <p>
-                  <%= if @target_user.username do %>
-                    <code>{@target_user.username}</code>
-                  <% else %>
-                    <span class="text-muted fst-italic">Not set</span>
-                  <% end %>
-                </p>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-md-6">
-                <h6 class="text-muted">Status</h6>
-                <p>
-                  <%= if @target_user.active do %>
-                    <span class="badge bg-success">
-                      <i class="bi bi-person-check"></i> Active
-                    </span>
-                  <% else %>
-                    <span class="badge bg-danger">
-                      <i class="bi bi-person-slash"></i> Disabled
-                    </span>
-                  <% end %>
-                </p>
-              </div>
-              <div class="col-md-6">
-                <h6 class="text-muted">Organization</h6>
-                <p>
-                  <%= if @target_user.organization do %>
-                    <%= if @is_global_view do %>
-                      <a
-                        href={
-                          ~p"/#{@current_organization.slug}/organizations/#{@target_user.organization.id}"
-                        }
-                        class="text-decoration-none"
-                      >
-                        {@target_user.organization.name}
-                      </a>
-                    <% else %>
-                      {@target_user.organization.name}
-                    <% end %>
-                  <% else %>
-                    <span class="text-muted">No organization</span>
-                  <% end %>
-                </p>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-md-6">
-                <h6 class="text-muted">Role</h6>
-                <p>
-                  <span class={"badge #{if @target_user.role == "admin", do: "bg-primary", else: "bg-secondary"}"}>
-                    {String.capitalize(@target_user.role)}
-                  </span>
-                  <%= if @is_global_view and @target_user.organization && @target_user.organization.slug == "authify-global" do %>
-                    <span class="badge bg-warning ms-1">Global Admin</span>
-                  <% end %>
-                </p>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-md-6">
-                <h6 class="text-muted">Joined</h6>
-                <p>{Calendar.strftime(@target_user.inserted_at, "%B %d, %Y at %I:%M %p")}</p>
-              </div>
-            </div>
+                <% else %>
+                  <span class="text-muted fst-italic">Not set</span>
+                <% end %>
+              </dd>
+              <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">Website</dt>
+              <dd class="col-md-4 col-sm-9 mb-0">
+                <%= if @target_user.website do %>
+                  <a href={@target_user.website} target="_blank" rel="noopener noreferrer">
+                    {@target_user.website}
+                  </a>
+                <% else %>
+                  <span class="text-muted fst-italic">Not set</span>
+                <% end %>
+              </dd>
+
+              <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">Locale</dt>
+              <dd class="col-md-4 col-sm-9 mb-0">
+                <%= if @target_user.locale do %>
+                  <code>{@target_user.locale}</code>
+                <% else %>
+                  <span class="text-muted fst-italic">Not set</span>
+                <% end %>
+              </dd>
+              <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">Timezone</dt>
+              <dd class="col-md-4 col-sm-9 mb-0">
+                <%= if @target_user.zoneinfo do %>
+                  <code>{@target_user.zoneinfo}</code>
+                <% else %>
+                  <span class="text-muted fst-italic">Not set</span>
+                <% end %>
+              </dd>
+
+              <%= if @target_user.avatar_url do %>
+                <dt class="col-md-2 col-sm-3 text-end small text-muted fw-semibold">
+                  Avatar URL
+                </dt>
+                <dd class="col-md-10 col-sm-9 mb-0">
+                  <a href={@target_user.avatar_url} target="_blank" rel="noopener noreferrer">
+                    {@target_user.avatar_url}
+                  </a>
+                </dd>
+              <% end %>
+            </dl>
           </div>
         </div>
         <!-- MFA Status -->
         <div class="card mt-3">
-          <div class="card-header">
+          <% totp_on = Authify.Accounts.User.totp_enabled?(@target_user)
+          mfa_on = totp_on || @webauthn_credentials_count > 0 %>
+          <div class="card-header d-flex align-items-center justify-content-between">
             <h5 class="card-title mb-0">
               <i class="bi bi-shield-lock"></i> Multi-Factor Authentication
             </h5>
+            <%= if mfa_on do %>
+              <span class="badge bg-success">
+                <i class="bi bi-shield-check"></i> Enabled
+              </span>
+            <% else %>
+              <span class="badge bg-secondary">
+                <i class="bi bi-shield-slash"></i> Not Enabled
+              </span>
+            <% end %>
           </div>
           <div class="card-body">
-            <%= if Authify.Accounts.User.totp_enabled?(@target_user) do %>
-              <div class="d-flex align-items-center mb-3">
-                <span class="badge bg-success me-2">
-                  <i class="bi bi-shield-check"></i> Enabled
-                </span>
-                <small class="text-muted">
-                  Since {Calendar.strftime(@target_user.totp_enabled_at, "%B %d, %Y")}
-                </small>
-              </div>
+            <%= if mfa_on do %>
+              <dl class="row gx-3 gy-2 mb-0">
+                <dt class="col-md-3 col-sm-4 text-end small text-muted fw-semibold">
+                  TOTP Authenticator
+                </dt>
+                <dd class="col-md-9 col-sm-8 mb-0">
+                  <%= if totp_on do %>
+                    <span class="badge bg-success">
+                      <i class="bi bi-check-circle"></i> Enabled
+                    </span>
+                    <small class="text-muted ms-2">
+                      Since {Calendar.strftime(@target_user.totp_enabled_at, "%b %d, %Y")}
+                    </small>
+                  <% else %>
+                    <span class="badge bg-secondary">Not configured</span>
+                  <% end %>
+                </dd>
 
-              <div class="row">
-                <div class="col-md-6">
-                  <h6 class="text-muted small">Backup Codes</h6>
-                  <p>
+                <dt class="col-md-3 col-sm-4 text-end small text-muted fw-semibold">
+                  Passkeys / Security Keys
+                </dt>
+                <dd class="col-md-9 col-sm-8 mb-0">
+                  <%= if @webauthn_credentials_count > 0 do %>
+                    <span class="badge bg-success">
+                      <i class="bi bi-check-circle"></i>
+                      {@webauthn_credentials_count}
+                      {if @webauthn_credentials_count == 1, do: "credential", else: "credentials"}
+                    </span>
+                  <% else %>
+                    <span class="badge bg-secondary">Not configured</span>
+                  <% end %>
+                </dd>
+
+                <%= if totp_on do %>
+                  <dt class="col-md-3 col-sm-4 text-end small text-muted fw-semibold">
+                    Backup Codes
+                  </dt>
+                  <dd class="col-md-9 col-sm-8 mb-0">
                     <%= if assigns[:backup_codes_count] do %>
                       <span class="badge bg-info">{@backup_codes_count} remaining</span>
                     <% else %>
                       <span class="badge bg-secondary">Unknown</span>
                     <% end %>
-                  </p>
-                </div>
-                <div class="col-md-6">
-                  <h6 class="text-muted small">Trusted Devices</h6>
-                  <p>
-                    <%= if assigns[:trusted_devices_count] do %>
-                      <span class="badge bg-info">{@trusted_devices_count} active</span>
-                    <% else %>
-                      <span class="badge bg-secondary">Unknown</span>
-                    <% end %>
-                  </p>
-                </div>
-              </div>
+                  </dd>
+                <% end %>
+
+                <dt class="col-md-3 col-sm-4 text-end small text-muted fw-semibold">
+                  Trusted Devices
+                </dt>
+                <dd class="col-md-9 col-sm-8 mb-0">
+                  <%= if assigns[:trusted_devices_count] do %>
+                    <span class="badge bg-info">{@trusted_devices_count} active</span>
+                  <% else %>
+                    <span class="badge bg-secondary">Unknown</span>
+                  <% end %>
+                </dd>
+              </dl>
 
               <%= if assigns[:lockout] do %>
-                <div class="alert alert-warning mb-0 mt-2">
+                <div class="alert alert-warning mb-0 mt-3">
                   <h6 class="alert-heading">
                     <i class="bi bi-lock"></i> User is Locked Out
                   </h6>
@@ -180,12 +292,7 @@
                 </div>
               <% end %>
             <% else %>
-              <div class="d-flex align-items-center">
-                <span class="badge bg-secondary me-2">
-                  <i class="bi bi-shield-slash"></i> Not Enabled
-                </span>
-                <small class="text-muted">User has not set up MFA</small>
-              </div>
+              <p class="text-muted small mb-0">User has not set up any MFA method.</p>
             <% end %>
           </div>
         </div>
@@ -371,7 +478,7 @@
                 </.form>
               <% end %>
 
-              <%= if Authify.Accounts.User.totp_enabled?(@target_user) && @target_user.id != @user.id do %>
+              <%= if (@webauthn_credentials_count > 0 || Authify.Accounts.User.totp_enabled?(@target_user)) && @target_user.id != @user.id do %>
                 <.form
                   for={%{}}
                   action={~p"/#{@current_organization.slug}/users/#{@target_user.id}/mfa/reset"}
@@ -398,21 +505,22 @@
               <h5 class="card-title mb-0">Organization Details</h5>
             </div>
             <div class="card-body">
-              <h6 class="text-muted">Name</h6>
-              <p>{@target_user.organization.name}</p>
+              <dl class="row gx-3 gy-2 mb-0">
+                <dt class="col-4 text-end small text-muted fw-semibold">Name</dt>
+                <dd class="col-8 mb-0">{@target_user.organization.name}</dd>
 
-              <h6 class="text-muted">Slug</h6>
-              <p><code>{@target_user.organization.slug}</code></p>
+                <dt class="col-4 text-end small text-muted fw-semibold">Slug</dt>
+                <dd class="col-8 mb-0"><code>{@target_user.organization.slug}</code></dd>
 
-              <h6 class="text-muted">Status</h6>
-              <p>
-                <%= if @target_user.organization.active do %>
-                  <span class="badge bg-success">Active</span>
-                <% else %>
-                  <span class="badge bg-danger">Inactive</span>
-                <% end %>
-              </p>
-
+                <dt class="col-4 text-end small text-muted fw-semibold">Status</dt>
+                <dd class="col-8 mb-0">
+                  <%= if @target_user.organization.active do %>
+                    <span class="badge bg-success">Active</span>
+                  <% else %>
+                    <span class="badge bg-danger">Inactive</span>
+                  <% end %>
+                </dd>
+              </dl>
               <div class="mt-3">
                 <a
                   href={

@@ -97,6 +97,103 @@
               </div>
 
               <div class="mb-3">
+                <label for="user_avatar_url" class="form-label">Avatar URL</label>
+                <input
+                  type="url"
+                  name="user[avatar_url]"
+                  id="user_avatar_url"
+                  class="form-control"
+                  placeholder="https://example.com/avatar.png"
+                  value={
+                    Map.get(@changeset.changes, :avatar_url) ||
+                      Map.get(@changeset.data, :avatar_url) || ""
+                  }
+                />
+                <div class="form-text">
+                  Optional custom avatar. Leave blank to use your Gravatar based on your email.
+                </div>
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :avatar_url) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_phone_number" class="form-label">Phone Number</label>
+                <input
+                  type="tel"
+                  name="user[phone_number]"
+                  id="user_phone_number"
+                  class="form-control"
+                  placeholder="+12125551234"
+                  value={
+                    Map.get(@changeset.changes, :phone_number) ||
+                      Map.get(@changeset.data, :phone_number) || ""
+                  }
+                />
+                <div class="form-text">
+                  E.164 format required: <code>+</code>
+                  followed by the country code and number, no spaces or dashes (e.g. <code>+12125551234</code>).
+                </div>
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :phone_number) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_website" class="form-label">Website</label>
+                <input
+                  type="url"
+                  name="user[website]"
+                  id="user_website"
+                  class="form-control"
+                  placeholder="https://example.com"
+                  value={
+                    Map.get(@changeset.changes, :website) ||
+                      Map.get(@changeset.data, :website) || ""
+                  }
+                />
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :website) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_locale" class="form-label">Locale</label>
+                <% current_locale =
+                  Map.get(@changeset.changes, :locale) ||
+                    Map.get(@changeset.data, :locale) || "" %>
+                <select name="user[locale]" id="user_locale" class="form-select">
+                  <option value="">— Select a locale —</option>
+                  <%= for {label, value} <- @locale_options do %>
+                    <option value={value} selected={current_locale == value}>{label}</option>
+                  <% end %>
+                </select>
+                <div class="form-text">Your preferred language and region.</div>
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :locale) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
+                <label for="user_zoneinfo" class="form-label">Timezone</label>
+                <% current_tz =
+                  Map.get(@changeset.changes, :zoneinfo) ||
+                    Map.get(@changeset.data, :zoneinfo) || "" %>
+                <select name="user[zoneinfo]" id="user_zoneinfo" class="form-select">
+                  <option value="">— Select a timezone —</option>
+                  <%= for {label, value} <- @timezone_options do %>
+                    <option value={value} selected={current_tz == value}>{label}</option>
+                  <% end %>
+                </select>
+                <div class="form-text">
+                  Your local IANA timezone. Offsets shown reflect standard time and do not account for daylight saving time.
+                </div>
+                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :zoneinfo) || []) do %>
+                  <div class="invalid-feedback d-block">{msg}</div>
+                <% end %>
+              </div>
+
+              <div class="mb-3">
                 <label for="user_theme_preference" class="form-label">
                   <i class="bi bi-palette"></i> Theme Preference
                 </label>

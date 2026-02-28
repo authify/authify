@@ -26,7 +26,17 @@ defmodule AuthifyWeb.API.ProfileController do
 
         # Only allow updating certain profile fields
         allowed_params =
-          Map.take(user_params, ["first_name", "last_name", "username", "theme_preference"])
+          Map.take(user_params, [
+            "first_name",
+            "last_name",
+            "username",
+            "theme_preference",
+            "avatar_url",
+            "locale",
+            "zoneinfo",
+            "phone_number",
+            "website"
+          ])
 
         case Accounts.update_user(current_user, allowed_params) do
           {:ok, updated_user} ->

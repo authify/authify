@@ -11,7 +11,9 @@ defmodule Authify.Scopes do
   @oauth_scopes [
     "openid",
     "profile",
-    "email"
+    "email",
+    "phone",
+    "groups"
   ]
 
   @management_api_scopes [
@@ -71,7 +73,7 @@ defmodule Authify.Scopes do
   ]
 
   @doc """
-  Returns all valid OAuth scopes (openid, profile, email).
+  Returns all valid OAuth scopes (openid, profile, email, phone, groups).
   """
   def oauth_scopes, do: @oauth_scopes
 
@@ -124,7 +126,9 @@ defmodule Authify.Scopes do
       "OAuth/OIDC" => [
         {"openid", "OpenID Connect authentication"},
         {"profile", "Read user profile information"},
-        {"email", "Read user email address"}
+        {"email", "Read user email address"},
+        {"phone", "Read user phone number"},
+        {"groups", "Read user group memberships"}
       ],
       "User Management" => [
         {"users:read", "Read user information in organization"},

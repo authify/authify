@@ -59,6 +59,34 @@ defmodule Authify.SCIM.AttributeMapperTest do
     end
   end
 
+  describe "extended profile SCIM mappings" do
+    test "maps title to :title" do
+      assert {:ok, :title} = AttributeMapper.scim_to_ecto_field("title", :user)
+    end
+
+    test "maps phoneNumbers.value to :phone_number" do
+      assert {:ok, :phone_number} =
+               AttributeMapper.scim_to_ecto_field("phoneNumbers.value", :user)
+    end
+
+    test "maps enterprise department extension to :team" do
+      assert {:ok, :team} =
+               AttributeMapper.scim_to_ecto_field(
+                 "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department",
+                 :user
+               )
+    end
+
+    test "new fields appear in known_scim_attributes" do
+      attributes = AttributeMapper.known_scim_attributes(:user)
+
+      assert "title" in attributes
+      assert "phoneNumbers.value" in attributes
+
+      assert "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department" in attributes
+    end
+  end
+
   describe "valid_scim_attribute?/2" do
     test "returns true for allowlisted attributes" do
       assert AttributeMapper.valid_scim_attribute?("userName", :user)

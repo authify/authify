@@ -558,8 +558,23 @@ defmodule Authify.OAuth do
       "given_name" => user.first_name,
       "family_name" => user.last_name,
       "preferred_username" => User.get_primary_email_value(user),
-      "updated_at" => DateTime.to_unix(user.updated_at)
+      "updated_at" => DateTime.to_unix(user.updated_at),
+      "picture" => User.avatar_url(user),
+      "locale" => user.locale,
+      "zoneinfo" => user.zoneinfo,
+      "website" => user.website,
+      "team" => user.team,
+      "title" => user.title
     })
+    |> Map.reject(fn {_, v} -> is_nil(v) || v == "" end)
+  end
+
+  defp add_scope_claims("phone", claims, user) do
+    Map.merge(claims, %{
+      "phone_number" => user.phone_number,
+      "phone_number_verified" => user.phone_number_verified || false
+    })
+    |> Map.reject(fn {_, v} -> is_nil(v) end)
   end
 
   defp add_scope_claims("email", claims, user) do

@@ -21,10 +21,15 @@
     <div class="row">
       <div class="col-lg-8">
         <div class="card">
-          <div class="card-header">
-            <h5 class="card-title mb-0">
-              <i class="bi bi-person"></i> Profile Information
-            </h5>
+          <div class="card-header d-flex align-items-center gap-2">
+            <img
+              src={Authify.Accounts.User.avatar_url(@user)}
+              alt="Profile photo"
+              class="rounded-circle"
+              width="40"
+              height="40"
+            />
+            <h5 class="card-title mb-0">Profile Information</h5>
           </div>
           <div class="card-body">
             <dl class="row">
@@ -109,6 +114,45 @@
                 <dd class="col-sm-9">
                   {Calendar.strftime(@user_email_verified_at, "%B %d, %Y at %I:%M %p")}
                 </dd>
+              <% end %>
+
+              <%= if @user.phone_number do %>
+                <dt class="col-sm-3">Phone</dt>
+                <dd class="col-sm-9">
+                  {@user.phone_number}
+                  <%= if @user.phone_number_verified do %>
+                    <span class="badge bg-success ms-1">Verified</span>
+                  <% end %>
+                </dd>
+              <% end %>
+
+              <%= if @user.website do %>
+                <dt class="col-sm-3">Website</dt>
+                <dd class="col-sm-9">
+                  <a href={@user.website} target="_blank" rel="noopener noreferrer">
+                    {@user.website}
+                  </a>
+                </dd>
+              <% end %>
+
+              <%= if @user.locale do %>
+                <dt class="col-sm-3">Locale</dt>
+                <dd class="col-sm-9">{@user.locale}</dd>
+              <% end %>
+
+              <%= if @user.zoneinfo do %>
+                <dt class="col-sm-3">Timezone</dt>
+                <dd class="col-sm-9">{@user.zoneinfo}</dd>
+              <% end %>
+
+              <%= if @user.title do %>
+                <dt class="col-sm-3">Title</dt>
+                <dd class="col-sm-9">{@user.title}</dd>
+              <% end %>
+
+              <%= if @user.team do %>
+                <dt class="col-sm-3">Team</dt>
+                <dd class="col-sm-9">{@user.team}</dd>
               <% end %>
             </dl>
           </div>

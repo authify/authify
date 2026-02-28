@@ -29,7 +29,9 @@ defmodule AuthifyWeb.ProfileController do
     render(conn, :edit,
       user: current_user,
       organization: organization,
-      changeset: changeset
+      changeset: changeset,
+      locale_options: Authify.LocaleHelpers.locale_options(),
+      timezone_options: Authify.LocaleHelpers.timezone_options()
     )
   end
 
@@ -55,7 +57,9 @@ defmodule AuthifyWeb.ProfileController do
         render(conn, :edit,
           user: current_user,
           organization: organization,
-          changeset: changeset
+          changeset: changeset,
+          locale_options: Authify.LocaleHelpers.locale_options(),
+          timezone_options: Authify.LocaleHelpers.timezone_options()
         )
     end
   end

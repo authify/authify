@@ -6,6 +6,7 @@ defmodule AuthifyWeb.UsersController do
   alias Authify.Accounts
   alias Authify.Accounts.User
   alias Authify.AuditLog
+  alias Authify.LocaleHelpers
 
   # Safely convert string to atom, only for known valid values
   defp safe_to_atom(string)
@@ -119,23 +120,26 @@ defmodule AuthifyWeb.UsersController do
       is_global_view: is_global_view,
       backup_codes_count: mfa_assigns.backup_codes_count,
       trusted_devices_count: mfa_assigns.trusted_devices_count,
-      lockout: mfa_assigns.lockout
+      lockout: mfa_assigns.lockout,
+      webauthn_credentials_count: mfa_assigns.webauthn_credentials_count
     )
   end
 
-  # Load MFA-related data for a user
+  # Load MFA-related data for a user (covers both TOTP and WebAuthn)
   defp load_mfa_data(user) do
-    if Authify.Accounts.User.totp_enabled?(user) do
-      # Count backup codes
-      backup_codes_count = Authify.MFA.backup_codes_count(user)
+    totp_enabled = Authify.Accounts.User.totp_enabled?(user)
+    webauthn_credentials_count = user |> Authify.MFA.WebAuthn.list_credentials() |> length()
+    mfa_enabled = totp_enabled || webauthn_credentials_count > 0
 
-      # Count trusted devices
+    if mfa_enabled do
+      backup_codes_count =
+        if totp_enabled, do: Authify.MFA.backup_codes_count(user), else: nil
+
       trusted_devices_count =
         user
         |> Authify.MFA.list_trusted_devices()
         |> length()
 
-      # Get active lockout record directly
       lockout =
         Authify.Repo.one(
           from l in Authify.MFA.TotpLockout,
@@ -150,14 +154,15 @@ defmodule AuthifyWeb.UsersController do
       %{
         backup_codes_count: backup_codes_count,
         trusted_devices_count: trusted_devices_count,
-        lockout: lockout
+        lockout: lockout,
+        webauthn_credentials_count: webauthn_credentials_count
       }
     else
-      # MFA not enabled, return nil values
       %{
         backup_codes_count: nil,
         trusted_devices_count: nil,
-        lockout: nil
+        lockout: nil,
+        webauthn_credentials_count: 0
       }
     end
   end
@@ -468,7 +473,9 @@ defmodule AuthifyWeb.UsersController do
       render(conn, :edit,
         changeset: changeset,
         user: target_user,
-        organization: organization
+        organization: organization,
+        locale_options: LocaleHelpers.locale_options(),
+        timezone_options: LocaleHelpers.timezone_options()
       )
     else
       conn
@@ -518,7 +525,9 @@ defmodule AuthifyWeb.UsersController do
           render(conn, :edit,
             changeset: changeset,
             user: target_user,
-            organization: organization
+            organization: organization,
+            locale_options: LocaleHelpers.locale_options(),
+            timezone_options: LocaleHelpers.timezone_options()
           )
       end
     else
@@ -628,7 +637,7 @@ defmodule AuthifyWeb.UsersController do
 
     case get_target_user_for_mfa_action(conn, id, organization) do
       {:ok, target_user} ->
-        {:ok, _user} = Authify.MFA.admin_reset_totp(target_user, current_user)
+        {:ok, _user} = Authify.MFA.admin_reset_mfa(target_user, current_user)
 
         # Log MFA reset
         log_audit_event(conn, :mfa_reset, target_user, %{
