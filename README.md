@@ -15,7 +15,7 @@ Authify is a self-hosted, open-source identity provider built with Elixir and Ph
 ## ✨ Features
 
 ### **Identity Protocols**
-- **OAuth 2.0 / OpenID Connect 1.0** - Full OIDC provider with authorization code flow
+- **OAuth 2.0 / OAuth 2.1 / OpenID Connect 1.0** - Full OIDC provider with authorization code flow
 - **SAML 2.0 Identity Provider** - Complete SAML IdP with SSO and SLO support
 - **SCIM 2.0 Provisioning** - Bi-directional user/group provisioning (Service Provider + Client)
 - **Multi-protocol Support** - Use OIDC, SAML, and SCIM simultaneously
@@ -32,7 +32,7 @@ Authify is a self-hosted, open-source identity provider built with Elixir and Ph
 - **Role-based Access Control** - Admin and user roles with proper authorization
 
 ### **Developer Experience**
-- **OpenAPI 3.1.1 Specification** - Auto-generated, deployment-specific API docs
+- **OpenAPI 3.1.2 Specification** - Auto-generated, deployment-specific API docs
 - **Header-based Versioning** - Clean API versioning without URL pollution
 - **Comprehensive Test Coverage** - TDD approach with extensive test suites
 - **Infrastructure as Code Ready** - Perfect for Terraform and automation tools
@@ -246,7 +246,7 @@ Authify works with any OAuth 2.0/OIDC or SAML 2.0 compatible application:
 Generate client libraries from the OpenAPI specification:
 
 ```bash
-curl http://localhost:4000/docs/openapi.json > authify-openapi.json
+curl https://api.authify.pw/docs/openapi.json > authify-openapi.json
 openapi-generator generate -i authify-openapi.json -g python -o ./authify-python-client
 ```
 
