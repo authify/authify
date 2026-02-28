@@ -43,10 +43,6 @@ defmodule AuthifyWeb.API.OpenAPI.Components.Security do
 
   defp scopes do
     %{
-      # OAuth/OIDC Scopes
-      "openid" => "OpenID Connect authentication",
-      "profile" => "Read user profile information (name, username, etc.)",
-      "email" => "Read user email address",
       # Management API Scopes - Applications
       "applications:read" => "Read OAuth2 applications",
       "applications:write" => "Manage OAuth2 applications",

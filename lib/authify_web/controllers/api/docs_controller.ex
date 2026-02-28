@@ -9,7 +9,7 @@ defmodule AuthifyWeb.API.DocsController do
 
     # Generate the OpenAPI specification dynamically
     openapi_spec = %{
-      openapi: "3.1.0",
+      openapi: "3.1.2",
       info: Spec.info(base_url),
       servers: Spec.servers(base_url),
       security: Spec.security(),
