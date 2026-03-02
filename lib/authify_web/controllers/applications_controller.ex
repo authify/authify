@@ -2,6 +2,7 @@ defmodule AuthifyWeb.ApplicationsController do
   use AuthifyWeb, :controller
 
   alias Authify.AuditLog
+  alias Authify.Configurations
   alias Authify.OAuth
   alias Authify.OAuth.Application
 
@@ -45,13 +46,25 @@ defmodule AuthifyWeb.ApplicationsController do
   def show(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
     application = OAuth.get_oauth_application!(id, organization)
-    render(conn, :show, application: application, organization: organization)
+    org_strict_mode = Configurations.oauth_21_strict_mode?(organization)
+
+    render(conn, :show,
+      application: application,
+      organization: organization,
+      org_strict_mode: org_strict_mode
+    )
   end
 
   def new(conn, _params) do
     organization = conn.assigns.current_organization
     changeset = OAuth.change_application_form(%Application{})
-    render(conn, :new, changeset: changeset, organization: organization)
+    org_strict_mode = Configurations.oauth_21_strict_mode?(organization)
+
+    render(conn, :new,
+      changeset: changeset,
+      organization: organization,
+      org_strict_mode: org_strict_mode
+    )
   end
 
   def create(conn, %{"application" => application_params}) do
@@ -77,7 +90,13 @@ defmodule AuthifyWeb.ApplicationsController do
         )
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        render(conn, :new, changeset: changeset, organization: organization)
+        org_strict_mode = Configurations.oauth_21_strict_mode?(organization)
+
+        render(conn, :new,
+          changeset: changeset,
+          organization: organization,
+          org_strict_mode: org_strict_mode
+        )
     end
   end
 
@@ -86,11 +105,13 @@ defmodule AuthifyWeb.ApplicationsController do
     application = OAuth.get_oauth_application!(id, organization)
     # Use form_changeset instead of changeset to avoid applying default scopes
     changeset = OAuth.change_application_form(application)
+    org_strict_mode = Configurations.oauth_21_strict_mode?(organization)
 
     render(conn, :edit,
       application: application,
       changeset: changeset,
-      organization: organization
+      organization: organization,
+      org_strict_mode: org_strict_mode
     )
   end
 
@@ -115,10 +136,13 @@ defmodule AuthifyWeb.ApplicationsController do
         )
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        org_strict_mode = Configurations.oauth_21_strict_mode?(organization)
+
         render(conn, :edit,
           application: application,
           changeset: changeset,
-          organization: organization
+          organization: organization,
+          org_strict_mode: org_strict_mode
         )
     end
   end

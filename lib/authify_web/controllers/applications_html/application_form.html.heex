@@ -256,9 +256,11 @@ https://app.example.com/oauth/callback"
         class="form-check-input"
         value="true"
         checked={
-          Map.get(@changeset.changes, :require_pkce) ||
+          @org_strict_mode ||
+            Map.get(@changeset.changes, :require_pkce) ||
             Map.get(@changeset.data, :require_pkce) || false
         }
+        disabled={@org_strict_mode}
       />
       <label class="form-check-label" for="application_require_pkce">
         Require PKCE
@@ -271,10 +273,19 @@ https://app.example.com/oauth/callback"
           <i class="bi bi-question-circle"></i>
         </button>
       </label>
-      <div class="form-text">
-        PKCE prevents authorization code interception attacks. Recommended for SPAs and mobile apps.
-        <em>Automatically enabled for public clients.</em>
-      </div>
+      <%= if @org_strict_mode do %>
+        <div class="form-text">
+          <i class="bi bi-shield-lock text-success"></i>
+          PKCE is enforced for all applications by the organization's
+          <strong>OAuth 2.1 strict mode</strong>
+          setting.
+        </div>
+      <% else %>
+        <div class="form-text">
+          PKCE prevents authorization code interception attacks. Recommended for SPAs and mobile apps.
+          <em>Automatically enabled for public clients.</em>
+        </div>
+      <% end %>
     </div>
     <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :require_pkce) || []) do %>
       <div class="invalid-feedback d-block">{msg}</div>
