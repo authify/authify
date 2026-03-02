@@ -33,6 +33,7 @@
             <.application_form
               changeset={@changeset}
               action={~p"/#{@current_organization.slug}/applications/#{@application}"}
+              org_strict_mode={@org_strict_mode}
             />
           </div>
         </div>

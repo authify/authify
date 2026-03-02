@@ -109,17 +109,25 @@
             <div class="mb-3">
               <label class="form-label fw-bold">PKCE Required</label>
               <div class="bg-body-secondary p-3 rounded">
-                <%= if Authify.OAuth.Application.requires_pkce?(@application) do %>
-                  <span class="badge bg-success">
-                    <i class="bi bi-check-circle"></i> Yes
-                  </span>
-                  <%= if @application.client_type == "public" do %>
-                    <div class="small text-muted mt-1">Enforced for public clients</div>
-                  <% end %>
-                <% else %>
-                  <span class="badge bg-secondary">
-                    <i class="bi bi-dash-circle"></i> No
-                  </span>
+                <%= cond do %>
+                  <% @org_strict_mode -> %>
+                    <span class="badge bg-success">
+                      <i class="bi bi-check-circle"></i> Yes
+                    </span>
+                    <div class="small text-muted mt-1">
+                      Enforced by organization OAuth 2.1 strict mode
+                    </div>
+                  <% Authify.OAuth.Application.requires_pkce?(@application) -> %>
+                    <span class="badge bg-success">
+                      <i class="bi bi-check-circle"></i> Yes
+                    </span>
+                    <%= if @application.client_type == "public" do %>
+                      <div class="small text-muted mt-1">Enforced for public clients</div>
+                    <% end %>
+                  <% true -> %>
+                    <span class="badge bg-secondary">
+                      <i class="bi bi-dash-circle"></i> No
+                    </span>
                 <% end %>
               </div>
             </div>
