@@ -11,7 +11,7 @@ defmodule AuthifyWeb.WebAuthnController do
 
   import AuthifyWeb.Helpers.ConnHelpers, only: [get_client_ip: 1, get_user_agent: 1]
 
-  alias Authify.{Accounts, MFA, Repo}
+  alias Authify.{Accounts, MFA, Organizations, Repo}
   alias Authify.Accounts.User
   alias Authify.MFA.WebAuthn
 
@@ -42,6 +42,7 @@ defmodule AuthifyWeb.WebAuthnController do
   """
   def register_begin(conn, params) do
     current_user = conn.assigns.current_user
+    organization = conn.assigns.current_organization
 
     # Extract options from params
     opts = [
@@ -50,7 +51,8 @@ defmodule AuthifyWeb.WebAuthnController do
       attestation: params["attestation"] || "none",
       credential_type: params["credentialType"],
       ip_address: get_client_ip(conn),
-      user_agent: get_user_agent(conn)
+      user_agent: get_user_agent(conn),
+      rp_id: Organizations.resolve_webauthn_rp_id(organization, conn.host)
     ]
 
     case WebAuthn.begin_registration(current_user, opts) do

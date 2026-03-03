@@ -60,7 +60,7 @@ defmodule Authify.MFA.WebAuthn do
           challenge: challenge_b64,
           rp: %{
             name: get_rp_name(),
-            id: get_rp_id()
+            id: opts[:rp_id] || get_rp_id()
           },
           user: %{
             id: Base.url_encode64("user_#{user.id}", padding: false),
@@ -157,7 +157,7 @@ defmodule Authify.MFA.WebAuthn do
             challenge: challenge_b64,
             timeout: 60_000,
             # 60 seconds
-            rpId: get_rp_id(),
+            rpId: opts[:rp_id] || get_rp_id(),
             userVerification: opts[:user_verification] || "preferred",
             allowCredentials:
               Enum.map(credentials, fn cred ->

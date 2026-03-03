@@ -103,6 +103,29 @@ defmodule Authify.Organizations do
   end
 
   @doc """
+  Resolves the WebAuthn Relying Party ID for an organization.
+
+  If the request host is a verified custom domain (CNAME) for the organization,
+  returns that domain as the rpId. Otherwise returns the globally configured
+  `:webauthn_rp_id` application setting (defaulting to "localhost").
+
+  This allows users on a custom domain to register and authenticate WebAuthn
+  credentials scoped to that domain.
+  """
+  def resolve_webauthn_rp_id(%Organization{} = org, request_host) do
+    OrganizationCname
+    |> where(
+      [c],
+      c.organization_id == ^org.id and c.domain == ^request_host and c.verified == true
+    )
+    |> Repo.one()
+    |> case do
+      nil -> Application.get_env(:authify, :webauthn_rp_id, "localhost")
+      _cname -> request_host
+    end
+  end
+
+  @doc """
   Gets the effective email link domain for an organization.
 
   Returns the configured email_link_domain if set, otherwise falls back

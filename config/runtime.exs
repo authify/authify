@@ -129,6 +129,20 @@ if config_env() == :prod do
 
   config :authify, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  # ## WebAuthn Configuration
+  #
+  # The Relying Party ID must match the domain where Authify is hosted.
+  # Defaults to PHX_HOST if WEBAUTHN_RP_ID is not explicitly set.
+  # This MUST be set correctly or WebAuthn registration/authentication will fail
+  # with a "DOMException: The operation is insecure" browser error.
+  #
+  # Examples:
+  #   WEBAUTHN_RP_ID=authifyidp.com
+  #   WEBAUTHN_RP_ID=auth.example.com
+  webauthn_rp_id = System.get_env("WEBAUTHN_RP_ID") || host
+
+  config :authify, :webauthn_rp_id, webauthn_rp_id
+
   config :authify, AuthifyWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [

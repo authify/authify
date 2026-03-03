@@ -3,7 +3,7 @@ defmodule AuthifyWeb.MfaController do
 
   import AuthifyWeb.Helpers.ConnHelpers, only: [get_client_ip: 1, get_user_agent: 1]
 
-  alias Authify.{Accounts, MFA, Repo}
+  alias Authify.{Accounts, MFA, Organizations, Repo}
   alias Authify.Accounts.User
   alias AuthifyWeb.Helpers.AuditHelper
 
@@ -324,11 +324,12 @@ defmodule AuthifyWeb.MfaController do
       {:error, _message} ->
         json(conn, %{success: false, error: "No active MFA session"})
 
-      {:ok, user, _organization} ->
+      {:ok, user, organization} ->
         # Get authentication options from WebAuthn context
         opts = [
           ip_address: get_client_ip(conn),
-          user_agent: get_user_agent(conn)
+          user_agent: get_user_agent(conn),
+          rp_id: Organizations.resolve_webauthn_rp_id(organization, conn.host)
         ]
 
         case MFA.WebAuthn.begin_authentication(user, opts) do
