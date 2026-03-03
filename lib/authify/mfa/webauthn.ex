@@ -552,7 +552,11 @@ defmodule Authify.MFA.WebAuthn do
   defp verify_signature(credential, auth_data_binary, client_data_json_bytes, signature_b64) do
     case Encryption.decrypt(credential.public_key) do
       {:ok, public_key_cbor} ->
-        with {:ok, {cose_key, _}} <- CBOR.decode(public_key_cbor),
+        # Use Wax.Utils.CBOR.decode/1 instead of raw CBOR.decode/1 because:
+        # 1. It returns {:ok, value, rest} matching the actual CBOR library return format
+        # 2. It unwraps %CBOR.Tag{tag: :bytes} structs to plain binaries,
+        #    which Wax.CoseKey.verify requires for EC key coordinates
+        with {:ok, cose_key, _} <- Wax.Utils.CBOR.decode(public_key_cbor),
              {:ok, signature} <- Base.url_decode64(signature_b64, padding: false),
              client_data_hash = :crypto.hash(:sha256, client_data_json_bytes),
              verification_data = auth_data_binary <> client_data_hash,
