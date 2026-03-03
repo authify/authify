@@ -1744,7 +1744,7 @@ defmodule Authify.Accounts do
     domain = Authify.Organizations.get_email_link_domain(organization)
 
     # Build the reset URL with proper protocol/port for environment
-    "#{build_base_url(domain)}/password_reset/#{token}"
+    "#{build_base_url(domain)}/password_reset/#{token}/edit"
   end
 
   @doc """
