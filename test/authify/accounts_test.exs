@@ -1068,6 +1068,14 @@ defmodule Authify.AccountsTest do
       refute String.contains?(token1, "/")
       refute String.contains?(token2, "/")
     end
+
+    test "build_password_reset_url/2 generates a link to the edit form" do
+      organization = organization_fixture()
+      token = User.generate_password_reset_token()
+      url = Accounts.build_password_reset_url(organization, token)
+
+      assert String.ends_with?(url, "/password_reset/#{token}/edit")
+    end
   end
 
   describe "certificates" do
