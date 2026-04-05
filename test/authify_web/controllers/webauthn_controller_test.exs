@@ -1,5 +1,5 @@
 defmodule AuthifyWeb.WebAuthnControllerTest do
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   alias Authify.{Accounts, Repo}
   alias Authify.MFA.{WebAuthn, WebAuthnCredential}

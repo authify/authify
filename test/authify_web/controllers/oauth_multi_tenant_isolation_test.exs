@@ -8,7 +8,7 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
   - Users can only authorize applications within their own organization
   - Cross-tenant access attempts are properly rejected
   """
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
   import Authify.OAuthFixtures

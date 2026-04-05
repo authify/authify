@@ -9,7 +9,7 @@ defmodule AuthifyWeb.WebAuthnIntegrationTest do
   - Organization scoping and user isolation
   - Authorization and ownership verification
   """
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   import Ecto.Query
   import Authify.AccountsFixtures

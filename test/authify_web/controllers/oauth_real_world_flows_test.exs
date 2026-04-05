@@ -8,7 +8,7 @@ defmodule AuthifyWeb.OAuthRealWorldFlowsTest do
   - Complete authorization code flow with PKCE
   - Token refresh and expiration scenarios
   """
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
 

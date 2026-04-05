@@ -1,5 +1,5 @@
 defmodule AuthifyWeb.Auth.OrganizationContextTest do
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   alias Authify.Accounts
   alias AuthifyWeb.Auth.OrganizationContext
