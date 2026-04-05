@@ -1,5 +1,5 @@
 defmodule Authify.AccountsTest do
-  use Authify.DataCase
+  use Authify.DataCase, async: true
 
   alias Authify.Accounts
   alias Authify.Accounts.{Invitation, Organization, User}

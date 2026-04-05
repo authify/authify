@@ -1,5 +1,5 @@
 defmodule Authify.SCIMClient.AttributeMapperTest do
-  use Authify.DataCase
+  use Authify.DataCase, async: true
 
   alias Authify.Accounts.{User, UserEmail}
   alias Authify.SCIMClient.AttributeMapper

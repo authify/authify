@@ -1,6 +1,6 @@
 defmodule Authify.OAuth.UserGrantTest do
   @moduledoc false
-  use Authify.DataCase
+  use Authify.DataCase, async: true
 
   alias Authify.OAuth.UserGrant
 

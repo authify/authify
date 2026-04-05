@@ -1,5 +1,5 @@
 defmodule Authify.Accounts.UserProfileFieldsTest do
-  use Authify.DataCase
+  use Authify.DataCase, async: true
 
   alias Authify.Accounts
   alias Authify.Accounts.User
