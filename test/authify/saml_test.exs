@@ -1,5 +1,5 @@
 defmodule Authify.SAMLTest do
-  use Authify.DataCase
+  use Authify.DataCase, async: true
 
   alias Authify.SAML
   alias Authify.SAML.{Certificate, ServiceProvider, Session}

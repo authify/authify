@@ -2,7 +2,7 @@ defmodule Authify.MFA.WebAuthnTest do
   @moduledoc """
   Tests for WebAuthn context module.
   """
-  use Authify.DataCase
+  use Authify.DataCase, async: true
 
   alias Authify.MFA.WebAuthn
   alias Authify.MFA.WebAuthnChallenge

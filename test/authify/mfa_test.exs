@@ -2,7 +2,7 @@ defmodule Authify.MFATest do
   @moduledoc """
   Tests for MFA (Multi-Factor Authentication) module.
   """
-  use Authify.DataCase
+  use Authify.DataCase, async: true
 
   alias Authify.Accounts.User
   alias Authify.MFA

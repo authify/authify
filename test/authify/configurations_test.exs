@@ -1,5 +1,5 @@
 defmodule Authify.ConfigurationsTest do
-  use Authify.DataCase
+  use Authify.DataCase, async: true
 
   alias Authify.Configurations
   alias Authify.Configurations.Schemas.Global
