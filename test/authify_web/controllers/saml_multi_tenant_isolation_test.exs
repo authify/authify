@@ -8,7 +8,7 @@ defmodule AuthifyWeb.SAMLMultiTenantIsolationTest do
   - Users can only authenticate to SPs within their own organization
   - Cross-tenant SSO/SLO attempts are properly rejected
   """
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
   import Authify.SAMLFixtures

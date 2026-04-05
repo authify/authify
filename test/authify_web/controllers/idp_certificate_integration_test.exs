@@ -7,7 +7,7 @@ defmodule AuthifyWeb.IdPCertificateIntegrationTest do
   - Certificates are scoped to organizations
   - Active certificates can be retrieved
   """
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
 

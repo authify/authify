@@ -7,7 +7,7 @@ defmodule AuthifyWeb.SAMLRealWorldFlowsTest do
   - Complete SSO flow with assertions and attribute mapping
   - SLO across multiple service providers
   """
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
   import Authify.SAMLFixtures
