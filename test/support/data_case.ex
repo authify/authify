@@ -27,14 +27,29 @@ defmodule Authify.DataCase do
     end
   end
 
+  # Tests that MUST use async: false:
+  #
+  # - Task engine tests (test/authify/tasks/) — shared TaskExecutor GenServer state
+  #   and telemetry hooks that register globally.
+  # - Scheduled worker tests (test/authify/tasks/workers/scheduled/) — Oban queue state.
+  # - Rate limiter tests (test/authify_web/plugs/rate_limiter_test.exs) — Hammer buckets
+  #   are global; these tests deliberately test global lockout behavior.
+  # - Maintenance controller tests — uses Oban.Testing with manual mode.
+  # - LiveView tests (test/authify_web/live/) — Phoenix LiveView process management.
   setup tags do
     Authify.DataCase.setup_sandbox(tags)
-    # Clear configuration cache before AND after tests to avoid cache pollution
-    Authify.Configurations.Cache.clear()
 
-    on_exit(fn ->
+    if tags[:async] do
+      # Bypass the ETS config cache for this process so async tests always
+      # read from the sandbox DB and never share cache state with concurrent tests.
+      Authify.Configurations.Cache.bypass_for_test()
+    else
       Authify.Configurations.Cache.clear()
-    end)
+
+      on_exit(fn ->
+        Authify.Configurations.Cache.clear()
+      end)
+    end
 
     :ok
   end

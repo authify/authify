@@ -164,8 +164,6 @@ defmodule AuthifyWeb.SetupControllerTest do
     test "works without authify_domain (optional)", %{conn: conn} do
       # Ensure no users exist
       Authify.Repo.delete_all(Accounts.User)
-      # Clear cache to avoid pollution from previous tests
-      Authify.Configurations.Cache.clear()
 
       user_params = %{
         "first_name" => "Global",

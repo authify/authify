@@ -31,8 +31,27 @@ defmodule AuthifyWeb.ConnCase do
     end
   end
 
+  # Tests that MUST use async: false:
+  #
+  # - Maintenance controller tests — uses Oban.Testing with manual mode.
+  # - LiveView tests (test/authify_web/live/) — Phoenix LiveView process management.
+  # - Rate limiter tests (test/authify_web/plugs/rate_limiter_test.exs) — global Hammer
+  #   buckets and Application-level rate_limiting_enabled config.
   setup tags do
     Authify.DataCase.setup_sandbox(tags)
+
+    if tags[:async] do
+      # Bypass the ETS config cache for this process so async controller tests
+      # always read from the sandbox DB.
+      Authify.Configurations.Cache.bypass_for_test()
+    else
+      Authify.Configurations.Cache.clear()
+
+      on_exit(fn ->
+        Authify.Configurations.Cache.clear()
+      end)
+    end
+
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 
