@@ -1,4 +1,7 @@
 defmodule AuthifyWeb.Plugs.RateLimiterTest do
+  # async: false — tests exercise global Hammer rate limit buckets and use
+  # Application.put_env to toggle rate limiting; concurrent execution would
+  # cause bucket and config interference between tests.
   use AuthifyWeb.ConnCase, async: false
   import Authify.RateLimitTestHelper
 

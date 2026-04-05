@@ -1,4 +1,6 @@
 defmodule Authify.Tasks.Workers.TaskExecutorTest do
+  # async: false — task engine tests share a TaskExecutor GenServer and register
+  # telemetry handlers globally; concurrent execution causes race conditions.
   use Authify.DataCase, async: false
 
   import ExUnit.CaptureLog
