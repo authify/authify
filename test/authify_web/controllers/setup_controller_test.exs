@@ -1,7 +1,5 @@
 defmodule AuthifyWeb.SetupControllerTest do
-  # async: false — tests use Repo.delete_all(Accounts.User) to simulate a fresh
-  # system, which is a global destructive operation incompatible with concurrent tests.
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
   alias Authify.Accounts

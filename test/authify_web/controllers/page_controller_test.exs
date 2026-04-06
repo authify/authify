@@ -1,6 +1,7 @@
 defmodule AuthifyWeb.PageControllerTest do
-  # async: false — the "redirects to setup" test calls Sandbox.checkout/1 directly
-  # and does a global delete_all(User), which is incompatible with concurrent tests.
+  # async: false — this test overrides the sandbox mode with
+  # Sandbox.mode(Repo, {:shared, self()}), which is incompatible with
+  # concurrent test execution.
   use AuthifyWeb.ConnCase
 
   import Authify.AccountsFixtures
