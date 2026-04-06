@@ -6,13 +6,15 @@ defmodule AuthifyWeb.Auth.OrganizationContextTest do
 
   describe "organization context middleware" do
     setup do
+      n = System.unique_integer([:positive])
       # Create organization and user
-      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      {:ok, organization} =
+        Accounts.create_organization(%{name: "Test Org #{n}", slug: "test-org-#{n}"})
 
       user_attrs = %{
         "first_name" => "Test",
         "last_name" => "User",
-        "email" => "test@example.com",
+        "email" => "test-ctx-#{n}@example.com",
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -48,14 +50,15 @@ defmodule AuthifyWeb.Auth.OrganizationContextTest do
 
   describe "require_organization_resource/2" do
     setup do
+      n = System.unique_integer([:positive])
       # Create two organizations
-      {:ok, org1} = Accounts.create_organization(%{name: "Org 1", slug: "org-1"})
-      {:ok, org2} = Accounts.create_organization(%{name: "Org 2", slug: "org-2"})
+      {:ok, org1} = Accounts.create_organization(%{name: "Org 1 #{n}", slug: "org-1-#{n}"})
+      {:ok, org2} = Accounts.create_organization(%{name: "Org 2 #{n}", slug: "org-2-#{n}"})
 
       user_attrs = %{
         "first_name" => "Test",
         "last_name" => "User",
-        "email" => "test@example.com",
+        "email" => "test-res-#{n}@example.com",
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -101,12 +104,15 @@ defmodule AuthifyWeb.Auth.OrganizationContextTest do
 
   describe "require_admin/2" do
     setup do
-      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      n = System.unique_integer([:positive])
+
+      {:ok, organization} =
+        Accounts.create_organization(%{name: "Test Org #{n}", slug: "test-org-adm-#{n}"})
 
       admin_attrs = %{
         "first_name" => "Admin",
         "last_name" => "User",
-        "email" => "admin@example.com",
+        "email" => "admin-#{n}@example.com",
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -114,7 +120,7 @@ defmodule AuthifyWeb.Auth.OrganizationContextTest do
       user_attrs = %{
         "first_name" => "Regular",
         "last_name" => "User",
-        "email" => "user@example.com",
+        "email" => "user-#{n}@example.com",
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }

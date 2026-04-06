@@ -1,5 +1,6 @@
 defmodule AuthifyWeb.SetupControllerTest do
-  use AuthifyWeb.ConnCase, async: true
+  # async: false because tests use Repo.delete_all which bypasses the sandbox transaction
+  use AuthifyWeb.ConnCase, async: false
 
   import Authify.AccountsFixtures
   alias Authify.Accounts

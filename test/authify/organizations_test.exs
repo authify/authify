@@ -1,5 +1,6 @@
 defmodule Authify.OrganizationsTest do
-  use Authify.DataCase, async: true
+  # async: false because tests write to global settings (tenant_base_domain), which is shared state
+  use Authify.DataCase, async: false
 
   alias Authify.Configurations
   alias Authify.Organizations
@@ -144,7 +145,9 @@ defmodule Authify.OrganizationsTest do
     end
 
     test "resets email_link_domain if it was using the deleted domain" do
-      org = organization_fixture(slug: "test-org")
+      n = System.unique_integer([:positive])
+      slug = "test-org-cname-#{n}"
+      org = organization_fixture(slug: slug)
 
       # Create CNAMEs
       {:ok, cname1} =
@@ -164,7 +167,7 @@ defmodule Authify.OrganizationsTest do
 
       # email_link_domain should be reset to tenant subdomain
       updated = Configurations.get_organization_setting(org, :email_link_domain)
-      assert updated == "test-org.authify.test"
+      assert updated == "#{slug}.authify.test"
     end
 
     test "does not reset email_link_domain if it's using a different domain" do

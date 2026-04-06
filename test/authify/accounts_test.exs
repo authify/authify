@@ -7,11 +7,15 @@ defmodule Authify.AccountsTest do
   import Authify.AccountsFixtures
 
   describe "organizations" do
-    @valid_org_attrs %{name: "Test Organization", slug: "test-org"}
     @invalid_org_attrs %{name: "", slug: ""}
 
+    defp valid_org_attrs do
+      n = System.unique_integer([:positive])
+      %{name: "Test Organization #{n}", slug: "test-org-#{n}"}
+    end
+
     test "list_organizations/0 returns all organizations" do
-      {:ok, org} = Accounts.create_organization(@valid_org_attrs)
+      {:ok, org} = Accounts.create_organization(valid_org_attrs())
       organizations = Accounts.list_organizations()
       # Should include the test org and the global org created by migration
       refute Enum.empty?(organizations)
@@ -19,20 +23,22 @@ defmodule Authify.AccountsTest do
     end
 
     test "get_organization!/1 returns the organization with given id" do
-      {:ok, org} = Accounts.create_organization(@valid_org_attrs)
+      {:ok, org} = Accounts.create_organization(valid_org_attrs())
       assert Accounts.get_organization!(org.id) == org
     end
 
     test "get_organization_by_slug/1 returns organization with given slug" do
-      {:ok, org} = Accounts.create_organization(@valid_org_attrs)
-      assert Accounts.get_organization_by_slug("test-org") == org
+      attrs = valid_org_attrs()
+      {:ok, org} = Accounts.create_organization(attrs)
+      assert Accounts.get_organization_by_slug(attrs.slug) == org
       assert Accounts.get_organization_by_slug("nonexistent") == nil
     end
 
     test "create_organization/1 with valid data creates an organization" do
-      assert {:ok, %Organization{} = org} = Accounts.create_organization(@valid_org_attrs)
-      assert org.name == "Test Organization"
-      assert org.slug == "test-org"
+      attrs = valid_org_attrs()
+      assert {:ok, %Organization{} = org} = Accounts.create_organization(attrs)
+      assert org.name == attrs.name
+      assert org.slug == attrs.slug
       assert org.active == true
     end
 
@@ -47,16 +53,17 @@ defmodule Authify.AccountsTest do
     end
 
     test "create_organization/1 enforces unique slug constraint" do
-      {:ok, _org1} = Accounts.create_organization(@valid_org_attrs)
+      attrs = valid_org_attrs()
+      {:ok, _org1} = Accounts.create_organization(attrs)
 
       assert {:error, %Ecto.Changeset{} = changeset} =
-               Accounts.create_organization(@valid_org_attrs)
+               Accounts.create_organization(attrs)
 
       assert "has already been taken" in errors_on(changeset).slug
     end
 
     test "update_organization/2 with valid data updates the organization" do
-      {:ok, org} = Accounts.create_organization(@valid_org_attrs)
+      {:ok, org} = Accounts.create_organization(valid_org_attrs())
       update_attrs = %{name: "Updated Organization"}
 
       assert {:ok, %Organization{} = updated_org} =
@@ -66,30 +73,36 @@ defmodule Authify.AccountsTest do
     end
 
     test "delete_organization/1 deletes the organization" do
-      {:ok, org} = Accounts.create_organization(@valid_org_attrs)
+      {:ok, org} = Accounts.create_organization(valid_org_attrs())
       assert {:ok, %Organization{}} = Accounts.delete_organization(org)
       assert_raise Ecto.NoResultsError, fn -> Accounts.get_organization!(org.id) end
     end
 
     test "change_organization/1 returns an organization changeset" do
-      {:ok, org} = Accounts.create_organization(@valid_org_attrs)
+      {:ok, org} = Accounts.create_organization(valid_org_attrs())
       assert %Ecto.Changeset{} = Accounts.change_organization(org)
     end
   end
 
   describe "users" do
     setup do
-      {:ok, org} = Accounts.create_organization(@valid_org_attrs)
+      {:ok, org} = Accounts.create_organization(valid_org_attrs())
       %{organization: org}
     end
 
-    @valid_user_attrs %{
-      "emails" => [%{"value" => "test@example.com", "type" => "work", "primary" => true}],
-      "first_name" => "John",
-      "last_name" => "Doe",
-      "password" => "SecureP@ssw0rd!",
-      "password_confirmation" => "SecureP@ssw0rd!"
-    }
+    defp valid_user_attrs do
+      n = System.unique_integer([:positive])
+
+      %{
+        "emails" => [
+          %{"value" => "test-user-#{n}@example.com", "type" => "work", "primary" => true}
+        ],
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+    end
 
     @invalid_user_attrs %{
       "emails" => [%{"value" => "invalid", "type" => "work", "primary" => true}],
@@ -98,7 +111,8 @@ defmodule Authify.AccountsTest do
     }
 
     test "list_users/1 returns all users for organization", %{organization: org} do
-      {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
+      attrs = valid_user_attrs()
+      {:ok, user} = Accounts.create_user_with_role(attrs, org.id, "user")
 
       [found_user] = Accounts.list_users(org.id)
       assert found_user.id == user.id
@@ -108,7 +122,7 @@ defmodule Authify.AccountsTest do
     end
 
     test "get_user!/1 returns the user with given id", %{organization: _org} do
-      {:ok, user} = Accounts.create_user(@valid_user_attrs)
+      {:ok, user} = Accounts.create_user(valid_user_attrs())
       found_user = Accounts.get_user!(user.id)
       assert found_user.id == user.id
 
@@ -119,9 +133,11 @@ defmodule Authify.AccountsTest do
     end
 
     test "get_user_by_email_and_organization/2 returns user", %{organization: org} do
-      {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
+      attrs = valid_user_attrs()
+      email = hd(attrs["emails"])["value"]
+      {:ok, user} = Accounts.create_user_with_role(attrs, org.id, "user")
 
-      found_user = Accounts.get_user_by_email_and_organization("test@example.com", org.id)
+      found_user = Accounts.get_user_by_email_and_organization(email, org.id)
       assert found_user.id == user.id
 
       assert Authify.Accounts.User.get_primary_email_value(found_user) ==
@@ -129,8 +145,10 @@ defmodule Authify.AccountsTest do
     end
 
     test "create_user/1 with valid data creates a user", %{organization: _org} do
-      assert {:ok, %User{} = user} = Accounts.create_user(@valid_user_attrs)
-      assert Authify.Accounts.User.get_primary_email_value(user) == "test@example.com"
+      attrs = valid_user_attrs()
+      expected_email = hd(attrs["emails"])["value"]
+      assert {:ok, %User{} = user} = Accounts.create_user(attrs)
+      assert Authify.Accounts.User.get_primary_email_value(user) == expected_email
       assert user.first_name == "John"
       assert user.last_name == "Doe"
       assert User.valid_password?(user, "SecureP@ssw0rd!")
@@ -141,42 +159,49 @@ defmodule Authify.AccountsTest do
     end
 
     test "create_organization_with_admin/2 creates org and admin user" do
-      org_attrs = %{name: "Admin Test Org", slug: "admin-test"}
-      user_attrs = @valid_user_attrs
+      n = System.unique_integer([:positive])
+      org_attrs = %{name: "Admin Test Org #{n}", slug: "admin-test-#{n}"}
+      user_attrs = valid_user_attrs()
+      expected_email = hd(user_attrs["emails"])["value"]
 
       assert {:ok, {org, user}} = Accounts.create_organization_with_admin(org_attrs, user_attrs)
 
-      assert org.name == "Admin Test Org"
-      assert Authify.Accounts.User.get_primary_email_value(user) == "test@example.com"
+      assert org.name == org_attrs.name
+      assert Authify.Accounts.User.get_primary_email_value(user) == expected_email
       # Check that user has admin role in the organization
       assert User.admin?(user, org.id) == true
     end
 
     test "create_organization_with_admin/2 rolls back on user error" do
-      org_attrs = %{name: "Rollback Test Org", slug: "rollback-test"}
+      n = System.unique_integer([:positive])
+      org_attrs = %{name: "Rollback Test Org #{n}", slug: "rollback-test-#{n}"}
       invalid_user_attrs = @invalid_user_attrs
 
       assert {:error, %Ecto.Changeset{}} =
                Accounts.create_organization_with_admin(org_attrs, invalid_user_attrs)
 
       # Organization should not exist due to rollback
-      assert Accounts.get_organization_by_slug("rollback-test") == nil
+      assert Accounts.get_organization_by_slug(org_attrs.slug) == nil
     end
 
     test "authenticate_user/3 with valid credentials returns user", %{organization: org} do
-      {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
+      attrs = valid_user_attrs()
+      email = hd(attrs["emails"])["value"]
+      {:ok, user} = Accounts.create_user_with_role(attrs, org.id, "user")
 
       assert {:ok, authenticated_user} =
-               Accounts.authenticate_user("test@example.com", "SecureP@ssw0rd!", org.id)
+               Accounts.authenticate_user(email, "SecureP@ssw0rd!", org.id)
 
       assert authenticated_user.id == user.id
     end
 
     test "authenticate_user/3 with invalid password returns error", %{organization: org} do
-      {:ok, _user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
+      attrs = valid_user_attrs()
+      email = hd(attrs["emails"])["value"]
+      {:ok, _user} = Accounts.create_user_with_role(attrs, org.id, "user")
 
       assert {:error, :invalid_password} =
-               Accounts.authenticate_user("test@example.com", "wrong_password", org.id)
+               Accounts.authenticate_user(email, "wrong_password", org.id)
     end
 
     test "authenticate_user/3 with non-existent user returns error", %{organization: org} do
@@ -185,8 +210,9 @@ defmodule Authify.AccountsTest do
     end
 
     test "update_user/2 clears email verification when email changes", %{organization: org} do
+      n = System.unique_integer([:positive])
       # Create a user with verified email
-      {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
+      {:ok, user} = Accounts.create_user_with_role(valid_user_attrs(), org.id, "user")
 
       # Verify the primary email directly
       user_with_emails = Authify.Repo.preload(user, :emails)
@@ -203,8 +229,10 @@ defmodule Authify.AccountsTest do
       assert primary_email.verified_at != nil
 
       # Update email address using the proper email management API
+      new_email_value = "newemail-#{n}@example.com"
+
       {:ok, new_email} =
-        Accounts.add_email_to_user(verified_user, %{value: "newemail@example.com", type: "work"})
+        Accounts.add_email_to_user(verified_user, %{value: new_email_value, type: "work"})
 
       {:ok, _primary_email} = Accounts.set_primary_email(verified_user, new_email.id)
 
@@ -213,8 +241,7 @@ defmodule Authify.AccountsTest do
         Authify.Repo.get!(Authify.Accounts.User, verified_user.id)
         |> Authify.Repo.preload(:emails, force: true)
 
-      assert Authify.Accounts.User.get_primary_email_value(updated_user) ==
-               "newemail@example.com"
+      assert Authify.Accounts.User.get_primary_email_value(updated_user) == new_email_value
 
       # New email starts unverified
       primary_email = Authify.Accounts.User.get_primary_email(updated_user)
@@ -225,7 +252,7 @@ defmodule Authify.AccountsTest do
       organization: org
     } do
       # Create a user with verified email
-      {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
+      {:ok, user} = Accounts.create_user_with_role(valid_user_attrs(), org.id, "user")
 
       # Verify the primary email directly
       user_with_emails = Authify.Repo.preload(user, :emails)
@@ -255,8 +282,9 @@ defmodule Authify.AccountsTest do
     test "update_user_profile/2 clears email verification when email changes", %{
       organization: org
     } do
+      n = System.unique_integer([:positive])
       # Create a user with verified email
-      {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
+      {:ok, user} = Accounts.create_user_with_role(valid_user_attrs(), org.id, "user")
 
       # Verify the primary email directly
       user_with_emails = Authify.Repo.preload(user, :emails)
@@ -273,9 +301,11 @@ defmodule Authify.AccountsTest do
       assert primary_email.verified_at != nil
 
       # Update email using the proper email management API
+      new_email_value = "profilechange-#{n}@example.com"
+
       {:ok, new_email} =
         Accounts.add_email_to_user(verified_user, %{
-          value: "profilechange@example.com",
+          value: new_email_value,
           type: "work"
         })
 
@@ -286,8 +316,7 @@ defmodule Authify.AccountsTest do
         Authify.Repo.get!(Authify.Accounts.User, verified_user.id)
         |> Authify.Repo.preload(:emails, force: true)
 
-      assert Authify.Accounts.User.get_primary_email_value(updated_user) ==
-               "profilechange@example.com"
+      assert Authify.Accounts.User.get_primary_email_value(updated_user) == new_email_value
 
       # New email starts unverified
       primary_email = Authify.Accounts.User.get_primary_email(updated_user)
@@ -298,7 +327,7 @@ defmodule Authify.AccountsTest do
       organization: org
     } do
       # Create a user with verified email
-      {:ok, user} = Accounts.create_user_with_role(@valid_user_attrs, org.id, "user")
+      {:ok, user} = Accounts.create_user_with_role(valid_user_attrs(), org.id, "user")
 
       # Verify the primary email directly
       user_with_emails = Authify.Repo.preload(user, :emails)
@@ -370,8 +399,10 @@ defmodule Authify.AccountsTest do
         end
 
       # Create a regular organization
+      n = System.unique_integer([:positive])
+
       {:ok, regular_org} =
-        Accounts.create_organization(%{name: "Regular Org", slug: "regular-org"})
+        Accounts.create_organization(%{name: "Regular Org #{n}", slug: "regular-org-#{n}"})
 
       # Create global admin user
       global_admin = admin_user_fixture(global_org)
@@ -735,11 +766,14 @@ defmodule Authify.AccountsTest do
     test "create_user_with_role/3 creates user and assigns to organization", %{
       organization: organization
     } do
+      n = System.unique_integer([:positive])
+      email = "john.doe-#{n}@example.com"
+
       user_attrs = %{
         "first_name" => "John",
         "last_name" => "Doe",
         "emails" => [
-          %{"value" => "john.doe@example.com", "type" => "work", "primary" => true}
+          %{"value" => email, "type" => "work", "primary" => true}
         ],
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
@@ -748,7 +782,7 @@ defmodule Authify.AccountsTest do
       assert {:ok, user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
 
       # Check user was created correctly
-      assert Authify.Accounts.User.get_primary_email_value(user) == "john.doe@example.com"
+      assert Authify.Accounts.User.get_primary_email_value(user) == email
       assert user.first_name == "John"
       assert user.last_name == "Doe"
       assert user.active
@@ -761,11 +795,13 @@ defmodule Authify.AccountsTest do
     end
 
     test "create_user_with_role/3 can create admin users", %{organization: organization} do
+      n = System.unique_integer([:positive])
+
       admin_attrs = %{
         "first_name" => "Jane",
         "last_name" => "Admin",
         "emails" => [
-          %{"value" => "jane.admin@example.com", "type" => "work", "primary" => true}
+          %{"value" => "jane.admin-#{n}@example.com", "type" => "work", "primary" => true}
         ],
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
@@ -782,11 +818,13 @@ defmodule Authify.AccountsTest do
     test "create_user_with_role/3 defaults to user role when not specified", %{
       organization: organization
     } do
+      n = System.unique_integer([:positive])
+
       user_attrs = %{
         "first_name" => "Default",
         "last_name" => "Role",
         "emails" => [
-          %{"value" => "default.role@example.com", "type" => "work", "primary" => true}
+          %{"value" => "default.role-#{n}@example.com", "type" => "work", "primary" => true}
         ],
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
@@ -818,11 +856,14 @@ defmodule Authify.AccountsTest do
     test "create_user_with_role/3 returns error with duplicate email", %{
       organization: organization
     } do
+      n = System.unique_integer([:positive])
+      dup_email = "duplicate-#{n}@example.com"
+
       user_attrs = %{
         "first_name" => "First",
         "last_name" => "User",
         "emails" => [
-          %{"value" => "duplicate@example.com", "type" => "work", "primary" => true}
+          %{"value" => dup_email, "type" => "work", "primary" => true}
         ],
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
@@ -834,7 +875,7 @@ defmodule Authify.AccountsTest do
       duplicate_attrs = %{
         "first_name" => "Second",
         "last_name" => "User",
-        "email" => "duplicate@example.com",
+        "email" => dup_email,
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -853,11 +894,13 @@ defmodule Authify.AccountsTest do
     test "create_user_with_role/3 rollbacks transaction on failure", %{
       organization: _organization
     } do
+      n = System.unique_integer([:positive])
+      rollback_email = "test.user-#{n}@example.com"
       # Use invalid organization ID to trigger error in user_organization creation
       user_attrs = %{
         "first_name" => "Test",
         "last_name" => "User",
-        "email" => "test.user@example.com",
+        "email" => rollback_email,
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -868,7 +911,7 @@ defmodule Authify.AccountsTest do
 
       # Verify user was not created due to rollback - there's no get_user_by_email in accounts
       # so we'll check that we can't find a user with this email globally
-      assert Accounts.get_user_by_email_and_organization("test.user@example.com", invalid_org_id) ==
+      assert Accounts.get_user_by_email_and_organization(rollback_email, invalid_org_id) ==
                nil
     end
   end
@@ -985,7 +1028,7 @@ defmodule Authify.AccountsTest do
     test "cleanup_expired_password_reset_tokens/0 removes expired tokens" do
       organization = organization_fixture()
       user1 = user_for_organization_fixture(organization)
-      user2 = user_for_organization_fixture(organization, %{"email" => "user2@example.com"})
+      user2 = user_for_organization_fixture(organization)
 
       # Create valid token for user1
       {:ok, _user1_updated, _token1} = Accounts.generate_password_reset_token(user1)

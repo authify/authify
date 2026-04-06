@@ -279,8 +279,9 @@ defmodule AuthifyWeb.WebAuthnIntegrationTest do
 
   describe "WebAuthn organization scoping and isolation" do
     test "credentials are scoped to organizations" do
-      org_a = organization_fixture(%{slug: "org-a"})
-      org_b = organization_fixture(%{slug: "org-b"})
+      n = System.unique_integer([:positive])
+      org_a = organization_fixture(%{slug: "org-a-wau-#{n}"})
+      org_b = organization_fixture(%{slug: "org-b-wau-#{n}"})
 
       user_a = user_for_organization_fixture(org_a)
       user_b = user_for_organization_fixture(org_b)

@@ -5,7 +5,7 @@ defmodule AuthifyWeb.SCIM.AttributesTest do
 
   setup %{conn: conn} do
     organization = organization_fixture()
-    user = user_fixture(organization: organization, email: "test@example.com")
+    user = user_fixture(organization: organization)
 
     conn =
       conn
@@ -65,8 +65,8 @@ defmodule AuthifyWeb.SCIM.AttributesTest do
     end
 
     test "works with list endpoint", %{conn: conn, organization: organization} do
-      user_fixture(organization: organization, email: "user1@example.com")
-      user_fixture(organization: organization, email: "user2@example.com")
+      user_fixture(organization: organization)
+      user_fixture(organization: organization)
 
       conn = get(conn, "/#{organization.slug}/scim/v2/Users?attributes=userName,active")
 
@@ -146,8 +146,8 @@ defmodule AuthifyWeb.SCIM.AttributesTest do
     end
 
     test "works with list endpoint", %{conn: conn, organization: organization} do
-      user_fixture(organization: organization, email: "user1@example.com")
-      user_fixture(organization: organization, email: "user2@example.com")
+      user_fixture(organization: organization)
+      user_fixture(organization: organization)
 
       conn = get(conn, "/#{organization.slug}/scim/v2/Users?excludedAttributes=groups,name")
 

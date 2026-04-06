@@ -57,8 +57,9 @@ defmodule AuthifyWeb.IdPCertificateIntegrationTest do
     end
 
     test "certificates are scoped to organizations" do
-      org_a = organization_fixture(%{slug: "org-a"})
-      org_b = organization_fixture(%{slug: "org-b"})
+      n = System.unique_integer([:positive])
+      org_a = organization_fixture(%{slug: "org-a-#{n}"})
+      org_b = organization_fixture(%{slug: "org-b-#{n}"})
 
       {:ok, cert_a} =
         Authify.Accounts.generate_certificate(org_a, %{

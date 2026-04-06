@@ -15,9 +15,10 @@ defmodule AuthifyWeb.SAMLMultiTenantIsolationTest do
 
   describe "SAML service provider isolation" do
     setup do
+      n = System.unique_integer([:positive])
       # Create two separate organizations with users and service providers
-      org_a = organization_fixture(%{name: "Organization A", slug: "org-a"})
-      org_b = organization_fixture(%{name: "Organization B", slug: "org-b"})
+      org_a = organization_fixture(%{name: "Organization A #{n}", slug: "org-a-#{n}"})
+      org_b = organization_fixture(%{name: "Organization B #{n}", slug: "org-b-#{n}"})
 
       user_a = user_for_organization_fixture(org_a)
       user_b = user_for_organization_fixture(org_b)
@@ -176,8 +177,9 @@ defmodule AuthifyWeb.SAMLMultiTenantIsolationTest do
 
   describe "SAML SSO flow isolation" do
     setup do
-      org_a = organization_fixture(%{name: "Organization A", slug: "org-a"})
-      org_b = organization_fixture(%{name: "Organization B", slug: "org-b"})
+      n = System.unique_integer([:positive])
+      org_a = organization_fixture(%{name: "Organization A #{n}", slug: "org-a-sso-#{n}"})
+      org_b = organization_fixture(%{name: "Organization B #{n}", slug: "org-b-sso-#{n}"})
 
       user_a = user_for_organization_fixture(org_a)
       user_b = user_for_organization_fixture(org_b)
@@ -279,8 +281,9 @@ defmodule AuthifyWeb.SAMLMultiTenantIsolationTest do
 
   describe "SAML SLO flow isolation" do
     setup do
-      org_a = organization_fixture(%{name: "Organization A", slug: "org-a"})
-      org_b = organization_fixture(%{name: "Organization B", slug: "org-b"})
+      n = System.unique_integer([:positive])
+      org_a = organization_fixture(%{name: "Organization A #{n}", slug: "org-a-slo-#{n}"})
+      org_b = organization_fixture(%{name: "Organization B #{n}", slug: "org-b-slo-#{n}"})
 
       user_a = user_for_organization_fixture(org_a)
       user_b = user_for_organization_fixture(org_b)
@@ -389,8 +392,9 @@ defmodule AuthifyWeb.SAMLMultiTenantIsolationTest do
 
   describe "SAML metadata endpoint isolation" do
     setup do
-      org_a = organization_fixture(%{name: "Organization A", slug: "org-a"})
-      org_b = organization_fixture(%{name: "Organization B", slug: "org-b"})
+      n = System.unique_integer([:positive])
+      org_a = organization_fixture(%{name: "Organization A #{n}", slug: "org-a-meta-#{n}"})
+      org_b = organization_fixture(%{name: "Organization B #{n}", slug: "org-b-meta-#{n}"})
 
       %{org_a: org_a, org_b: org_b}
     end
@@ -445,8 +449,9 @@ defmodule AuthifyWeb.SAMLMultiTenantIsolationTest do
 
   describe "SAML assertion attribute isolation" do
     setup do
-      org_a = organization_fixture(%{name: "Organization A", slug: "org-a"})
-      org_b = organization_fixture(%{name: "Organization B", slug: "org-b"})
+      n = System.unique_integer([:positive])
+      org_a = organization_fixture(%{name: "Organization A #{n}", slug: "org-a-assert-#{n}"})
+      org_b = organization_fixture(%{name: "Organization B #{n}", slug: "org-b-assert-#{n}"})
 
       user_a = user_for_organization_fixture(org_a)
       user_b = user_for_organization_fixture(org_b)
@@ -542,8 +547,9 @@ defmodule AuthifyWeb.SAMLMultiTenantIsolationTest do
 
   describe "SAML session security across organizations" do
     setup do
-      org_a = organization_fixture(%{name: "Organization A", slug: "org-a"})
-      org_b = organization_fixture(%{name: "Organization B", slug: "org-b"})
+      n = System.unique_integer([:positive])
+      org_a = organization_fixture(%{name: "Organization A #{n}", slug: "org-a-sess-#{n}"})
+      org_b = organization_fixture(%{name: "Organization B #{n}", slug: "org-b-sess-#{n}"})
 
       user_a = user_for_organization_fixture(org_a)
       user_b = user_for_organization_fixture(org_b)
@@ -641,8 +647,9 @@ defmodule AuthifyWeb.SAMLMultiTenantIsolationTest do
 
   describe "Service provider lookup by entity ID respects organization" do
     setup do
-      org_a = organization_fixture(%{name: "Organization A", slug: "org-a"})
-      org_b = organization_fixture(%{name: "Organization B", slug: "org-b"})
+      n = System.unique_integer([:positive])
+      org_a = organization_fixture(%{name: "Organization A #{n}", slug: "org-a-lookup-#{n}"})
+      org_b = organization_fixture(%{name: "Organization B #{n}", slug: "org-b-lookup-#{n}"})
 
       user_a = user_for_organization_fixture(org_a)
       user_b = user_for_organization_fixture(org_b)
