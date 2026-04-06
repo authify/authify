@@ -9,10 +9,9 @@ defmodule AuthifyWeb.ConnCase do
 
   Finally, if the test case interacts with the database,
   we enable the SQL sandbox, so changes done to the database
-  are reverted at the end of every test. If you are using
-  PostgreSQL, you can even run database tests asynchronously
-  by setting `use AuthifyWeb.ConnCase, async: true`, although
-  this option is not recommended for other databases.
+  are reverted at the end of every test. Use `async: true`
+  to run tests concurrently — the sandbox and config cache
+  bypass handle isolation automatically.
   """
 
   use ExUnit.CaseTemplate
@@ -31,8 +30,27 @@ defmodule AuthifyWeb.ConnCase do
     end
   end
 
+  # Tests that MUST use async: false:
+  #
+  # - Maintenance controller tests — uses Oban.Testing with manual mode.
+  # - LiveView tests (test/authify_web/live/) — Phoenix LiveView process management.
+  # - Rate limiter tests (test/authify_web/plugs/rate_limiter_test.exs) — global Hammer
+  #   buckets and Application-level rate_limiting_enabled config.
   setup tags do
     Authify.DataCase.setup_sandbox(tags)
+
+    if tags[:async] do
+      # Bypass the ETS config cache for this process so async controller tests
+      # always read from the sandbox DB.
+      Authify.Configurations.Cache.bypass_for_test()
+    else
+      Authify.Configurations.Cache.clear()
+
+      on_exit(fn ->
+        Authify.Configurations.Cache.clear()
+      end)
+    end
+
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 

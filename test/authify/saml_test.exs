@@ -1,5 +1,5 @@
 defmodule Authify.SAMLTest do
-  use Authify.DataCase
+  use Authify.DataCase, async: true
 
   alias Authify.SAML
   alias Authify.SAML.{Certificate, ServiceProvider, Session}
@@ -437,14 +437,17 @@ defmodule Authify.SAMLTest do
 
   describe "attribute mapping with mustache interpolation" do
     test "interpolates simple field placeholders" do
+      n = System.unique_integer([:positive])
       organization = organization_fixture()
+      email = "test-saml-#{n}@example.com"
+      username = "johndoe-#{n}"
 
       user =
         user_for_organization_fixture(organization, %{
-          "email" => "test@example.com",
+          "email" => email,
           "first_name" => "John",
           "last_name" => "Doe",
-          "username" => "johndoe"
+          "username" => username
         })
 
       sp =
@@ -466,7 +469,7 @@ defmodule Authify.SAMLTest do
 
       assert String.contains?(
                response,
-               ~s(<saml2:AttributeValue>test@example.com</saml2:AttributeValue>)
+               ~s(<saml2:AttributeValue>#{email}</saml2:AttributeValue>)
              )
 
       assert String.contains?(response, ~s(<saml2:Attribute Name="firstName">))
@@ -474,15 +477,21 @@ defmodule Authify.SAMLTest do
       assert String.contains?(response, ~s(<saml2:Attribute Name="lastName">))
       assert String.contains?(response, ~s(<saml2:AttributeValue>Doe</saml2:AttributeValue>))
       assert String.contains?(response, ~s(<saml2:Attribute Name="username">))
-      assert String.contains?(response, ~s(<saml2:AttributeValue>johndoe</saml2:AttributeValue>))
+
+      assert String.contains?(
+               response,
+               ~s(<saml2:AttributeValue>#{username}</saml2:AttributeValue>)
+             )
     end
 
     test "interpolates multiple fields in a single template" do
+      n = System.unique_integer([:positive])
       organization = organization_fixture()
+      email = "jane-saml-#{n}@example.com"
 
       user =
         user_for_organization_fixture(organization, %{
-          "email" => "jane@example.com",
+          "email" => email,
           "first_name" => "Jane",
           "last_name" => "Smith"
         })
@@ -519,7 +528,7 @@ defmodule Authify.SAMLTest do
 
       assert String.contains?(
                response,
-               ~s(<saml2:AttributeValue>Jane Smith &lt;jane@example.com&gt;</saml2:AttributeValue>)
+               ~s(<saml2:AttributeValue>Jane Smith &lt;#{email}&gt;</saml2:AttributeValue>)
              )
     end
 
@@ -620,14 +629,17 @@ defmodule Authify.SAMLTest do
     end
 
     test "uses default attribute mapping when none specified" do
+      n = System.unique_integer([:positive])
       organization = organization_fixture()
+      email = "default-saml-#{n}@example.com"
+      username = "defaultuser-#{n}"
 
       user =
         user_for_organization_fixture(organization, %{
-          "email" => "default@example.com",
+          "email" => email,
           "first_name" => "Default",
           "last_name" => "User",
-          "username" => "defaultuser"
+          "username" => username
         })
 
       sp =
@@ -642,7 +654,7 @@ defmodule Authify.SAMLTest do
       # Should use default mapping
       assert String.contains?(
                response,
-               ~s(<saml2:AttributeValue>default@example.com</saml2:AttributeValue>)
+               ~s(<saml2:AttributeValue>#{email}</saml2:AttributeValue>)
              )
 
       assert String.contains?(response, ~s(<saml2:AttributeValue>Default</saml2:AttributeValue>))
@@ -655,7 +667,7 @@ defmodule Authify.SAMLTest do
 
       assert String.contains?(
                response,
-               ~s(<saml2:AttributeValue>defaultuser</saml2:AttributeValue>)
+               ~s(<saml2:AttributeValue>#{username}</saml2:AttributeValue>)
              )
     end
 
@@ -664,7 +676,6 @@ defmodule Authify.SAMLTest do
 
       user =
         user_for_organization_fixture(organization, %{
-          "email" => "test@example.com",
           "first_name" => "John<script>",
           "last_name" => "Doe&Co"
         })

@@ -1,5 +1,5 @@
 defmodule AuthifyWeb.DashboardControllerTest do
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
 
@@ -8,7 +8,13 @@ defmodule AuthifyWeb.DashboardControllerTest do
   describe "GET /dashboard" do
     setup do
       # Create organization and admin user
-      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      n = System.unique_integer([:positive])
+
+      {:ok, organization} =
+        Accounts.create_organization(%{
+          name: "Test Org #{n}",
+          slug: "test-org-#{n}"
+        })
 
       admin_attrs = %{
         "first_name" => "Admin",

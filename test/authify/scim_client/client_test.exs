@@ -1,5 +1,5 @@
 defmodule Authify.SCIMClient.ClientTest do
-  use Authify.DataCase
+  use Authify.DataCase, async: true
 
   alias Authify.SCIMClient.Client
   alias Authify.SCIMClient.{ExternalId, ScimClient, SyncLog}

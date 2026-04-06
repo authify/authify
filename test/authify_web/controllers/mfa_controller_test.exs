@@ -1,13 +1,18 @@
 defmodule AuthifyWeb.MfaControllerTest do
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   alias Authify.{Accounts, MFA, Repo}
   alias Authify.Accounts.User
 
   setup do
     # Create organization
+    n = System.unique_integer([:positive])
+
     {:ok, organization} =
-      Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      Accounts.create_organization(%{
+        name: "Test Org #{n}",
+        slug: "test-org-#{n}"
+      })
 
     # Create user
     user_attrs = %{

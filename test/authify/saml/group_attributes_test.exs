@@ -6,22 +6,26 @@ defmodule Authify.SAML.GroupAttributesTest do
 
   describe "SAML group attributes" do
     setup do
+      n = System.unique_integer([:positive])
+
       # Create organization
       {:ok, org} =
         Accounts.create_organization(%{
-          name: "Test Organization",
-          slug: "test-org",
+          name: "Test Organization #{n}",
+          slug: "test-org-grp-#{n}",
           active: true
         })
 
       # Create user with username
       {:ok, user} =
         Accounts.create_user(%{
-          "emails" => [%{"value" => "user@example.com", "type" => "work", "primary" => true}],
+          "emails" => [
+            %{"value" => "user-grp-#{n}@example.com", "type" => "work", "primary" => true}
+          ],
           "password" => "SecurePassword123!",
           "first_name" => "John",
           "last_name" => "Doe",
-          "username" => "johndoe",
+          "username" => "johndoe-#{n}",
           "organization_id" => org.id,
           "role" => "user"
         })
@@ -64,11 +68,11 @@ defmodule Authify.SAML.GroupAttributesTest do
       # Create SAML session
       {:ok, session} =
         SAML.create_session(%{
-          session_id: "test-session-id",
-          request_id: "test-request-id",
+          session_id: "test-session-id-#{n}",
+          request_id: "test-request-id-#{n}",
           user_id: user.id,
           service_provider_id: sp.id,
-          subject_id: "test-subject",
+          subject_id: "test-subject-#{n}",
           issued_at: DateTime.utc_now() |> DateTime.truncate(:second),
           expires_at:
             DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
@@ -84,7 +88,7 @@ defmodule Authify.SAML.GroupAttributesTest do
       {:ok, saml_response} = SAML.XML.generate_saml_response(session, sp, user)
 
       assert saml_response =~ ~s(<saml2:Attribute Name="username">)
-      assert saml_response =~ ~s(<saml2:AttributeValue>johndoe</saml2:AttributeValue>)
+      assert saml_response =~ ~s(<saml2:AttributeValue>#{user.username}</saml2:AttributeValue>)
     end
 
     test "includes groups as multi-valued attribute in SAML assertion", %{
@@ -107,18 +111,19 @@ defmodule Authify.SAML.GroupAttributesTest do
       sp: sp,
       session: session
     } do
-      # Preload groups
-      user = Repo.preload(user, :groups)
+      # Preload groups and emails
+      user = Repo.preload(user, [:groups, :emails])
+      email = Authify.Accounts.User.get_primary_email_value(user)
 
       {:ok, saml_response} = SAML.XML.generate_saml_response(session, sp, user)
 
       # Username
       assert saml_response =~ ~s(Name="username")
-      assert saml_response =~ ~s(>johndoe<)
+      assert saml_response =~ ~s(>#{user.username}<)
 
       # Email
       assert saml_response =~ ~s(Name="email")
-      assert saml_response =~ ~s(>user@example.com<)
+      assert saml_response =~ ~s(>#{email}<)
 
       # Display name
       assert saml_response =~ ~s(Name="displayName")

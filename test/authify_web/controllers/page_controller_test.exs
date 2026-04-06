@@ -1,4 +1,7 @@
 defmodule AuthifyWeb.PageControllerTest do
+  # async: false — this test overrides the sandbox mode with
+  # Sandbox.mode(Repo, {:shared, self()}), which is incompatible with
+  # concurrent test execution.
   use AuthifyWeb.ConnCase
 
   import Authify.AccountsFixtures

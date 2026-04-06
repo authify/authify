@@ -1,6 +1,6 @@
 defmodule AuthifyWeb.CertificatesControllerTest do
   @moduledoc false
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
 

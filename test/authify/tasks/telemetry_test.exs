@@ -3,6 +3,8 @@ defmodule Authify.Tasks.TelemetryTest do
   Tests for task engine telemetry events, verifying that the correct
   events are emitted with proper measurements and metadata.
   """
+  # async: false — task engine tests share a TaskExecutor GenServer and register
+  # telemetry handlers globally; concurrent execution causes race conditions.
   use Authify.DataCase, async: false
 
   alias Authify.Tasks

@@ -1,5 +1,5 @@
 defmodule Authify.Configurations.EncryptedSettingsTest do
-  use Authify.DataCase
+  use Authify.DataCase, async: true
 
   alias Authify.Configurations
 

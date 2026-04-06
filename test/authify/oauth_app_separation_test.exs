@@ -1,5 +1,5 @@
 defmodule Authify.OAuthAppSeparationTest do
-  use Authify.DataCase
+  use Authify.DataCase, async: true
 
   alias Authify.OAuth
   import Authify.AccountsFixtures

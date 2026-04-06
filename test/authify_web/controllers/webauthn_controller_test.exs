@@ -1,19 +1,21 @@
 defmodule AuthifyWeb.WebAuthnControllerTest do
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   alias Authify.{Accounts, Repo}
   alias Authify.MFA.{WebAuthn, WebAuthnCredential}
 
   setup do
+    n = System.unique_integer([:positive])
+
     # Create organization
     {:ok, organization} =
-      Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      Accounts.create_organization(%{name: "Test Org #{n}", slug: "test-org-wa-#{n}"})
 
     # Create user
     user_attrs = %{
       "first_name" => "John",
       "last_name" => "Doe",
-      "email" => "john@test.com",
+      "email" => "john-#{n}@test.com",
       "password" => "SecureP@ssw0rd!",
       "password_confirmation" => "SecureP@ssw0rd!"
     }
@@ -281,7 +283,7 @@ defmodule AuthifyWeb.WebAuthnControllerTest do
           %{
             "first_name" => "Jane",
             "last_name" => "Smith",
-            "email" => "jane@test.com",
+            "email" => "jane-#{System.unique_integer([:positive])}@test.com",
             "password" => "SecureP@ssw0rd!",
             "password_confirmation" => "SecureP@ssw0rd!"
           },
@@ -345,7 +347,7 @@ defmodule AuthifyWeb.WebAuthnControllerTest do
           %{
             "first_name" => "Jane",
             "last_name" => "Smith",
-            "email" => "jane@test.com",
+            "email" => "jane-#{System.unique_integer([:positive])}@test.com",
             "password" => "SecureP@ssw0rd!",
             "password_confirmation" => "SecureP@ssw0rd!"
           },

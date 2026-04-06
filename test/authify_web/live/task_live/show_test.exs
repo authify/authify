@@ -1,4 +1,6 @@
 defmodule AuthifyWeb.TaskLive.ShowTest do
+  # async: false — Phoenix LiveView tests manage shared process state and
+  # require sequential execution to avoid port/session conflicts.
   use AuthifyWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest

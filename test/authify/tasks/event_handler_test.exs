@@ -1,4 +1,6 @@
 defmodule Authify.Tasks.EventHandlerTest do
+  # async: false — task engine tests share a TaskExecutor GenServer and register
+  # telemetry handlers globally; concurrent execution causes race conditions.
   use Authify.DataCase, async: false
   use Oban.Testing, repo: Authify.Repo
 

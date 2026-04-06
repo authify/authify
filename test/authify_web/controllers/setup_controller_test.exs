@@ -1,5 +1,6 @@
 defmodule AuthifyWeb.SetupControllerTest do
-  use AuthifyWeb.ConnCase
+  # async: false because tests use Repo.delete_all which bypasses the sandbox transaction
+  use AuthifyWeb.ConnCase, async: false
 
   import Authify.AccountsFixtures
   alias Authify.Accounts
@@ -164,8 +165,6 @@ defmodule AuthifyWeb.SetupControllerTest do
     test "works without authify_domain (optional)", %{conn: conn} do
       # Ensure no users exist
       Authify.Repo.delete_all(Accounts.User)
-      # Clear cache to avoid pollution from previous tests
-      Authify.Configurations.Cache.clear()
 
       user_params = %{
         "first_name" => "Global",

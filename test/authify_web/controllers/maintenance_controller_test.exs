@@ -1,4 +1,6 @@
 defmodule AuthifyWeb.MaintenanceControllerTest do
+  # async: false — uses Oban.Testing with manual mode, which modifies global
+  # Oban queue state incompatible with concurrent test execution.
   use AuthifyWeb.ConnCase, async: false
   use Oban.Testing, repo: Authify.Repo
 

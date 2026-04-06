@@ -1,5 +1,5 @@
 defmodule Authify.OAuth.ApplicationTypeTest do
-  use Authify.DataCase
+  use Authify.DataCase, async: true
 
   import Authify.AccountsFixtures
   import Authify.OAuthFixtures

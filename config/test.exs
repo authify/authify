@@ -8,6 +8,13 @@ config :authify, env: :test
 # The MIX_TEST_PARTITION environment variable can be used
 # to provide built-in test partitioning in CI environment.
 # Run `mix help test` for more information.
+# Use READ COMMITTED isolation for test connections to eliminate MySQL InnoDB gap
+# locking, which causes intermittent deadlocks when async tests concurrently insert
+# rows into tables with unique indexes (e.g. organizations.slug, user_emails.value).
+# READ COMMITTED uses row-level locks only, avoiding gap locks entirely.
+after_connect_fn =
+  {MyXQL, :query!, ["SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED", []]}
+
 if System.get_env("CI_MODE") do
   config :authify, Authify.Repo,
     username: "authifytest",
@@ -15,7 +22,8 @@ if System.get_env("CI_MODE") do
     hostname: "127.0.0.1",
     database: "authify_test#{System.get_env("MIX_TEST_PARTITION")}",
     pool: Ecto.Adapters.SQL.Sandbox,
-    pool_size: System.schedulers_online() * 2
+    pool_size: System.schedulers_online() * 2,
+    after_connect: after_connect_fn
 else
   config :authify, Authify.Repo,
     username: "root",
@@ -23,7 +31,8 @@ else
     hostname: "localhost",
     database: "authify_test#{System.get_env("MIX_TEST_PARTITION")}",
     pool: Ecto.Adapters.SQL.Sandbox,
-    pool_size: System.schedulers_online() * 2
+    pool_size: System.schedulers_online() * 2,
+    after_connect: after_connect_fn
 end
 
 # We don't run a server during test. If one is required,

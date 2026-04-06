@@ -8,7 +8,7 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
   - Users can only authorize applications within their own organization
   - Cross-tenant access attempts are properly rejected
   """
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
   import Authify.OAuthFixtures
@@ -17,9 +17,10 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
 
   describe "OAuth application isolation" do
     setup do
+      n = System.unique_integer([:positive])
       # Create two separate organizations with users and apps
-      org_a = organization_fixture(%{name: "Organization A", slug: "org-a"})
-      org_b = organization_fixture(%{name: "Organization B", slug: "org-b"})
+      org_a = organization_fixture(%{name: "Organization A #{n}", slug: "org-a-oauth-#{n}"})
+      org_b = organization_fixture(%{name: "Organization B #{n}", slug: "org-b-oauth-#{n}"})
 
       user_a = user_for_organization_fixture(org_a)
       user_b = user_for_organization_fixture(org_b)
@@ -193,8 +194,9 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
 
   describe "Authorization code validation across tenants" do
     setup do
-      org_a = organization_fixture(%{name: "Organization A", slug: "org-a"})
-      org_b = organization_fixture(%{name: "Organization B", slug: "org-b"})
+      n = System.unique_integer([:positive])
+      org_a = organization_fixture(%{name: "Organization A #{n}", slug: "org-a-auth-#{n}"})
+      org_b = organization_fixture(%{name: "Organization B #{n}", slug: "org-b-auth-#{n}"})
 
       user_a = user_for_organization_fixture(org_a)
       user_b = user_for_organization_fixture(org_b)
@@ -279,8 +281,9 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
 
   describe "Access token isolation" do
     setup do
-      org_a = organization_fixture(%{name: "Organization A", slug: "org-a"})
-      org_b = organization_fixture(%{name: "Organization B", slug: "org-b"})
+      n = System.unique_integer([:positive])
+      org_a = organization_fixture(%{name: "Organization A #{n}", slug: "org-a-token-#{n}"})
+      org_b = organization_fixture(%{name: "Organization B #{n}", slug: "org-b-token-#{n}"})
 
       user_a = user_for_organization_fixture(org_a)
       user_b = user_for_organization_fixture(org_b)
@@ -382,8 +385,9 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
 
   describe "Management API multi-tenant isolation" do
     setup do
-      org_a = organization_fixture(%{name: "Organization A", slug: "org-a"})
-      org_b = organization_fixture(%{name: "Organization B", slug: "org-b"})
+      n = System.unique_integer([:positive])
+      org_a = organization_fixture(%{name: "Organization A #{n}", slug: "org-a-mgmt-#{n}"})
+      org_b = organization_fixture(%{name: "Organization B #{n}", slug: "org-b-mgmt-#{n}"})
 
       mgmt_app_a = management_api_application_fixture(organization: org_a)
       mgmt_app_b = management_api_application_fixture(organization: org_b)
@@ -467,8 +471,9 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
 
   describe "OIDC discovery endpoint isolation" do
     setup do
-      org_a = organization_fixture(%{name: "Organization A", slug: "org-a"})
-      org_b = organization_fixture(%{name: "Organization B", slug: "org-b"})
+      n = System.unique_integer([:positive])
+      org_a = organization_fixture(%{name: "Organization A #{n}", slug: "org-a-oidc-#{n}"})
+      org_b = organization_fixture(%{name: "Organization B #{n}", slug: "org-b-oidc-#{n}"})
 
       %{org_a: org_a, org_b: org_b}
     end
@@ -539,8 +544,9 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
 
   describe "Cross-organization consent flow prevention" do
     setup do
-      org_a = organization_fixture(%{name: "Organization A", slug: "org-a"})
-      org_b = organization_fixture(%{name: "Organization B", slug: "org-b"})
+      n = System.unique_integer([:positive])
+      org_a = organization_fixture(%{name: "Organization A #{n}", slug: "org-a-consent-#{n}"})
+      org_b = organization_fixture(%{name: "Organization B #{n}", slug: "org-b-consent-#{n}"})
 
       user_a = user_for_organization_fixture(org_a)
       app_b = application_fixture(organization: org_b)

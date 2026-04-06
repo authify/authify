@@ -28,6 +28,19 @@ defmodule Authify.Configurations.Cache do
   end
 
   @doc """
+  Bypasses the cache for the current test process.
+
+  When set, `get/3` always returns `:miss` and `put/4` is a no-op.
+  The flag is stored in the calling process's dictionary and is
+  invisible to other concurrent processes.
+
+  Only call this from test support code.
+  """
+  def bypass_for_test do
+    Process.put(:skip_config_cache, true)
+  end
+
+  @doc """
   Gets a cached configuration setting value.
 
   Returns `{:ok, value}` if found and not expired, `:miss` otherwise.
@@ -47,15 +60,19 @@ defmodule Authify.Configurations.Cache do
       :miss
   """
   def get(configurable_type, configurable_id, setting_name) do
-    key = cache_key(configurable_type, configurable_id, setting_name)
-    now = System.monotonic_time(:millisecond)
+    if Process.get(:skip_config_cache) do
+      :miss
+    else
+      key = cache_key(configurable_type, configurable_id, setting_name)
+      now = System.monotonic_time(:millisecond)
 
-    case :ets.lookup(@cache_table, key) do
-      [{^key, value, expires_at}] when expires_at > now ->
-        {:ok, value}
+      case :ets.lookup(@cache_table, key) do
+        [{^key, value, expires_at}] when expires_at > now ->
+          {:ok, value}
 
-      _ ->
-        :miss
+        _ ->
+          :miss
+      end
     end
   end
 
@@ -77,9 +94,12 @@ defmodule Authify.Configurations.Cache do
       :ok
   """
   def put(configurable_type, configurable_id, setting_name, value) do
-    key = cache_key(configurable_type, configurable_id, setting_name)
-    expires_at = System.monotonic_time(:millisecond) + @ttl
-    :ets.insert(@cache_table, {key, value, expires_at})
+    unless Process.get(:skip_config_cache) do
+      key = cache_key(configurable_type, configurable_id, setting_name)
+      expires_at = System.monotonic_time(:millisecond) + @ttl
+      :ets.insert(@cache_table, {key, value, expires_at})
+    end
+
     :ok
   end
 

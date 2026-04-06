@@ -1,5 +1,6 @@
 defmodule Authify.Configurations.DomainSettingsTest do
-  use Authify.DataCase, async: true
+  # async: false because tests write to global settings (tenant_base_domain), which is shared state
+  use Authify.DataCase, async: false
 
   alias Authify.Configurations
   alias Authify.Organizations
