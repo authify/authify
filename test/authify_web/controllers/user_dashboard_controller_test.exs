@@ -1,5 +1,5 @@
 defmodule AuthifyWeb.UserDashboardControllerTest do
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   alias Authify.Accounts
   alias Authify.OAuth
@@ -7,10 +7,12 @@ defmodule AuthifyWeb.UserDashboardControllerTest do
 
   setup %{conn: conn} do
     # Create test organization
+    n = System.unique_integer([:positive])
+
     {:ok, organization} =
       Accounts.create_organization(%{
-        name: "Test Organization",
-        slug: "test-org"
+        name: "Test Organization #{n}",
+        slug: "test-org-#{n}"
       })
 
     # Create test user directly in organization

@@ -1,5 +1,5 @@
 defmodule AuthifyWeb.HealthControllerTest do
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   setup do
     # Clear the cache before each test

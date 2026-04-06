@@ -1,5 +1,5 @@
 defmodule AuthifyWeb.SessionControllerTest do
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   alias Authify.Accounts
 
@@ -14,12 +14,13 @@ defmodule AuthifyWeb.SessionControllerTest do
 
     test "redirects to dashboard when user is already authenticated", %{conn: conn} do
       # Create organization and user
-      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
 
       user_attrs = %{
         "first_name" => "John",
         "last_name" => "Doe",
-        "email" => "john@test.com",
+        "email" => "john-#{System.unique_integer([:positive])}@test.com",
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -44,14 +45,15 @@ defmodule AuthifyWeb.SessionControllerTest do
 
     test "redirects to current organization when user has switched context", %{conn: conn} do
       # Create two organizations
-      {:ok, org1} = Accounts.create_organization(%{name: "Org 1", slug: "org-1"})
-      {:ok, org2} = Accounts.create_organization(%{name: "Org 2", slug: "org-2"})
+      suffix = System.unique_integer([:positive])
+      {:ok, org1} = Accounts.create_organization(%{name: "Org 1", slug: "org-1-#{suffix}"})
+      {:ok, org2} = Accounts.create_organization(%{name: "Org 2", slug: "org-2-#{suffix}"})
 
       # Create a global admin user in org1
       user_attrs = %{
         "first_name" => "Admin",
         "last_name" => "User",
-        "email" => "admin@test.com",
+        "email" => "admin-#{suffix}@test.com",
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!",
         "super_admin" => true
@@ -79,12 +81,15 @@ defmodule AuthifyWeb.SessionControllerTest do
   describe "POST /login" do
     test "logs in user with valid credentials", %{conn: conn} do
       # Create organization and user
-      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
+
+      email = "john-#{System.unique_integer([:positive])}@test.com"
 
       user_attrs = %{
         "first_name" => "John",
         "last_name" => "Doe",
-        "email" => "john@test.com",
+        "email" => email,
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -92,8 +97,8 @@ defmodule AuthifyWeb.SessionControllerTest do
       {:ok, _user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
 
       login_params = %{
-        "organization_slug" => "test-org",
-        "email" => "john@test.com",
+        "organization_slug" => slug,
+        "email" => email,
         "password" => "SecureP@ssw0rd!"
       }
 
@@ -118,12 +123,15 @@ defmodule AuthifyWeb.SessionControllerTest do
 
     test "shows error with invalid credentials", %{conn: conn} do
       # Create organization
-      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
+
+      email = "john-#{System.unique_integer([:positive])}@test.com"
 
       user_attrs = %{
         "first_name" => "John",
         "last_name" => "Doe",
-        "email" => "john@test.com",
+        "email" => email,
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -131,8 +139,8 @@ defmodule AuthifyWeb.SessionControllerTest do
       {:ok, _user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
 
       login_params = %{
-        "organization_slug" => "test-org",
-        "email" => "john@test.com",
+        "organization_slug" => slug,
+        "email" => email,
         "password" => "wrong_password"
       }
 
@@ -144,10 +152,11 @@ defmodule AuthifyWeb.SessionControllerTest do
 
     test "shows error with non-existent user", %{conn: conn} do
       # Create organization but no user
-      {:ok, _organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, _organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
 
       login_params = %{
-        "organization_slug" => "test-org",
+        "organization_slug" => slug,
         "email" => "nonexistent@test.com",
         "password" => "SecureP@ssw0rd!"
       }
@@ -160,12 +169,15 @@ defmodule AuthifyWeb.SessionControllerTest do
 
     test "redirects to MFA verification when TOTP is enabled", %{conn: conn} do
       # Create organization and user
-      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
+
+      email = "john-#{System.unique_integer([:positive])}@test.com"
 
       user_attrs = %{
         "first_name" => "John",
         "last_name" => "Doe",
-        "email" => "john@test.com",
+        "email" => email,
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -178,8 +190,8 @@ defmodule AuthifyWeb.SessionControllerTest do
       {:ok, _user, _codes} = Authify.MFA.complete_totp_setup(user, code, secret)
 
       login_params = %{
-        "organization_slug" => "test-org",
-        "email" => "john@test.com",
+        "organization_slug" => slug,
+        "email" => email,
         "password" => "SecureP@ssw0rd!"
       }
 
@@ -196,12 +208,15 @@ defmodule AuthifyWeb.SessionControllerTest do
 
     test "completes login when TOTP is enabled but trusted device exists", %{conn: conn} do
       # Create organization and user
-      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
+
+      email = "john-#{System.unique_integer([:positive])}@test.com"
 
       user_attrs = %{
         "first_name" => "John",
         "last_name" => "Doe",
-        "email" => "john@test.com",
+        "email" => email,
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -222,8 +237,8 @@ defmodule AuthifyWeb.SessionControllerTest do
         })
 
       login_params = %{
-        "organization_slug" => "test-org",
-        "email" => "john@test.com",
+        "organization_slug" => slug,
+        "email" => email,
         "password" => "SecureP@ssw0rd!"
       }
 
@@ -242,12 +257,15 @@ defmodule AuthifyWeb.SessionControllerTest do
   describe "DELETE /logout" do
     test "logs out the user", %{conn: conn} do
       # Create organization and user
-      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
+
+      email = "john-#{System.unique_integer([:positive])}@test.com"
 
       user_attrs = %{
         "first_name" => "John",
         "last_name" => "Doe",
-        "email" => "john@test.com",
+        "email" => email,
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -270,7 +288,8 @@ defmodule AuthifyWeb.SessionControllerTest do
       conn: conn
     } do
       # Create organization
-      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
 
       # Create configuration and set require_mfa to true
       _config =
@@ -284,10 +303,12 @@ defmodule AuthifyWeb.SessionControllerTest do
         Authify.Configurations.set_setting("organization", organization.id, :require_mfa, true)
 
       # Create user without MFA
+      email = "john-#{System.unique_integer([:positive])}@test.com"
+
       user_attrs = %{
         "first_name" => "John",
         "last_name" => "Doe",
-        "email" => "john@test.com",
+        "email" => email,
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -299,15 +320,15 @@ defmodule AuthifyWeb.SessionControllerTest do
 
       # Attempt to log in
       login_params = %{
-        "organization_slug" => "test-org",
-        "email" => "john@test.com",
+        "organization_slug" => slug,
+        "email" => email,
         "password" => "SecureP@ssw0rd!"
       }
 
       conn = post(conn, ~p"/login", login: login_params)
 
       # Should redirect to MFA setup
-      assert redirected_to(conn) == ~p"/test-org/profile/mfa/setup"
+      assert redirected_to(conn) == ~p"/#{slug}/profile/mfa/setup"
       assert Phoenix.Flash.get(conn.assigns.flash, :warning) =~ "organization requires"
 
       # Session should have MFA setup flags
@@ -318,7 +339,8 @@ defmodule AuthifyWeb.SessionControllerTest do
 
     test "allows login when MFA is not required", %{conn: conn} do
       # Create organization
-      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
 
       # Create configuration and ensure require_mfa is false (default)
       _config =
@@ -332,10 +354,12 @@ defmodule AuthifyWeb.SessionControllerTest do
         Authify.Configurations.set_setting("organization", organization.id, :require_mfa, false)
 
       # Create user without MFA
+      email = "john-#{System.unique_integer([:positive])}@test.com"
+
       user_attrs = %{
         "first_name" => "John",
         "last_name" => "Doe",
-        "email" => "john@test.com",
+        "email" => email,
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -344,15 +368,15 @@ defmodule AuthifyWeb.SessionControllerTest do
 
       # Attempt to log in
       login_params = %{
-        "organization_slug" => "test-org",
-        "email" => "john@test.com",
+        "organization_slug" => slug,
+        "email" => email,
         "password" => "SecureP@ssw0rd!"
       }
 
       conn = post(conn, ~p"/login", login: login_params)
 
       # Should complete normal login
-      assert redirected_to(conn) == ~p"/test-org/user/dashboard"
+      assert redirected_to(conn) == ~p"/#{slug}/user/dashboard"
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Welcome back"
     end
 
@@ -360,7 +384,8 @@ defmodule AuthifyWeb.SessionControllerTest do
       conn: conn
     } do
       # Create organization with MFA required
-      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: "test-org"})
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
 
       # Create configuration and set require_mfa
       _config =
@@ -374,10 +399,12 @@ defmodule AuthifyWeb.SessionControllerTest do
         Authify.Configurations.set_setting("organization", organization.id, :require_mfa, true)
 
       # Create user
+      email = "john-#{System.unique_integer([:positive])}@test.com"
+
       user_attrs = %{
         "first_name" => "John",
         "last_name" => "Doe",
-        "email" => "john@test.com",
+        "email" => email,
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -391,8 +418,8 @@ defmodule AuthifyWeb.SessionControllerTest do
 
       # Attempt to log in
       login_params = %{
-        "organization_slug" => "test-org",
-        "email" => "john@test.com",
+        "organization_slug" => slug,
+        "email" => email,
         "password" => "SecureP@ssw0rd!"
       }
 

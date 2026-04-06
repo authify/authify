@@ -1,5 +1,5 @@
 defmodule AuthifyWeb.UsersControllerTest do
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
 

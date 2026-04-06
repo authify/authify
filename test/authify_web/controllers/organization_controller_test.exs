@@ -1,5 +1,5 @@
 defmodule AuthifyWeb.OrganizationControllerTest do
-  use AuthifyWeb.ConnCase
+  use AuthifyWeb.ConnCase, async: true
 
   alias Authify.Accounts
   alias Authify.Configurations
@@ -21,15 +21,17 @@ defmodule AuthifyWeb.OrganizationControllerTest do
 
   describe "POST /signup" do
     test "creates organization and admin user with valid data", %{conn: conn} do
+      slug = "test-org-#{System.unique_integer([:positive])}"
+
       org_params = %{
         "name" => "Test Organization",
-        "slug" => "test-org"
+        "slug" => slug
       }
 
       user_params = %{
         "first_name" => "John",
         "last_name" => "Doe",
-        "email" => "john@test.com",
+        "email" => "john-#{System.unique_integer([:positive])}@test.com",
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }
@@ -46,11 +48,11 @@ defmodule AuthifyWeb.OrganizationControllerTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Organization created successfully"
 
       # Verify organization was created
-      org = Accounts.get_organization_by_slug("test-org")
+      org = Accounts.get_organization_by_slug(slug)
       assert org.name == "Test Organization"
 
       # Verify admin user was created
-      user = Accounts.get_user_by_email_and_organization("john@test.com", org.id)
+      user = Accounts.get_user_by_email_and_organization(user_params["email"], org.id)
       assert user.first_name == "John"
       assert user.last_name == "Doe"
       assert user.role == "admin"
@@ -89,7 +91,7 @@ defmodule AuthifyWeb.OrganizationControllerTest do
     test "shows errors with invalid user data", %{conn: conn} do
       org_params = %{
         "name" => "Test Organization",
-        "slug" => "test-org",
+        "slug" => "test-org-#{System.unique_integer([:positive])}",
         "domain" => "test.com"
       }
 
@@ -116,14 +118,16 @@ defmodule AuthifyWeb.OrganizationControllerTest do
     end
 
     test "prevents duplicate organization slugs", %{conn: conn} do
+      slug = "test-org-#{System.unique_integer([:positive])}"
+
       # Create first organization
-      {:ok, _org} = Accounts.create_organization(%{name: "First Org", slug: "test-org"})
+      {:ok, _org} = Accounts.create_organization(%{name: "First Org", slug: slug})
 
       # Try to create second organization with same slug
       org_params = %{
         "name" => "Second Organization",
         # Duplicate slug
-        "slug" => "test-org",
+        "slug" => slug,
         "domain" => "second.com"
       }
 
@@ -149,7 +153,11 @@ defmodule AuthifyWeb.OrganizationControllerTest do
 
   describe "GET /organizations/:id/success" do
     test "displays success page for existing organization", %{conn: conn} do
-      {:ok, org} = Accounts.create_organization(%{name: "Success Org", slug: "success-org"})
+      {:ok, org} =
+        Accounts.create_organization(%{
+          name: "Success Org",
+          slug: "success-org-#{System.unique_integer([:positive])}"
+        })
 
       conn = get(conn, ~p"/organizations/#{org.id}/success")
 
