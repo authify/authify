@@ -2,7 +2,7 @@ defmodule Authify.AccountsTest do
   use Authify.DataCase, async: true
 
   alias Authify.Accounts
-  alias Authify.Accounts.{Invitation, Organization, User}
+  alias Authify.Accounts.{Group, GroupMembership, Invitation, Organization, User}
 
   import Authify.AccountsFixtures
 
@@ -1274,6 +1274,516 @@ defmodule Authify.AccountsTest do
 
       assert {:ok, cert} = Accounts.get_or_generate_oauth_signing_certificate(organization)
       assert cert.id == existing.id
+    end
+  end
+
+  describe "groups" do
+    setup do
+      {:ok, org} = Accounts.create_organization(valid_org_attrs())
+      %{organization: org}
+    end
+
+    test "Group.changeset/2 with valid attrs produces a valid changeset", %{organization: org} do
+      changeset =
+        Group.changeset(%Group{}, %{"name" => "Engineering", "organization_id" => org.id})
+
+      assert changeset.valid?
+    end
+
+    test "Group.changeset/2 requires name", %{organization: org} do
+      changeset = Group.changeset(%Group{}, %{"organization_id" => org.id})
+      refute changeset.valid?
+      assert "can't be blank" in errors_on(changeset).name
+    end
+
+    test "Group.changeset/2 requires organization_id" do
+      changeset = Group.changeset(%Group{}, %{"name" => "Engineering"})
+      refute changeset.valid?
+      assert "can't be blank" in errors_on(changeset).organization_id
+    end
+
+    test "Group.changeset/2 validates name max length", %{organization: org} do
+      changeset =
+        Group.changeset(%Group{}, %{
+          "name" => String.duplicate("a", 256),
+          "organization_id" => org.id
+        })
+
+      refute changeset.valid?
+      assert "should be at most 255 character(s)" in errors_on(changeset).name
+    end
+
+    test "Group.changeset/2 validates description max length", %{organization: org} do
+      changeset =
+        Group.changeset(%Group{}, %{
+          "name" => "Engineering",
+          "organization_id" => org.id,
+          "description" => String.duplicate("a", 1001)
+        })
+
+      refute changeset.valid?
+      assert "should be at most 1000 character(s)" in errors_on(changeset).description
+    end
+
+    test "Group.changeset/2 accepts valid external_id", %{organization: org} do
+      changeset =
+        Group.changeset(%Group{}, %{
+          "name" => "Engineering",
+          "organization_id" => org.id,
+          "external_id" => "ext-123.valid_id"
+        })
+
+      assert changeset.valid?
+    end
+
+    test "Group.changeset/2 rejects external_id starting with non-alphanumeric character", %{
+      organization: org
+    } do
+      changeset =
+        Group.changeset(%Group{}, %{
+          "name" => "Engineering",
+          "organization_id" => org.id,
+          "external_id" => "-bad-start"
+        })
+
+      refute changeset.valid?
+      assert Enum.any?(errors_on(changeset).external_id, &String.contains?(&1, "must start with"))
+    end
+
+    test "Group.changeset/2 rejects external_id exceeding max length", %{organization: org} do
+      changeset =
+        Group.changeset(%Group{}, %{
+          "name" => "Engineering",
+          "organization_id" => org.id,
+          "external_id" => "a" <> String.duplicate("x", 255)
+        })
+
+      refute changeset.valid?
+      assert "should be at most 255 character(s)" in errors_on(changeset).external_id
+    end
+
+    test "create_group/1 defaults is_active to true", %{organization: org} do
+      {:ok, group} =
+        Accounts.create_group(%{"name" => "Default Active", "organization_id" => org.id})
+
+      assert group.is_active == true
+    end
+
+    test "create_group/1 allows setting is_active to false", %{organization: org} do
+      {:ok, group} =
+        Accounts.create_group(%{
+          "name" => "Inactive Group",
+          "organization_id" => org.id,
+          "is_active" => false
+        })
+
+      assert group.is_active == false
+    end
+
+    test "Group.apply_scim_timestamps/2 sets scim timestamps on insert", %{organization: org} do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, group} =
+        Accounts.create_group(%{
+          name: "SCIM Group",
+          organization_id: org.id,
+          scim_created_at: now,
+          scim_updated_at: now
+        })
+
+      assert group.scim_created_at == now
+      assert group.scim_updated_at == now
+    end
+
+    test "list_groups/1 returns all groups for the organization", %{organization: org} do
+      {:ok, g1} = Accounts.create_group(%{"name" => "Alpha", "organization_id" => org.id})
+      {:ok, g2} = Accounts.create_group(%{"name" => "Beta", "organization_id" => org.id})
+      ids = Accounts.list_groups(org) |> Enum.map(& &1.id)
+      assert g1.id in ids
+      assert g2.id in ids
+    end
+
+    test "list_groups/1 does not return groups from other organizations", %{organization: org} do
+      {:ok, other_org} = Accounts.create_organization(valid_org_attrs())
+
+      {:ok, other_group} =
+        Accounts.create_group(%{"name" => "Other", "organization_id" => other_org.id})
+
+      ids = Accounts.list_groups(org) |> Enum.map(& &1.id)
+      refute other_group.id in ids
+    end
+
+    test "list_groups_filtered/2 with no opts returns all groups", %{organization: org} do
+      {:ok, g1} = Accounts.create_group(%{"name" => "Gamma", "organization_id" => org.id})
+      ids = Accounts.list_groups_filtered(org) |> Enum.map(& &1.id)
+      assert g1.id in ids
+    end
+
+    test "list_groups_filtered/2 filters by active status true", %{organization: org} do
+      {:ok, active} =
+        Accounts.create_group(%{
+          "name" => "Active",
+          "organization_id" => org.id,
+          "is_active" => true
+        })
+
+      {:ok, inactive} =
+        Accounts.create_group(%{
+          "name" => "Inactive",
+          "organization_id" => org.id,
+          "is_active" => false
+        })
+
+      results = Accounts.list_groups_filtered(org, status: true)
+      ids = Enum.map(results, & &1.id)
+      assert active.id in ids
+      refute inactive.id in ids
+    end
+
+    test "list_groups_filtered/2 filters by active status false", %{organization: org} do
+      {:ok, active} =
+        Accounts.create_group(%{
+          "name" => "Active2",
+          "organization_id" => org.id,
+          "is_active" => true
+        })
+
+      {:ok, inactive} =
+        Accounts.create_group(%{
+          "name" => "Inactive2",
+          "organization_id" => org.id,
+          "is_active" => false
+        })
+
+      results = Accounts.list_groups_filtered(org, status: false)
+      ids = Enum.map(results, & &1.id)
+      assert inactive.id in ids
+      refute active.id in ids
+    end
+
+    test "list_groups_filtered/2 searches by name", %{organization: org} do
+      {:ok, match} =
+        Accounts.create_group(%{"name" => "UniqueSearchName", "organization_id" => org.id})
+
+      {:ok, no_match} =
+        Accounts.create_group(%{"name" => "SomethingElse", "organization_id" => org.id})
+
+      results = Accounts.list_groups_filtered(org, search: "UniqueSearchName")
+      ids = Enum.map(results, & &1.id)
+      assert match.id in ids
+      refute no_match.id in ids
+    end
+
+    test "list_groups_filtered/2 searches by description", %{organization: org} do
+      {:ok, match} =
+        Accounts.create_group(%{
+          "name" => "GroupWithDesc",
+          "organization_id" => org.id,
+          "description" => "UniqueDescriptionText"
+        })
+
+      {:ok, no_match} =
+        Accounts.create_group(%{"name" => "NoDescGroup", "organization_id" => org.id})
+
+      results = Accounts.list_groups_filtered(org, search: "UniqueDescriptionText")
+      ids = Enum.map(results, & &1.id)
+      assert match.id in ids
+      refute no_match.id in ids
+    end
+
+    test "list_groups_filtered/2 sorts by name ascending", %{organization: org} do
+      Accounts.create_group(%{"name" => "Zephyr", "organization_id" => org.id})
+      Accounts.create_group(%{"name" => "Aardvark", "organization_id" => org.id})
+      results = Accounts.list_groups_filtered(org, sort: :name, order: :asc)
+      names = Enum.map(results, & &1.name)
+      assert names == Enum.sort(names)
+    end
+
+    test "list_groups_filtered/2 sorts by name descending", %{organization: org} do
+      Accounts.create_group(%{"name" => "Zeta", "organization_id" => org.id})
+      Accounts.create_group(%{"name" => "Alpha", "organization_id" => org.id})
+      results = Accounts.list_groups_filtered(org, sort: :name, order: :desc)
+      names = Enum.map(results, & &1.name)
+      assert names == Enum.sort(names, :desc)
+    end
+
+    test "get_group!/2 returns the group scoped to the organization", %{organization: org} do
+      {:ok, group} = Accounts.create_group(%{"name" => "GetTest", "organization_id" => org.id})
+      found = Accounts.get_group!(group.id, org)
+      assert found.id == group.id
+      assert found.name == "GetTest"
+    end
+
+    test "get_group!/2 raises when group belongs to a different organization", %{
+      organization: org
+    } do
+      {:ok, other_org} = Accounts.create_organization(valid_org_attrs())
+
+      {:ok, group} =
+        Accounts.create_group(%{"name" => "OtherOrgGroup", "organization_id" => other_org.id})
+
+      assert_raise Ecto.NoResultsError, fn -> Accounts.get_group!(group.id, org) end
+    end
+
+    test "get_group/1 returns group by integer id", %{organization: org} do
+      {:ok, group} = Accounts.create_group(%{"name" => "IntIdGroup", "organization_id" => org.id})
+      found = Accounts.get_group(group.id)
+      assert found.id == group.id
+    end
+
+    test "get_group/1 returns group by string id", %{organization: org} do
+      {:ok, group} =
+        Accounts.create_group(%{"name" => "StringIdGroup", "organization_id" => org.id})
+
+      found = Accounts.get_group(Integer.to_string(group.id))
+      assert found.id == group.id
+    end
+
+    test "get_group/1 returns nil for non-existent integer id" do
+      assert Accounts.get_group(999_999_999) == nil
+    end
+
+    test "get_group/1 returns nil for non-numeric string id" do
+      assert Accounts.get_group("not-a-number") == nil
+    end
+
+    test "create_group/1 with valid attrs creates a group", %{organization: org} do
+      assert {:ok, %Group{} = group} =
+               Accounts.create_group(%{
+                 "name" => "New Group",
+                 "organization_id" => org.id,
+                 "description" => "A test group"
+               })
+
+      assert group.name == "New Group"
+      assert group.description == "A test group"
+      assert group.organization_id == org.id
+      assert group.is_active == true
+    end
+
+    test "create_group/1 with invalid attrs returns error changeset" do
+      assert {:error, %Ecto.Changeset{}} = Accounts.create_group(%{"name" => ""})
+    end
+
+    test "create_group/1 enforces unique name within the same organization", %{organization: org} do
+      {:ok, _} = Accounts.create_group(%{"name" => "DupeName", "organization_id" => org.id})
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Accounts.create_group(%{"name" => "DupeName", "organization_id" => org.id})
+
+      assert "Group name already exists in this organization" in errors_on(changeset).name
+    end
+
+    test "create_group/1 allows the same name across different organizations", %{
+      organization: org
+    } do
+      {:ok, other_org} = Accounts.create_organization(valid_org_attrs())
+      {:ok, _} = Accounts.create_group(%{"name" => "SharedName", "organization_id" => org.id})
+
+      assert {:ok, _} =
+               Accounts.create_group(%{"name" => "SharedName", "organization_id" => other_org.id})
+    end
+
+    test "create_group/1 enforces unique external_id within the same organization", %{
+      organization: org
+    } do
+      {:ok, _} =
+        Accounts.create_group(%{
+          "name" => "Group1",
+          "organization_id" => org.id,
+          "external_id" => "ext-unique-123"
+        })
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Accounts.create_group(%{
+                 "name" => "Group2",
+                 "organization_id" => org.id,
+                 "external_id" => "ext-unique-123"
+               })
+
+      assert "external_id already exists in this organization" in errors_on(changeset).external_id
+    end
+
+    test "update_group/2 with valid attrs updates the group", %{organization: org} do
+      {:ok, group} = Accounts.create_group(%{"name" => "Before", "organization_id" => org.id})
+
+      assert {:ok, updated} =
+               Accounts.update_group(group, %{"name" => "After", "description" => "Updated"})
+
+      assert updated.name == "After"
+      assert updated.description == "Updated"
+    end
+
+    test "update_group/2 with invalid attrs returns error changeset", %{organization: org} do
+      {:ok, group} = Accounts.create_group(%{"name" => "Valid", "organization_id" => org.id})
+      assert {:error, %Ecto.Changeset{}} = Accounts.update_group(group, %{"name" => ""})
+    end
+
+    test "update_group/2 prevents changing external_id once set", %{organization: org} do
+      {:ok, group} =
+        Accounts.create_group(%{
+          "name" => "ExtGroup",
+          "organization_id" => org.id,
+          "external_id" => "original-ext"
+        })
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Accounts.update_group(group, %{"external_id" => "changed-ext"})
+
+      assert "cannot be changed once set" in errors_on(changeset).external_id
+    end
+
+    test "update_group/2 allows setting the same external_id value again", %{organization: org} do
+      {:ok, group} =
+        Accounts.create_group(%{
+          "name" => "SameExtGroup",
+          "organization_id" => org.id,
+          "external_id" => "keep-same"
+        })
+
+      assert {:ok, updated} =
+               Accounts.update_group(group, %{
+                 "external_id" => "keep-same",
+                 "name" => "Updated Name"
+               })
+
+      assert updated.external_id == "keep-same"
+      assert updated.name == "Updated Name"
+    end
+
+    test "delete_group/1 deletes the group", %{organization: org} do
+      {:ok, group} = Accounts.create_group(%{"name" => "ToDelete", "organization_id" => org.id})
+      assert {:ok, %Group{}} = Accounts.delete_group(group)
+      assert_raise Ecto.NoResultsError, fn -> Accounts.get_group!(group.id, org) end
+    end
+
+    test "change_group/2 returns a group changeset", %{organization: org} do
+      {:ok, group} =
+        Accounts.create_group(%{"name" => "ForChangeset", "organization_id" => org.id})
+
+      assert %Ecto.Changeset{} = Accounts.change_group(group)
+    end
+
+    test "get_group_by_external_id/2 finds group by external_id", %{organization: org} do
+      {:ok, group} =
+        Accounts.create_group(%{
+          "name" => "ExtLookup",
+          "organization_id" => org.id,
+          "external_id" => "lookup-ext-id"
+        })
+
+      found = Accounts.get_group_by_external_id("lookup-ext-id", org.id)
+      assert found.id == group.id
+    end
+
+    test "get_group_by_external_id/2 returns nil when not found", %{organization: org} do
+      assert Accounts.get_group_by_external_id("nonexistent", org.id) == nil
+    end
+
+    test "get_group_by_external_id/2 returns nil for nil arguments" do
+      assert Accounts.get_group_by_external_id(nil, nil) == nil
+    end
+  end
+
+  describe "group memberships" do
+    setup do
+      {:ok, org} = Accounts.create_organization(valid_org_attrs())
+      {:ok, user} = Accounts.create_user_with_role(valid_user_attrs(), org.id, "user")
+
+      {:ok, group} =
+        Accounts.create_group(%{"name" => "MembershipGroup", "organization_id" => org.id})
+
+      %{organization: org, user: user, group: group}
+    end
+
+    test "GroupMembership.changeset/2 with valid attrs produces a valid changeset", %{
+      user: user,
+      group: group
+    } do
+      changeset =
+        GroupMembership.changeset(%GroupMembership{}, %{user_id: user.id, group_id: group.id})
+
+      assert changeset.valid?
+    end
+
+    test "GroupMembership.changeset/2 requires user_id", %{group: group} do
+      changeset = GroupMembership.changeset(%GroupMembership{}, %{group_id: group.id})
+      refute changeset.valid?
+      assert "can't be blank" in errors_on(changeset).user_id
+    end
+
+    test "GroupMembership.changeset/2 requires group_id", %{user: user} do
+      changeset = GroupMembership.changeset(%GroupMembership{}, %{user_id: user.id})
+      refute changeset.valid?
+      assert "can't be blank" in errors_on(changeset).group_id
+    end
+
+    test "add_user_to_group/2 adds the user to the group", %{user: user, group: group} do
+      assert {:ok, %GroupMembership{}} = Accounts.add_user_to_group(user, group)
+      members = Accounts.list_group_members(group)
+      assert Enum.any?(members, &(&1.id == user.id))
+    end
+
+    test "add_user_to_group/2 returns error when user is already in the group", %{
+      user: user,
+      group: group
+    } do
+      {:ok, _} = Accounts.add_user_to_group(user, group)
+
+      assert {:error, %Ecto.Changeset{} = changeset} = Accounts.add_user_to_group(user, group)
+      assert "User is already in this group" in errors_on(changeset).user_id
+    end
+
+    test "remove_user_from_group/2 removes the user from the group", %{user: user, group: group} do
+      {:ok, _} = Accounts.add_user_to_group(user, group)
+      Accounts.remove_user_from_group(user, group)
+      members = Accounts.list_group_members(group)
+      refute Enum.any?(members, &(&1.id == user.id))
+    end
+
+    test "list_group_members/1 returns all users in the group", %{
+      organization: org,
+      group: group
+    } do
+      {:ok, user2} = Accounts.create_user_with_role(valid_user_attrs(), org.id, "user")
+      {:ok, user3} = Accounts.create_user_with_role(valid_user_attrs(), org.id, "user")
+      {:ok, _} = Accounts.add_user_to_group(user2, group)
+      {:ok, _} = Accounts.add_user_to_group(user3, group)
+
+      ids = Accounts.list_group_members(group) |> Enum.map(& &1.id)
+      assert user2.id in ids
+      assert user3.id in ids
+    end
+
+    test "list_group_members/1 returns empty list when group has no members", %{group: group} do
+      assert Accounts.list_group_members(group) == []
+    end
+
+    test "list_user_groups/1 returns all groups the user belongs to", %{
+      organization: org,
+      user: user
+    } do
+      {:ok, group2} =
+        Accounts.create_group(%{"name" => "SecondGroup", "organization_id" => org.id})
+
+      {:ok, _other} =
+        Accounts.create_group(%{"name" => "NotJoined", "organization_id" => org.id})
+
+      {:ok, _} = Accounts.add_user_to_group(user, group2)
+
+      group_ids = Accounts.list_user_groups(user) |> Enum.map(& &1.id)
+      assert group2.id in group_ids
+    end
+
+    test "list_user_groups/1 returns empty list when user belongs to no groups", %{user: user} do
+      assert Accounts.list_user_groups(user) == []
+    end
+
+    test "delete_group/1 cascades to remove group memberships", %{user: user, group: group} do
+      {:ok, _} = Accounts.add_user_to_group(user, group)
+      {:ok, _} = Accounts.delete_group(group)
+      group_ids = Accounts.list_user_groups(user) |> Enum.map(& &1.id)
+      refute group.id in group_ids
     end
   end
 end
