@@ -96,8 +96,15 @@ defmodule AuthifyWeb.OAuthController do
          {:ok, redirect_uri} <- validate_redirect_uri(application, params["redirect_uri"]),
          {:ok, scopes} <- validate_scopes(application, params["scope"]),
          pkce_params = extract_pkce_params(params),
+         nonce_params = extract_nonce_param(params),
          {:ok, auth_code} <-
-           OAuth.create_authorization_code(application, user, redirect_uri, scopes, pkce_params) do
+           OAuth.create_authorization_code(
+             application,
+             user,
+             redirect_uri,
+             scopes,
+             Map.merge(pkce_params, nonce_params)
+           ) do
       {:ok,
        %{
          application: application,
@@ -315,6 +322,7 @@ defmodule AuthifyWeb.OAuthController do
       state: params["state"],
       code_challenge: params["code_challenge"],
       code_challenge_method: params["code_challenge_method"],
+      nonce: params["nonce"],
       organization: organization,
       layout: false
     })
@@ -377,10 +385,16 @@ defmodule AuthifyWeb.OAuthController do
          params
        ) do
     pkce_params = extract_pkce_params(params)
+    nonce_params = extract_nonce_param(params)
 
-    case OAuth.create_authorization_code(application, user, redirect_uri, scopes, pkce_params) do
+    case OAuth.create_authorization_code(
+           application,
+           user,
+           redirect_uri,
+           scopes,
+           Map.merge(pkce_params, nonce_params)
+         ) do
       {:ok, auth_code} ->
-        # Log auto-approved authorization
         AuditLogger.log_authorization_auto_approved(
           conn,
           organization,
@@ -398,7 +412,6 @@ defmodule AuthifyWeb.OAuthController do
         {:auto_approve, redirect_url}
 
       {:error, _} ->
-        # Failed to create auth code, show consent screen
         :show_consent
     end
   end
@@ -407,6 +420,11 @@ defmodule AuthifyWeb.OAuthController do
     %{}
     |> maybe_add_param(:code_challenge, params["code_challenge"])
     |> maybe_add_param(:code_challenge_method, params["code_challenge_method"])
+  end
+
+  defp extract_nonce_param(params) do
+    %{}
+    |> maybe_add_param(:nonce, params["nonce"])
   end
 
   defp maybe_add_param(map, _key, nil), do: map

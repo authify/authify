@@ -73,6 +73,28 @@ defmodule AuthifyWeb.OAuthControllerTest do
       assert redirected_to(conn) =~ "https://example.com/callback"
       assert redirected_to(conn) =~ "error=invalid_client"
     end
+
+    test "renders nonce as hidden field in consent screen when provided", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid profile",
+        "nonce" => "test_nonce_xyz"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+      body = html_response(conn, 200)
+      assert body =~ ~s(name="nonce")
+      assert body =~ ~s(value="test_nonce_xyz")
+    end
   end
 
   describe "consent" do
@@ -126,6 +148,57 @@ defmodule AuthifyWeb.OAuthControllerTest do
       conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
       assert redirected_to(conn) =~ "https://example.com/callback"
       assert redirected_to(conn) =~ "error=access_denied"
+    end
+
+    test "stores nonce on authorization code when provided in consent params", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "scope" => "openid profile",
+        "approve" => "true",
+        "nonce" => "consent_nonce_456"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+      redirect_url = redirected_to(conn)
+
+      uri = URI.parse(redirect_url)
+      query = URI.decode_query(uri.query)
+      auth_code = Authify.OAuth.get_authorization_code(query["code"])
+
+      assert auth_code.nonce == "consent_nonce_456"
+    end
+
+    test "authorization code has nil nonce when not provided in consent params", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "scope" => "openid profile",
+        "approve" => "true"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+      redirect_url = redirected_to(conn)
+
+      uri = URI.parse(redirect_url)
+      query = URI.decode_query(uri.query)
+      auth_code = Authify.OAuth.get_authorization_code(query["code"])
+
+      assert is_nil(auth_code.nonce)
     end
   end
 

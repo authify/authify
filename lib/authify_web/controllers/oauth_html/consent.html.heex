@@ -87,6 +87,9 @@
                         value={@code_challenge_method}
                       />
                     <% end %>
+                    <%= if @nonce do %>
+                      <input type="hidden" name="nonce" value={@nonce} />
+                    <% end %>
                     <input type="hidden" name="approve" value="false" />
                     <button type="submit" class="btn btn-outline-secondary w-100">
                       <i class="bi bi-x-circle"></i> Deny
@@ -115,6 +118,9 @@
                         name="code_challenge_method"
                         value={@code_challenge_method}
                       />
+                    <% end %>
+                    <%= if @nonce do %>
+                      <input type="hidden" name="nonce" value={@nonce} />
                     <% end %>
                     <input type="hidden" name="approve" value="true" />
                     <button type="submit" class="btn btn-primary w-100">
