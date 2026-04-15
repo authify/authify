@@ -718,7 +718,7 @@ defmodule Authify.OAuth do
                 refresh_token.nonce
               )
 
-            new_rt
+            Repo.preload(new_rt, [:application, :user])
           else
             refresh_token
           end
