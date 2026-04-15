@@ -280,6 +280,61 @@ defmodule AuthifyWeb.OAuthControllerTest do
       response = json_response(conn, 401)
       assert response["error"] == "invalid_client"
     end
+
+    test "ID token includes nonce claim when authorization code had a nonce", %{
+      conn: conn,
+      application: application,
+      user: user,
+      organization: organization
+    } do
+      {:ok, auth_code_with_nonce} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "profile"],
+          %{nonce: "id_token_nonce_test"}
+        )
+
+      params = %{
+        "grant_type" => "authorization_code",
+        "client_id" => application.client_id,
+        "client_secret" => application.client_secret,
+        "code" => auth_code_with_nonce.code
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/token", params)
+      response = json_response(conn, 200)
+
+      id_token = response["id_token"]
+      [_header, payload, _sig] = String.split(id_token, ".")
+      claims = payload |> Base.url_decode64!(padding: false) |> Jason.decode!()
+
+      assert claims["nonce"] == "id_token_nonce_test"
+    end
+
+    test "ID token omits nonce claim when authorization code had no nonce", %{
+      conn: conn,
+      application: application,
+      auth_code: auth_code,
+      organization: organization
+    } do
+      params = %{
+        "grant_type" => "authorization_code",
+        "client_id" => application.client_id,
+        "client_secret" => application.client_secret,
+        "code" => auth_code.code
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/token", params)
+      response = json_response(conn, 200)
+
+      id_token = response["id_token"]
+      [_header, payload, _sig] = String.split(id_token, ".")
+      claims = payload |> Base.url_decode64!(padding: false) |> Jason.decode!()
+
+      refute Map.has_key?(claims, "nonce")
+    end
   end
 
   describe "client credentials token" do

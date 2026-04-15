@@ -456,6 +456,7 @@ defmodule AuthifyWeb.OAuthController do
          {:ok, auth_code} <- get_authorization_code(params["code"]),
          :ok <- verify_pkce(auth_code, params["code_verifier"]),
          {:ok, result} <- OAuth.exchange_authorization_code(auth_code, application) do
+      nonce = auth_code.nonce
       access_token = result.access_token
       refresh_token = result.refresh_token
 
@@ -470,7 +471,7 @@ defmodule AuthifyWeb.OAuthController do
       )
 
       response =
-        build_token_response_with_refresh_and_id(access_token, refresh_token, organization)
+        build_token_response_with_refresh_and_id(access_token, refresh_token, organization, nonce)
 
       json(conn, response)
     else
@@ -487,10 +488,10 @@ defmodule AuthifyWeb.OAuthController do
     end
   end
 
-  defp build_token_response_with_refresh_and_id(access_token, refresh_token, organization) do
+  defp build_token_response_with_refresh_and_id(access_token, refresh_token, organization, nonce) do
     build_token_response(access_token)
     |> maybe_add_refresh_token(refresh_token)
-    |> maybe_add_id_token(access_token, organization)
+    |> maybe_add_id_token(access_token, organization, nonce)
   end
 
   defp maybe_add_refresh_token(response, nil), do: response
@@ -499,9 +500,9 @@ defmodule AuthifyWeb.OAuthController do
     Map.put(response, :refresh_token, refresh_token.token)
   end
 
-  defp maybe_add_id_token(response, access_token, organization) do
+  defp maybe_add_id_token(response, access_token, organization, nonce \\ nil) do
     if "openid" in OAuth.AccessToken.scopes_list(access_token) do
-      case generate_id_token(access_token, organization) do
+      case generate_id_token(access_token, organization, nonce) do
         {:ok, id_token} ->
           Map.put(response, :id_token, id_token)
 
@@ -704,10 +705,10 @@ defmodule AuthifyWeb.OAuthController do
     end
   end
 
-  defp generate_id_token(access_token, organization) do
+  defp generate_id_token(access_token, organization, nonce) do
     with {:ok, certificate} <- Accounts.get_or_generate_oauth_signing_certificate(organization),
          {:ok, private_key} <- load_private_key(certificate) do
-      sign_id_token(access_token, organization, certificate, private_key)
+      sign_id_token(access_token, organization, certificate, private_key, nonce)
     end
   end
 
@@ -722,7 +723,7 @@ defmodule AuthifyWeb.OAuthController do
     error -> {:error, {:pem_decode_failed, error}}
   end
 
-  defp sign_id_token(access_token, organization, certificate, private_key) do
+  defp sign_id_token(access_token, organization, certificate, private_key, nonce) do
     user = access_token.user
     scopes = OAuth.AccessToken.scopes_list(access_token)
     org_base_url = "#{AuthifyWeb.Endpoint.url()}/#{organization.slug}"
@@ -740,6 +741,7 @@ defmodule AuthifyWeb.OAuthController do
       }
       |> maybe_add_profile_claims(user, scopes)
       |> maybe_add_email_claims(user, scopes)
+      |> maybe_add_nonce_claim(nonce)
 
     encoded_header = Base.url_encode64(Jason.encode!(header), padding: false)
     encoded_claims = Base.url_encode64(Jason.encode!(claims), padding: false)
@@ -752,6 +754,9 @@ defmodule AuthifyWeb.OAuthController do
   rescue
     error -> {:error, {:signing_failed, error}}
   end
+
+  defp maybe_add_nonce_claim(claims, nil), do: claims
+  defp maybe_add_nonce_claim(claims, nonce), do: Map.put(claims, "nonce", nonce)
 
   defp maybe_add_profile_claims(claims, user, scopes) do
     if "profile" in scopes do
