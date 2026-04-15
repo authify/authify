@@ -500,7 +500,7 @@ defmodule AuthifyWeb.OAuthController do
     Map.put(response, :refresh_token, refresh_token.token)
   end
 
-  defp maybe_add_id_token(response, access_token, organization, nonce \\ nil) do
+  defp maybe_add_id_token(response, access_token, organization, nonce) do
     if "openid" in OAuth.AccessToken.scopes_list(access_token) do
       case generate_id_token(access_token, organization, nonce) do
         {:ok, id_token} ->
@@ -552,6 +552,7 @@ defmodule AuthifyWeb.OAuthController do
          {:ok, refresh_token} <- get_refresh_token(params["refresh_token"]),
          :ok <- verify_refresh_token_application(refresh_token, application),
          {:ok, result} <- OAuth.exchange_refresh_token(refresh_token) do
+      nonce = result.refresh_token.nonce
       access_token = result.access_token
       new_refresh_token = result.refresh_token
 
@@ -563,7 +564,9 @@ defmodule AuthifyWeb.OAuthController do
         "refresh_token"
       )
 
-      response = build_refresh_token_response(access_token, new_refresh_token, organization)
+      response =
+        build_refresh_token_response(access_token, new_refresh_token, organization, nonce)
+
       json(conn, response)
     else
       {:error, error} ->
@@ -572,7 +575,7 @@ defmodule AuthifyWeb.OAuthController do
     end
   end
 
-  defp build_refresh_token_response(access_token, new_refresh_token, organization) do
+  defp build_refresh_token_response(access_token, new_refresh_token, organization, nonce) do
     %{
       access_token: access_token.token,
       token_type: "Bearer",
@@ -580,7 +583,7 @@ defmodule AuthifyWeb.OAuthController do
       scope: access_token.scopes,
       refresh_token: new_refresh_token.token
     }
-    |> maybe_add_id_token(access_token, organization)
+    |> maybe_add_id_token(access_token, organization, nonce)
   end
 
   defp handle_refresh_token_error(conn, :invalid_client) do
