@@ -416,10 +416,11 @@ defmodule Authify.OAuth do
                 application,
                 user,
                 auth_code.scopes,
-                access_token.id
+                access_token.id,
+                auth_code.nonce
               )
 
-            rt
+            Repo.preload(rt, [:application, :user])
           else
             nil
           end
@@ -649,13 +650,15 @@ defmodule Authify.OAuth do
         %Application{} = application,
         %User{} = user,
         scopes,
-        access_token_id \\ nil
+        access_token_id \\ nil,
+        nonce \\ nil
       ) do
     attrs = %{
       application_id: application.id,
       user_id: user.id,
       scopes: scopes,
-      access_token_id: access_token_id
+      access_token_id: access_token_id,
+      nonce: nonce
     }
 
     %RefreshToken{}
@@ -711,7 +714,8 @@ defmodule Authify.OAuth do
                 refresh_token.application,
                 refresh_token.user,
                 refresh_token.scopes,
-                access_token.id
+                access_token.id,
+                refresh_token.nonce
               )
 
             new_rt

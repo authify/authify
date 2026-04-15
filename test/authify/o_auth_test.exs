@@ -363,6 +363,86 @@ defmodule Authify.OAuthTest do
     end
   end
 
+  describe "refresh_tokens nonce" do
+    setup do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      application = application_fixture(organization: organization)
+      %{organization: organization, user: user, application: application}
+    end
+
+    test "create_refresh_token stores nonce when provided", %{
+      application: application,
+      user: user
+    } do
+      {:ok, rt} =
+        OAuth.create_refresh_token(application, user, "openid profile", nil, "nonce_abc")
+
+      assert rt.nonce == "nonce_abc"
+    end
+
+    test "create_refresh_token stores nil nonce when not provided", %{
+      application: application,
+      user: user
+    } do
+      {:ok, rt} = OAuth.create_refresh_token(application, user, "openid profile")
+      assert is_nil(rt.nonce)
+    end
+
+    test "exchange_authorization_code propagates nonce to refresh token", %{
+      application: application,
+      user: user
+    } do
+      {:ok, auth_code} =
+        OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "profile"],
+          %{nonce: "propagate_me"}
+        )
+
+      {:ok, result} = OAuth.exchange_authorization_code(auth_code, application)
+      assert result.refresh_token.nonce == "propagate_me"
+    end
+
+    test "exchange_authorization_code propagates nil nonce when not set", %{
+      application: application,
+      user: user
+    } do
+      {:ok, auth_code} =
+        OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "profile"]
+        )
+
+      {:ok, result} = OAuth.exchange_authorization_code(auth_code, application)
+      assert is_nil(result.refresh_token.nonce)
+    end
+
+    test "exchange_refresh_token preserves nonce in rotated refresh token", %{
+      application: application,
+      user: user
+    } do
+      {:ok, auth_code} =
+        OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "profile"],
+          %{nonce: "rotation_nonce"}
+        )
+
+      {:ok, result} = OAuth.exchange_authorization_code(auth_code, application)
+      original_rt = result.refresh_token
+
+      {:ok, rotated} = OAuth.exchange_refresh_token(original_rt)
+      assert rotated.refresh_token.nonce == "rotation_nonce"
+    end
+  end
+
   describe "authorization_codes nonce" do
     setup do
       organization = organization_fixture()
