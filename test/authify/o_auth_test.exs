@@ -362,4 +362,44 @@ defmodule Authify.OAuthTest do
       assert String.starts_with?(claims["picture"], "https://www.gravatar.com/avatar/")
     end
   end
+
+  describe "authorization_codes nonce" do
+    setup do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      application = application_fixture(organization: organization)
+      %{organization: organization, user: user, application: application}
+    end
+
+    test "create_authorization_code stores nonce when provided", %{
+      application: application,
+      user: user
+    } do
+      {:ok, auth_code} =
+        OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "profile"],
+          %{nonce: "my_test_nonce"}
+        )
+
+      assert auth_code.nonce == "my_test_nonce"
+    end
+
+    test "create_authorization_code stores nil nonce when not provided", %{
+      application: application,
+      user: user
+    } do
+      {:ok, auth_code} =
+        OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "profile"]
+        )
+
+      assert is_nil(auth_code.nonce)
+    end
+  end
 end
