@@ -421,6 +421,156 @@ defmodule AuthifyWeb.OAuthRealWorldFlowsTest do
     end
   end
 
+  describe "OIDC nonce propagation" do
+    setup do
+      org = organization_fixture()
+      user = user_for_organization_fixture(org)
+
+      {:ok, app} =
+        Authify.OAuth.create_application(%{
+          "name" => "Nonce Test App",
+          "scopes" => "openid profile",
+          "redirect_uris" => "https://example.com/callback",
+          "organization_id" => org.id,
+          "application_type" => "oauth2_app"
+        })
+
+      %{org: org, user: user, app: app}
+    end
+
+    test "auto-approve path stores nonce on auth code and includes it in ID token", %{
+      org: org,
+      user: user,
+      app: app
+    } do
+      # Pre-create a user grant so the authorize endpoint auto-approves (skips consent screen)
+      {:ok, _grant} = Authify.OAuth.create_or_update_user_grant(user, app, ["openid", "profile"])
+
+      conn = build_conn() |> log_in_user(user)
+
+      conn =
+        get(conn, ~p"/#{org.slug}/oauth/authorize", %{
+          "client_id" => app.client_id,
+          "redirect_uri" => "https://example.com/callback",
+          "response_type" => "code",
+          "scope" => "openid profile",
+          "nonce" => "auto_approve_nonce"
+        })
+
+      # Should redirect directly to callback, not show consent screen
+      redirect_url = redirected_to(conn)
+      assert redirect_url =~ "https://example.com/callback"
+      assert redirect_url =~ "code="
+
+      uri = URI.parse(redirect_url)
+      query = URI.decode_query(uri.query)
+      code = query["code"]
+
+      conn = build_conn()
+
+      conn =
+        post(conn, ~p"/#{org.slug}/oauth/token", %{
+          "grant_type" => "authorization_code",
+          "client_id" => app.client_id,
+          "client_secret" => app.client_secret,
+          "code" => code
+        })
+
+      response = json_response(conn, 200)
+      assert response["id_token"]
+
+      [_header, payload, _sig] = String.split(response["id_token"], ".")
+      claims = payload |> Base.url_decode64!(padding: false) |> Jason.decode!()
+
+      assert claims["nonce"] == "auto_approve_nonce"
+    end
+
+    test "refresh token grant includes nonce in ID token (OIDC §12.2)", %{
+      org: org,
+      user: user,
+      app: app
+    } do
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          app,
+          user,
+          "https://example.com/callback",
+          ["openid", "profile"],
+          %{nonce: "s12_2_compliance_nonce"}
+        )
+
+      # Exchange via HTTP so we exercise the token endpoint response (plaintext refresh token)
+      token_conn =
+        post(build_conn(), ~p"/#{org.slug}/oauth/token", %{
+          "grant_type" => "authorization_code",
+          "client_id" => app.client_id,
+          "client_secret" => app.client_secret,
+          "code" => auth_code.code
+        })
+
+      token_response = json_response(token_conn, 200)
+      refresh_token = token_response["refresh_token"]
+
+      conn =
+        post(build_conn(), ~p"/#{org.slug}/oauth/token", %{
+          "grant_type" => "refresh_token",
+          "client_id" => app.client_id,
+          "client_secret" => app.client_secret,
+          "refresh_token" => refresh_token
+        })
+
+      response = json_response(conn, 200)
+      assert response["id_token"]
+
+      [_header, payload, _sig] = String.split(response["id_token"], ".")
+      claims = payload |> Base.url_decode64!(padding: false) |> Jason.decode!()
+
+      assert claims["nonce"] == "s12_2_compliance_nonce"
+    end
+
+    test "refresh token grant omits nonce in ID token when original request had none", %{
+      org: org,
+      user: user,
+      app: app
+    } do
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          app,
+          user,
+          "https://example.com/callback",
+          ["openid", "profile"]
+        )
+
+      # Exchange via HTTP so we exercise the token endpoint response (plaintext refresh token)
+      token_conn =
+        post(build_conn(), ~p"/#{org.slug}/oauth/token", %{
+          "grant_type" => "authorization_code",
+          "client_id" => app.client_id,
+          "client_secret" => app.client_secret,
+          "code" => auth_code.code
+        })
+
+      token_response = json_response(token_conn, 200)
+      refresh_token = token_response["refresh_token"]
+
+      conn =
+        post(build_conn(), ~p"/#{org.slug}/oauth/token", %{
+          "grant_type" => "refresh_token",
+          "client_id" => app.client_id,
+          "client_secret" => app.client_secret,
+          "refresh_token" => refresh_token
+        })
+
+      response = json_response(conn, 200)
+      assert response["id_token"]
+
+      [_header, payload, _sig] = String.split(response["id_token"], ".")
+      claims = payload |> Base.url_decode64!(padding: false) |> Jason.decode!()
+
+      refute Map.has_key?(claims, "nonce")
+    end
+  end
+
   describe "Management API access flow" do
     test "complete flow: create mgmt app, get token, access API" do
       # Step 1: Create organization and admin

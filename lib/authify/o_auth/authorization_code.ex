@@ -16,6 +16,8 @@ defmodule Authify.OAuth.AuthorizationCode do
     # PKCE fields
     field :code_challenge, :string
     field :code_challenge_method, :string
+    # OIDC nonce
+    field :nonce, :string
 
     belongs_to :application, Authify.OAuth.Application
     belongs_to :user, Authify.Accounts.User
@@ -34,10 +36,12 @@ defmodule Authify.OAuth.AuthorizationCode do
       :used_at,
       :code_challenge,
       :code_challenge_method,
+      :nonce,
       :application_id,
       :user_id
     ])
     |> validate_required([:redirect_uri, :scopes, :application_id, :user_id])
+    |> validate_length(:nonce, max: 2048)
     |> validate_pkce()
     |> put_code()
     |> put_expires_at()

@@ -12,6 +12,8 @@ defmodule Authify.OAuth.RefreshToken do
     field :scopes, :string
     field :expires_at, :utc_datetime
     field :revoked_at, :utc_datetime
+    # OIDC nonce — propagated from the original authorization code
+    field :nonce, :string
 
     belongs_to :application, Authify.OAuth.Application
     belongs_to :user, Authify.Accounts.User
@@ -28,11 +30,13 @@ defmodule Authify.OAuth.RefreshToken do
       :scopes,
       :expires_at,
       :revoked_at,
+      :nonce,
       :application_id,
       :user_id,
       :access_token_id
     ])
     |> validate_required([:scopes, :application_id, :user_id])
+    |> validate_length(:nonce, max: 2048)
     |> put_token()
     |> put_expires_at()
     |> unique_constraint(:token)

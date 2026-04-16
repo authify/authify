@@ -38,7 +38,8 @@ defmodule AuthifyWeb.OIDCController do
         "email_verified",
         "phone_number",
         "phone_number_verified",
-        "updated_at"
+        "updated_at",
+        "nonce"
       ],
       grant_types_supported: ["authorization_code"],
       response_modes_supported: ["query"],
