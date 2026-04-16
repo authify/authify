@@ -499,17 +499,24 @@ defmodule AuthifyWeb.OAuthRealWorldFlowsTest do
           %{nonce: "s12_2_compliance_nonce"}
         )
 
-      {:ok, result} = Authify.OAuth.exchange_authorization_code(auth_code, app)
-      plaintext_refresh_token = result.refresh_token.plaintext_token
+      # Exchange via HTTP so we exercise the token endpoint response (plaintext refresh token)
+      token_conn =
+        post(build_conn(), ~p"/#{org.slug}/oauth/token", %{
+          "grant_type" => "authorization_code",
+          "client_id" => app.client_id,
+          "client_secret" => app.client_secret,
+          "code" => auth_code.code
+        })
 
-      conn = build_conn()
+      token_response = json_response(token_conn, 200)
+      refresh_token = token_response["refresh_token"]
 
       conn =
-        post(conn, ~p"/#{org.slug}/oauth/token", %{
+        post(build_conn(), ~p"/#{org.slug}/oauth/token", %{
           "grant_type" => "refresh_token",
           "client_id" => app.client_id,
           "client_secret" => app.client_secret,
-          "refresh_token" => plaintext_refresh_token
+          "refresh_token" => refresh_token
         })
 
       response = json_response(conn, 200)
@@ -534,17 +541,24 @@ defmodule AuthifyWeb.OAuthRealWorldFlowsTest do
           ["openid", "profile"]
         )
 
-      {:ok, result} = Authify.OAuth.exchange_authorization_code(auth_code, app)
-      plaintext_refresh_token = result.refresh_token.plaintext_token
+      # Exchange via HTTP so we exercise the token endpoint response (plaintext refresh token)
+      token_conn =
+        post(build_conn(), ~p"/#{org.slug}/oauth/token", %{
+          "grant_type" => "authorization_code",
+          "client_id" => app.client_id,
+          "client_secret" => app.client_secret,
+          "code" => auth_code.code
+        })
 
-      conn = build_conn()
+      token_response = json_response(token_conn, 200)
+      refresh_token = token_response["refresh_token"]
 
       conn =
-        post(conn, ~p"/#{org.slug}/oauth/token", %{
+        post(build_conn(), ~p"/#{org.slug}/oauth/token", %{
           "grant_type" => "refresh_token",
           "client_id" => app.client_id,
           "client_secret" => app.client_secret,
-          "refresh_token" => plaintext_refresh_token
+          "refresh_token" => refresh_token
         })
 
       response = json_response(conn, 200)

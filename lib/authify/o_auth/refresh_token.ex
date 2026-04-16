@@ -36,6 +36,7 @@ defmodule Authify.OAuth.RefreshToken do
       :access_token_id
     ])
     |> validate_required([:scopes, :application_id, :user_id])
+    |> validate_length(:nonce, max: 2048)
     |> put_token()
     |> put_expires_at()
     |> unique_constraint(:token)

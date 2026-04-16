@@ -41,6 +41,7 @@ defmodule Authify.OAuth.AuthorizationCode do
       :user_id
     ])
     |> validate_required([:redirect_uri, :scopes, :application_id, :user_id])
+    |> validate_length(:nonce, max: 2048)
     |> validate_pkce()
     |> put_code()
     |> put_expires_at()

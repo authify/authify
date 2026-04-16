@@ -497,7 +497,7 @@ defmodule AuthifyWeb.OAuthController do
   defp maybe_add_refresh_token(response, nil), do: response
 
   defp maybe_add_refresh_token(response, refresh_token) do
-    Map.put(response, :refresh_token, refresh_token.token)
+    Map.put(response, :refresh_token, refresh_token.plaintext_token)
   end
 
   defp maybe_add_id_token(response, access_token, organization, nonce) do
@@ -581,7 +581,7 @@ defmodule AuthifyWeb.OAuthController do
       token_type: "Bearer",
       expires_in: 3600,
       scope: access_token.scopes,
-      refresh_token: new_refresh_token.token
+      refresh_token: new_refresh_token.plaintext_token
     }
     |> maybe_add_id_token(access_token, organization, nonce)
   end

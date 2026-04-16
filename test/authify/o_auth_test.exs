@@ -481,5 +481,24 @@ defmodule Authify.OAuthTest do
 
       assert is_nil(auth_code.nonce)
     end
+
+    test "create_authorization_code rejects nonce exceeding 2048 characters", %{
+      application: application,
+      user: user
+    } do
+      oversized_nonce = String.duplicate("x", 2049)
+
+      assert {:error, changeset} =
+               OAuth.create_authorization_code(
+                 application,
+                 user,
+                 "https://example.com/callback",
+                 ["openid", "profile"],
+                 %{nonce: oversized_nonce}
+               )
+
+      assert {"should be at most %{count} character(s)", _} =
+               Keyword.fetch!(changeset.errors, :nonce)
+    end
   end
 end
