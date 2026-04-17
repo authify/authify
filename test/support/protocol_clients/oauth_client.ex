@@ -69,6 +69,52 @@ defmodule AuthifyTest.OAuthClient do
     {:error, {:unexpected_status, status}}
   end
 
+  def exchange_code(%__MODULE__{app: app, org: org}, _conn, code, verifier) do
+    params = %{
+      "grant_type" => "authorization_code",
+      "client_id" => app.client_id,
+      "client_secret" => app.client_secret,
+      "code" => code,
+      "redirect_uri" => first_redirect_uri(app),
+      "code_verifier" => verifier
+    }
+
+    resp = post(build_conn(), "/#{org.slug}/oauth/token", params)
+
+    case resp.status do
+      200 ->
+        body = Jason.decode!(resp.resp_body)
+        validate_token_response(body)
+
+      _status ->
+        body = Jason.decode!(resp.resp_body)
+        {:error, {:token_exchange_failed, body}}
+    end
+  end
+
+  defp validate_token_response(body) do
+    required = ["access_token", "token_type", "expires_in"]
+    missing = Enum.reject(required, &Map.has_key?(body, &1))
+
+    cond do
+      missing != [] ->
+        {:error, {:missing_fields, missing}}
+
+      body["token_type"] != "Bearer" ->
+        {:error, {:wrong_token_type, body["token_type"]}}
+
+      true ->
+        {:ok,
+         %{
+           access_token: body["access_token"],
+           id_token: body["id_token"],
+           refresh_token: body["refresh_token"],
+           expires_in: body["expires_in"],
+           token_type: body["token_type"]
+         }}
+    end
+  end
+
   defp first_redirect_uri(app) do
     app.redirect_uris
     |> String.split("\n")

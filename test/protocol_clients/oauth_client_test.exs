@@ -58,4 +58,46 @@ defmodule AuthifyTest.OAuthClientTest do
       refute nonce1 == nonce2
     end
   end
+
+  describe "exchange_code/4" do
+    setup do
+      org = organization_fixture()
+      app = application_fixture(organization: org)
+      user = user_for_organization_fixture(org)
+      client = OAuthClient.new(build_conn(), app, org)
+
+      {:ok, {conn, code, verifier, nonce}} =
+        OAuthClient.authorize(client, user, scopes: ["openid", "profile", "email"])
+
+      %{
+        org: org,
+        app: app,
+        user: user,
+        client: client,
+        conn: conn,
+        code: code,
+        verifier: verifier,
+        nonce: nonce
+      }
+    end
+
+    test "returns tokens map with all required fields", %{
+      client: client,
+      conn: conn,
+      code: code,
+      verifier: verifier
+    } do
+      assert {:ok, tokens} = OAuthClient.exchange_code(client, conn, code, verifier)
+      assert is_binary(tokens.access_token)
+      assert is_binary(tokens.id_token)
+      assert is_binary(tokens.refresh_token)
+      assert is_integer(tokens.expires_in)
+      assert tokens.token_type == "Bearer"
+    end
+
+    test "server rejects wrong code_verifier", %{client: client, conn: conn, code: code} do
+      wrong_verifier = Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
+      assert {:error, _reason} = OAuthClient.exchange_code(client, conn, code, wrong_verifier)
+    end
+  end
 end
