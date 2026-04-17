@@ -164,18 +164,7 @@ defmodule AuthifyTest.OAuthClient do
 
     case resp.status do
       200 ->
-        body = Jason.decode!(resp.resp_body)
-
-        if body["access_token"] && body["token_type"] == "Bearer" do
-          {:ok,
-           %{
-             access_token: body["access_token"],
-             token_type: body["token_type"],
-             expires_in: body["expires_in"]
-           }}
-        else
-          {:error, {:invalid_response, body}}
-        end
+        resp.resp_body |> Jason.decode!() |> validate_token_response()
 
       _status ->
         {:error, {:client_credentials_failed, Jason.decode!(resp.resp_body)}}
@@ -187,6 +176,7 @@ defmodule AuthifyTest.OAuthClient do
 
     with {:ok, {header_b64, payload_b64, sig_b64}} <- split_jwt(id_token),
          {:ok, header} <- decode_json_b64(header_b64),
+         :ok <- verify_alg(header["alg"]),
          {:ok, claims} <- decode_json_b64(payload_b64),
          {:ok, signature} <- Base.url_decode64(sig_b64, padding: false),
          {:ok, public_key} <- fetch_signing_key(org, header["kid"]),
@@ -195,6 +185,9 @@ defmodule AuthifyTest.OAuthClient do
       {:ok, claims}
     end
   end
+
+  defp verify_alg("RS256"), do: :ok
+  defp verify_alg(alg), do: {:error, {:unsupported_alg, alg}}
 
   defp split_jwt(token) do
     case String.split(token, ".") do
