@@ -171,6 +171,64 @@ defmodule AuthifyTest.OAuthClientTest do
     end
   end
 
+  describe "refresh/2" do
+    setup do
+      org = organization_fixture()
+      app = application_fixture(organization: org)
+      user = user_for_organization_fixture(org)
+      client = OAuthClient.new(build_conn(), app, org)
+
+      {:ok, {conn, code, verifier, _nonce}} =
+        OAuthClient.authorize(client, user, scopes: ["openid", "profile"])
+
+      {:ok, tokens} = OAuthClient.exchange_code(client, conn, code, verifier)
+
+      %{client: client, tokens: tokens}
+    end
+
+    test "returns a new access token", %{client: client, tokens: tokens} do
+      assert {:ok, new_tokens} = OAuthClient.refresh(client, tokens.refresh_token)
+      assert is_binary(new_tokens.access_token)
+      assert new_tokens.token_type == "Bearer"
+      assert is_integer(new_tokens.expires_in)
+    end
+
+    test "new access token differs from the original", %{client: client, tokens: tokens} do
+      {:ok, new_tokens} = OAuthClient.refresh(client, tokens.refresh_token)
+      refute new_tokens.access_token == tokens.access_token
+    end
+
+    test "returns error for invalid refresh token", %{client: client} do
+      assert {:error, _reason} = OAuthClient.refresh(client, "not-a-valid-refresh-token")
+    end
+  end
+
+  describe "client_credentials/2" do
+    setup do
+      org = organization_fixture()
+      # Management API app required for client_credentials grant
+      app = management_api_application_fixture(organization: org)
+      client = OAuthClient.new(build_conn(), app, org)
+      %{org: org, app: app, client: client}
+    end
+
+    test "returns an access token with correct shape", %{client: client} do
+      assert {:ok, tokens} =
+               OAuthClient.client_credentials(client,
+                 scopes: ["management_app:read", "users:read"]
+               )
+
+      assert is_binary(tokens.access_token)
+      assert tokens.token_type == "Bearer"
+      assert is_integer(tokens.expires_in)
+    end
+
+    test "returns error for scopes not granted to the app", %{client: client} do
+      result = OAuthClient.client_credentials(client, scopes: ["invalid_scope"])
+      assert match?({:error, _}, result)
+    end
+  end
+
   describe "exchange_code/4" do
     setup do
       org = organization_fixture()

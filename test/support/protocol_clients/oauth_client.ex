@@ -127,6 +127,70 @@ defmodule AuthifyTest.OAuthClient do
     end
   end
 
+  def refresh(%__MODULE__{app: app, org: org}, refresh_token) do
+    params = %{
+      "grant_type" => "refresh_token",
+      "client_id" => app.client_id,
+      "client_secret" => app.client_secret,
+      "refresh_token" => refresh_token
+    }
+
+    resp = post(build_conn(), "/#{org.slug}/oauth/token", params)
+
+    case resp.status do
+      200 ->
+        body = Jason.decode!(resp.resp_body)
+
+        if body["access_token"] && body["token_type"] == "Bearer" do
+          {:ok,
+           %{
+             access_token: body["access_token"],
+             id_token: body["id_token"],
+             refresh_token: body["refresh_token"],
+             expires_in: body["expires_in"],
+             token_type: body["token_type"]
+           }}
+        else
+          {:error, {:invalid_refresh_response, body}}
+        end
+
+      _status ->
+        {:error, {:refresh_failed, Jason.decode!(resp.resp_body)}}
+    end
+  end
+
+  def client_credentials(%__MODULE__{app: app, org: org}, opts \\ []) do
+    scopes = Keyword.get(opts, :scopes, [])
+
+    params = %{
+      "grant_type" => "client_credentials",
+      "client_id" => app.client_id,
+      "client_secret" => app.client_secret,
+      "scope" => Enum.join(scopes, " ")
+    }
+
+    resp = post(build_conn(), "/#{org.slug}/oauth/token", params)
+
+    case resp.status do
+      200 ->
+        body = Jason.decode!(resp.resp_body)
+
+        if body["access_token"] && body["token_type"] == "Bearer" do
+          {:ok,
+           %{
+             access_token: body["access_token"],
+             token_type: body["token_type"],
+             expires_in: body["expires_in"]
+           }}
+        else
+          {:error, {:invalid_response, body}}
+        end
+
+      _status ->
+        {:error, {:client_credentials_failed, Jason.decode!(resp.resp_body)}}
+    end
+  end
+
   def validate_id_token(%__MODULE__{app: app, org: org}, id_token, opts \\ []) do
     expected_nonce = Keyword.get(opts, :nonce)
 
