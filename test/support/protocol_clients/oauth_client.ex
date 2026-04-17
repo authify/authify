@@ -3,7 +3,7 @@ defmodule AuthifyTest.OAuthClient do
 
   @endpoint AuthifyWeb.Endpoint
 
-  import Plug.Conn, only: [get_resp_header: 2]
+  import Plug.Conn, only: [get_resp_header: 2, put_req_header: 3]
   import Phoenix.ConnTest
   import AuthifyWeb.ConnCase, only: [log_in_user: 2]
 
@@ -112,6 +112,18 @@ defmodule AuthifyTest.OAuthClient do
            expires_in: body["expires_in"],
            token_type: body["token_type"]
          }}
+    end
+  end
+
+  def fetch_userinfo(%__MODULE__{org: org}, access_token) do
+    resp =
+      build_conn()
+      |> put_req_header("authorization", "Bearer #{access_token}")
+      |> get("/#{org.slug}/oauth/userinfo")
+
+    case resp.status do
+      200 -> {:ok, Jason.decode!(resp.resp_body)}
+      _status -> {:error, {:userinfo_failed, resp.status}}
     end
   end
 

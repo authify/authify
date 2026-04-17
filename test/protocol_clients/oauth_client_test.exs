@@ -134,6 +134,43 @@ defmodule AuthifyTest.OAuthClientTest do
     end
   end
 
+  describe "fetch_userinfo/2" do
+    setup do
+      org = organization_fixture()
+      app = application_fixture(organization: org)
+      user = user_for_organization_fixture(org)
+      client = OAuthClient.new(build_conn(), app, org)
+      %{org: org, app: app, user: user, client: client}
+    end
+
+    test "returns claims when email scope is requested", %{client: client, user: user} do
+      {:ok, {conn, code, verifier, _nonce}} =
+        OAuthClient.authorize(client, user, scopes: ["openid", "profile", "email"])
+
+      {:ok, tokens} = OAuthClient.exchange_code(client, conn, code, verifier)
+
+      assert {:ok, userinfo} = OAuthClient.fetch_userinfo(client, tokens.access_token)
+      assert is_binary(userinfo["sub"])
+      assert is_binary(userinfo["email"])
+      assert is_binary(userinfo["name"])
+    end
+
+    test "email claim is absent when email scope is not requested", %{client: client, user: user} do
+      {:ok, {conn, code, verifier, _nonce}} =
+        OAuthClient.authorize(client, user, scopes: ["openid", "profile"])
+
+      {:ok, tokens} = OAuthClient.exchange_code(client, conn, code, verifier)
+
+      assert {:ok, userinfo} = OAuthClient.fetch_userinfo(client, tokens.access_token)
+      assert is_binary(userinfo["sub"])
+      refute Map.has_key?(userinfo, "email")
+    end
+
+    test "returns error for invalid access token", %{client: client} do
+      assert {:error, _reason} = OAuthClient.fetch_userinfo(client, "not-a-valid-token")
+    end
+  end
+
   describe "exchange_code/4" do
     setup do
       org = organization_fixture()
