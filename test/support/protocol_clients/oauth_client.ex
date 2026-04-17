@@ -139,20 +139,7 @@ defmodule AuthifyTest.OAuthClient do
 
     case resp.status do
       200 ->
-        body = Jason.decode!(resp.resp_body)
-
-        if body["access_token"] && body["token_type"] == "Bearer" do
-          {:ok,
-           %{
-             access_token: body["access_token"],
-             id_token: body["id_token"],
-             refresh_token: body["refresh_token"],
-             expires_in: body["expires_in"],
-             token_type: body["token_type"]
-           }}
-        else
-          {:error, {:invalid_refresh_response, body}}
-        end
+        resp.resp_body |> Jason.decode!() |> validate_token_response()
 
       _status ->
         {:error, {:refresh_failed, Jason.decode!(resp.resp_body)}}
@@ -162,12 +149,16 @@ defmodule AuthifyTest.OAuthClient do
   def client_credentials(%__MODULE__{app: app, org: org}, opts \\ []) do
     scopes = Keyword.get(opts, :scopes, [])
 
-    params = %{
+    base_params = %{
       "grant_type" => "client_credentials",
       "client_id" => app.client_id,
-      "client_secret" => app.client_secret,
-      "scope" => Enum.join(scopes, " ")
+      "client_secret" => app.client_secret
     }
+
+    params =
+      if scopes == [],
+        do: base_params,
+        else: Map.put(base_params, "scope", Enum.join(scopes, " "))
 
     resp = post(build_conn(), "/#{org.slug}/oauth/token", params)
 
