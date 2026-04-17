@@ -115,6 +115,93 @@ defmodule AuthifyTest.OAuthClient do
     end
   end
 
+  def validate_id_token(%__MODULE__{app: app, org: org}, id_token, opts \\ []) do
+    expected_nonce = Keyword.get(opts, :nonce)
+
+    with {:ok, {header_b64, payload_b64, sig_b64}} <- split_jwt(id_token),
+         {:ok, header} <- decode_json_b64(header_b64),
+         {:ok, claims} <- decode_json_b64(payload_b64),
+         {:ok, signature} <- Base.url_decode64(sig_b64, padding: false),
+         {:ok, public_key} <- fetch_signing_key(org, header["kid"]),
+         :ok <- verify_signature("#{header_b64}.#{payload_b64}", signature, public_key),
+         :ok <- validate_claims(claims, app, org, expected_nonce) do
+      {:ok, claims}
+    end
+  end
+
+  defp split_jwt(token) do
+    case String.split(token, ".") do
+      [h, p, s] -> {:ok, {h, p, s}}
+      _ -> {:error, :invalid_jwt_format}
+    end
+  end
+
+  defp decode_json_b64(b64) do
+    with {:ok, json} <- Base.url_decode64(b64, padding: false),
+         {:ok, decoded} <- Jason.decode(json) do
+      {:ok, decoded}
+    else
+      _ -> {:error, :jwt_decode_failed}
+    end
+  end
+
+  defp fetch_signing_key(org, kid) do
+    discovery_resp = get(build_conn(), "/#{org.slug}/.well-known/openid-configuration")
+    discovery = Jason.decode!(discovery_resp.resp_body)
+
+    base_url = AuthifyWeb.Endpoint.url()
+    jwks_path = String.replace_prefix(discovery["jwks_uri"], base_url, "")
+
+    jwks_resp = get(build_conn(), jwks_path)
+    keys = Jason.decode!(jwks_resp.resp_body)["keys"] || []
+
+    key = Enum.find(keys, List.first(keys), &(&1["kid"] == kid))
+
+    if key, do: parse_rsa_public_key(key), else: {:error, :no_signing_key}
+  end
+
+  defp parse_rsa_public_key(%{"n" => n_b64, "e" => e_b64}) do
+    with {:ok, n_bin} <- Base.url_decode64(n_b64, padding: false),
+         {:ok, e_bin} <- Base.url_decode64(e_b64, padding: false) do
+      {:ok, {:RSAPublicKey, :binary.decode_unsigned(n_bin), :binary.decode_unsigned(e_bin)}}
+    else
+      _ -> {:error, :invalid_jwk}
+    end
+  end
+
+  defp verify_signature(signing_input, signature, public_key) do
+    if :public_key.verify(signing_input, :sha256, signature, public_key) do
+      :ok
+    else
+      {:error, :invalid_signature}
+    end
+  end
+
+  defp validate_claims(claims, app, org, expected_nonce) do
+    expected_iss = "#{AuthifyWeb.Endpoint.url()}/#{org.slug}"
+    now = System.system_time(:second)
+
+    cond do
+      claims["iss"] != expected_iss ->
+        {:error, :wrong_issuer}
+
+      claims["aud"] != app.client_id ->
+        {:error, :wrong_audience}
+
+      is_nil(claims["exp"]) or claims["exp"] <= now ->
+        {:error, :expired}
+
+      is_nil(claims["iat"]) ->
+        {:error, :missing_iat}
+
+      not is_nil(expected_nonce) and claims["nonce"] != expected_nonce ->
+        {:error, :nonce_mismatch}
+
+      true ->
+        :ok
+    end
+  end
+
   defp first_redirect_uri(app) do
     app.redirect_uris
     |> String.split("\n")

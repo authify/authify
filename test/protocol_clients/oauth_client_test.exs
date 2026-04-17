@@ -61,6 +61,79 @@ defmodule AuthifyTest.OAuthClientTest do
     end
   end
 
+  describe "validate_id_token/3" do
+    setup do
+      org = organization_fixture()
+      app = application_fixture(organization: org)
+      user = user_for_organization_fixture(org)
+      client = OAuthClient.new(build_conn(), app, org)
+
+      {:ok, {conn, code, verifier, nonce}} =
+        OAuthClient.authorize(client, user, scopes: ["openid", "profile", "email"])
+
+      {:ok, tokens} = OAuthClient.exchange_code(client, conn, code, verifier)
+
+      %{org: org, app: app, user: user, client: client, tokens: tokens, nonce: nonce}
+    end
+
+    test "accepts a valid RS256-signed ID token", %{client: client, tokens: tokens, nonce: nonce} do
+      assert {:ok, claims} = OAuthClient.validate_id_token(client, tokens.id_token, nonce: nonce)
+      assert is_map(claims)
+      assert is_binary(claims["sub"])
+      assert is_binary(claims["iss"])
+    end
+
+    test "rejects a tampered signature", %{client: client, tokens: tokens, nonce: nonce} do
+      [header, payload, _sig] = String.split(tokens.id_token, ".")
+      tampered = "#{header}.#{payload}.dGFtcGVyZWQ"
+
+      assert {:error, :invalid_signature} =
+               OAuthClient.validate_id_token(client, tampered, nonce: nonce)
+    end
+
+    test "rejects an expired token", %{org: org, app: app, client: client} do
+      # Sign a token with an exp in the past using the org's actual signing key
+      {:ok, cert} = Authify.Accounts.get_or_generate_oauth_signing_certificate(org)
+      [entry | _] = :public_key.pem_decode(cert.private_key)
+      private_key = :public_key.pem_entry_decode(entry)
+
+      now = System.system_time(:second)
+
+      claims = %{
+        "iss" => "#{AuthifyWeb.Endpoint.url()}/#{org.slug}",
+        "sub" => "1",
+        "aud" => app.client_id,
+        "exp" => now - 3600,
+        "iat" => now - 7200
+      }
+
+      header = %{"alg" => "RS256", "typ" => "JWT", "kid" => to_string(cert.id)}
+      encoded_header = Base.url_encode64(Jason.encode!(header), padding: false)
+      encoded_claims = Base.url_encode64(Jason.encode!(claims), padding: false)
+      signing_input = "#{encoded_header}.#{encoded_claims}"
+      signature = :public_key.sign(signing_input, :sha256, private_key)
+      expired_token = "#{signing_input}.#{Base.url_encode64(signature, padding: false)}"
+
+      assert {:error, :expired} = OAuthClient.validate_id_token(client, expired_token)
+    end
+
+    test "rejects wrong audience", %{org: org, tokens: tokens, nonce: nonce} do
+      # Create a second app; its client_id won't match the token's aud claim
+      app2 = application_fixture(organization: org)
+      client2 = OAuthClient.new(build_conn(), app2, org)
+
+      assert {:error, :wrong_audience} =
+               OAuthClient.validate_id_token(client2, tokens.id_token, nonce: nonce)
+    end
+
+    test "rejects nonce mismatch", %{client: client, tokens: tokens} do
+      assert {:error, :nonce_mismatch} =
+               OAuthClient.validate_id_token(client, tokens.id_token,
+                 nonce: "definitely-wrong-nonce"
+               )
+    end
+  end
+
   describe "exchange_code/4" do
     setup do
       org = organization_fixture()
