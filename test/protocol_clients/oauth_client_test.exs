@@ -1,4 +1,6 @@
 defmodule AuthifyTest.OAuthClientTest do
+  @moduledoc false
+
   use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
