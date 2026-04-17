@@ -1,6 +1,9 @@
 defmodule AuthifyTest.OAuthClientTest do
   use AuthifyWeb.ConnCase, async: true
 
+  import Authify.AccountsFixtures
+  import Authify.OAuthFixtures
+
   alias AuthifyTest.OAuthClient
 
   describe "generate_pkce/0" do
@@ -22,6 +25,37 @@ defmodule AuthifyTest.OAuthClientTest do
       {v1, _} = OAuthClient.generate_pkce()
       {v2, _} = OAuthClient.generate_pkce()
       refute v1 == v2
+    end
+  end
+
+  describe "authorize/3" do
+    setup do
+      org = organization_fixture()
+      app = application_fixture(organization: org)
+      user = user_for_organization_fixture(org)
+      %{org: org, app: app, user: user}
+    end
+
+    test "returns code, verifier, and nonce for a fresh user (consent required)", %{
+      org: org,
+      app: app,
+      user: user
+    } do
+      client = OAuthClient.new(build_conn(), app, org)
+
+      assert {:ok, {_conn, code, verifier, nonce}} =
+               OAuthClient.authorize(client, user, scopes: ["openid", "profile", "email"])
+
+      assert is_binary(code) and byte_size(code) > 0
+      assert is_binary(verifier) and byte_size(verifier) > 0
+      assert is_binary(nonce) and byte_size(nonce) > 0
+    end
+
+    test "generates a unique nonce on each call", %{org: org, app: app, user: user} do
+      client = OAuthClient.new(build_conn(), app, org)
+      {:ok, {_, _, _, nonce1}} = OAuthClient.authorize(client, user, scopes: ["openid"])
+      {:ok, {_, _, _, nonce2}} = OAuthClient.authorize(client, user, scopes: ["openid"])
+      refute nonce1 == nonce2
     end
   end
 end
