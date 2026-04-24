@@ -4,6 +4,7 @@ defmodule Authify.SAML do
   """
 
   import Ecto.Query, warn: false
+  alias Authify.FilterSort
   alias Authify.Repo
 
   alias Authify.Accounts.{Organization, User}
@@ -86,19 +87,15 @@ defmodule Authify.SAML do
     )
   end
 
-  defp apply_saml_provider_sorting(query, nil, _),
-    do: order_by(query, [sp], desc: sp.inserted_at)
+  @saml_sp_sort_fields [:entity_id, :acs_url, :inserted_at, :updated_at]
 
-  defp apply_saml_provider_sorting(query, "", _), do: order_by(query, [sp], desc: sp.inserted_at)
-
-  defp apply_saml_provider_sorting(query, sort_field, order)
-       when sort_field in [:entity_id, :acs_url, :inserted_at, :updated_at] do
-    order_atom = if order == :asc or order == "asc", do: :asc, else: :desc
-    order_by(query, [sp], ^[{order_atom, sort_field}])
+  defp apply_saml_provider_sorting(query, sort_field, order) do
+    if sort_field in @saml_sp_sort_fields do
+      FilterSort.apply_sort(query, sort_field, to_string(order), @saml_sp_sort_fields)
+    else
+      order_by(query, [sp], desc: sp.inserted_at)
+    end
   end
-
-  defp apply_saml_provider_sorting(query, _sort_field, _order),
-    do: order_by(query, [sp], desc: sp.inserted_at)
 
   @doc """
   Returns a paginated list of service providers for an organization.
