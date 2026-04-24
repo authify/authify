@@ -22,14 +22,17 @@ defmodule Authify.FilterSort do
       iex> apply_sort(User, "name", "asc", [:name, :email])
       #Ecto.Query<...>
   """
-  def apply_sort(query, sort_field, order \\ "asc", allowed_fields) do
+  def apply_sort(query, sort_field, order \\ "asc", allowed_fields, opts \\ []) do
     field_atom = normalize_field(sort_field)
     order_atom = normalize_order(order)
 
     if field_atom in allowed_fields do
       order_by(query, ^[{order_atom, field_atom}])
     else
-      query
+      case Keyword.get(opts, :default) do
+        nil -> query
+        default_sort -> order_by(query, ^default_sort)
+      end
     end
   end
 
@@ -52,6 +55,34 @@ defmodule Authify.FilterSort do
   def apply_text_filter(query, field, search_term) when is_binary(search_term) do
     search_pattern = "%#{search_term}%"
     where(query, [q], like(field(q, ^field), ^search_pattern))
+  end
+
+  @doc """
+  Applies text search filtering across multiple fields using OR semantics.
+
+  ## Parameters
+    * `query` - The Ecto query to filter
+    * `fields` - List of fields to search across
+    * `search_term` - The text to search for (uses LIKE)
+
+  ## Examples
+
+      iex> apply_multi_text_filter(ServiceProvider, [:entity_id, :acs_url], "example")
+      #Ecto.Query<...>
+  """
+  def apply_multi_text_filter(query, _fields, nil), do: query
+  def apply_multi_text_filter(query, _fields, ""), do: query
+
+  def apply_multi_text_filter(query, fields, search_term)
+      when is_binary(search_term) and is_list(fields) do
+    search_pattern = "%#{search_term}%"
+
+    condition =
+      Enum.reduce(fields, dynamic(false), fn field, acc ->
+        dynamic([q], ^acc or like(field(q, ^field), ^search_pattern))
+      end)
+
+    where(query, ^condition)
   end
 
   @doc """

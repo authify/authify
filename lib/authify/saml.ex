@@ -34,16 +34,15 @@ defmodule Authify.SAML do
       iex> list_service_providers_filtered(org, sort: :entity_id, order: :asc, search: "app")
       [%ServiceProvider{}, ...]
   """
-  def list_service_providers_filtered(%Organization{id: org_id}, opts \\ []) do
-    query =
-      from(sp in ServiceProvider,
-        where: sp.organization_id == ^org_id
-      )
+  @saml_sp_sort_fields [:entity_id, :acs_url, :inserted_at, :updated_at]
 
-    query
+  def list_service_providers_filtered(%Organization{id: org_id}, opts \\ []) do
+    from(sp in ServiceProvider, where: sp.organization_id == ^org_id)
     |> apply_saml_provider_filters(opts)
-    |> apply_saml_provider_search(opts[:search])
-    |> apply_saml_provider_sorting(opts[:sort], opts[:order])
+    |> FilterSort.apply_multi_text_filter([:entity_id, :acs_url], opts[:search])
+    |> FilterSort.apply_sort(opts[:sort], to_string(opts[:order]), @saml_sp_sort_fields,
+      default: [desc: :inserted_at]
+    )
     |> Repo.all()
   end
 
@@ -73,29 +72,6 @@ defmodule Authify.SAML do
 
   defp maybe_filter_saml_provider_by_status(query, _),
     do: where(query, [sp], sp.is_active == true)
-
-  defp apply_saml_provider_search(query, nil), do: query
-  defp apply_saml_provider_search(query, ""), do: query
-
-  defp apply_saml_provider_search(query, search_term) when is_binary(search_term) do
-    search_pattern = "%#{search_term}%"
-
-    where(
-      query,
-      [sp],
-      like(sp.entity_id, ^search_pattern) or like(sp.acs_url, ^search_pattern)
-    )
-  end
-
-  @saml_sp_sort_fields [:entity_id, :acs_url, :inserted_at, :updated_at]
-
-  defp apply_saml_provider_sorting(query, sort_field, order) do
-    if sort_field in @saml_sp_sort_fields do
-      FilterSort.apply_sort(query, sort_field, to_string(order), @saml_sp_sort_fields)
-    else
-      order_by(query, [sp], desc: sp.inserted_at)
-    end
-  end
 
   @doc """
   Returns a paginated list of service providers for an organization.
