@@ -122,6 +122,7 @@ defmodule AuthifyTest.WebAuthnIntegrationTest do
              )["success"] == true
     end
 
+    @tag :capture_log
     test "server rejects authentication with replayed (non-incremented) counter", %{
       org: org,
       user: user,
@@ -165,11 +166,11 @@ defmodule AuthifyTest.WebAuthnIntegrationTest do
           mfa_pending_organization_id: org.id
         })
 
-      {:ok, {_auth_options2, auth_conn2}} =
+      {:ok, {auth_options2, auth_conn2}} =
         WebAuthnAuthenticator.fetch_authentication_options(mfa_conn2, org)
 
-      # Sign with stale authenticator — produces assertion with counter = 1
-      {:ok, {replayed_assertion, _}} = WebAuthnAuthenticator.sign_challenge(auth, auth_options1)
+      # Sign with stale authenticator over fresh challenge — counter = 1, DB already has 1
+      {:ok, {replayed_assertion, _}} = WebAuthnAuthenticator.sign_challenge(auth, auth_options2)
 
       replay_response =
         json_response(
