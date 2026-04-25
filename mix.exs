@@ -75,7 +75,7 @@ defmodule Authify.MixProject do
       {:telemetry_metrics_prometheus, "~> 1.1"},
       {:telemetry_poller, "~> 1.0"},
       {:uniq, "~> 0.6.2"},
-      {:cbor, "~> 1.0", only: :test, override: true},
+      {:cbor, "~> 1.0", override: true},
       {:wax_, "~> 0.7"},
       {:x509, "~> 0.9"},
       # Static analysis & security (dev/test only)
