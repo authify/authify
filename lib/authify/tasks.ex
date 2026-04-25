@@ -6,6 +6,7 @@ defmodule Authify.Tasks do
 
   import Ecto.Query, warn: false
 
+  alias Authify.FilterSort
   alias Authify.Repo
   alias Authify.Tasks.{BasicTask, StateMachine, Task, TaskLog}
   alias Authify.Tasks.Telemetry, as: TaskTelemetry
@@ -289,8 +290,8 @@ defmodule Authify.Tasks do
   defp apply_task_filters(query, opts) do
     query
     |> filter_by_status(opts[:status])
-    |> filter_by_type(opts[:type])
-    |> filter_by_action(opts[:action])
+    |> FilterSort.apply_exact_filter(:type, opts[:type])
+    |> FilterSort.apply_exact_filter(:action, opts[:action])
   end
 
   defp filter_by_status(query, nil), do: query
@@ -301,18 +302,6 @@ defmodule Authify.Tasks do
 
   defp filter_by_status(query, statuses) when is_list(statuses) do
     where(query, [t], t.status in ^statuses)
-  end
-
-  defp filter_by_type(query, nil), do: query
-
-  defp filter_by_type(query, type) when is_binary(type) do
-    where(query, [t], t.type == ^type)
-  end
-
-  defp filter_by_action(query, nil), do: query
-
-  defp filter_by_action(query, action) when is_binary(action) do
-    where(query, [t], t.action == ^action)
   end
 
   defp apply_organization_filter(query, nil), do: query
