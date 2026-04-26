@@ -48,4 +48,51 @@ defmodule AuthifyTest.SAMLServiceProviderTest do
       assert String.contains?(sp.sp_record.certificate, "BEGIN CERTIFICATE")
     end
   end
+
+  describe "build_authn_request/1" do
+    setup do: %{org: organization_fixture()}
+
+    test "returns a Base64-encoded XML string and a request ID", %{org: org} do
+      sp = SAMLServiceProvider.new(org)
+      assert {:ok, {encoded, request_id}} = SAMLServiceProvider.build_authn_request(sp)
+      assert is_binary(encoded)
+      assert is_binary(request_id) and String.starts_with?(request_id, "_")
+      xml = Base.decode64!(encoded)
+      assert String.contains?(xml, "<?xml")
+      assert String.contains?(xml, "<saml2p:AuthnRequest")
+    end
+
+    test "XML contains required SAML AuthnRequest elements", %{org: org} do
+      sp = SAMLServiceProvider.new(org)
+      {:ok, {encoded, request_id}} = SAMLServiceProvider.build_authn_request(sp)
+      xml = Base.decode64!(encoded)
+
+      assert String.contains?(xml, request_id)
+      assert String.contains?(xml, "IssueInstant")
+      assert String.contains?(xml, sp.entity_id)
+      assert String.contains?(xml, sp.acs_url)
+      assert String.contains?(xml, "AuthnRequest")
+    end
+
+    test "AuthnRequest contains a ds:Signature element", %{org: org} do
+      sp = SAMLServiceProvider.new(org)
+      {:ok, {encoded, _}} = SAMLServiceProvider.build_authn_request(sp)
+      xml = Base.decode64!(encoded)
+
+      assert String.contains?(xml, "<ds:Signature")
+      assert String.contains?(xml, "<ds:SignatureValue>")
+      assert String.contains?(xml, "<ds:DigestValue>")
+    end
+
+    test "SignatureValue is valid RSA-SHA256 base64 of correct length", %{org: org} do
+      sp = SAMLServiceProvider.new(org)
+      {:ok, {encoded, _}} = SAMLServiceProvider.build_authn_request(sp)
+      xml = Base.decode64!(encoded)
+
+      [_, sig_b64] = Regex.run(~r/<ds:SignatureValue>([\s\S]*?)<\/ds:SignatureValue>/, xml)
+      assert {:ok, sig_bytes} = Base.decode64(String.trim(sig_b64))
+      # RSA-2048 signatures are 256 bytes
+      assert byte_size(sig_bytes) == 256
+    end
+  end
 end
