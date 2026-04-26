@@ -267,6 +267,63 @@ defmodule AuthifyTest.SAMLServiceProviderTest do
     end
   end
 
+  describe "build_logout_request/2" do
+    setup do: %{org: organization_fixture()}
+
+    test "returns Base64-encoded XML and a request ID", %{org: org} do
+      sp = SAMLServiceProvider.new(org)
+      assert {:ok, {encoded, request_id}} = SAMLServiceProvider.build_logout_request(sp, "sess-1")
+      assert is_binary(encoded)
+      assert String.starts_with?(request_id, "_")
+      xml = Base.decode64!(encoded)
+      assert String.contains?(xml, "LogoutRequest")
+    end
+
+    test "LogoutRequest XML contains the given SessionIndex", %{org: org} do
+      sp = SAMLServiceProvider.new(org)
+      {:ok, {encoded, _}} = SAMLServiceProvider.build_logout_request(sp, "my-session-index")
+      xml = Base.decode64!(encoded)
+      assert String.contains?(xml, "my-session-index")
+    end
+
+    test "LogoutRequest is signed with ds:Signature", %{org: org} do
+      sp = SAMLServiceProvider.new(org)
+      {:ok, {encoded, _}} = SAMLServiceProvider.build_logout_request(sp, "sess-1")
+      xml = Base.decode64!(encoded)
+      assert String.contains?(xml, "<ds:Signature")
+    end
+  end
+
+  describe "validate_logout_response/2" do
+    setup do: %{org: organization_fixture()}
+
+    test "returns {:ok, :logged_out} for a Success status response", %{org: org} do
+      sp = SAMLServiceProvider.new(org)
+
+      logout_xml =
+        build_logout_response_xml(sp, org, "urn:oasis:names:tc:SAML:2.0:status:Success")
+
+      encoded = Base.encode64(logout_xml)
+      html = ~s(<form><input name="SAMLResponse" value="#{encoded}" /></form>)
+      fake_conn = %Plug.Conn{resp_body: html}
+      assert {:ok, :logged_out} = SAMLServiceProvider.validate_logout_response(sp, fake_conn)
+    end
+
+    test "returns {:error, {:unexpected_status, _}} for a non-Success status", %{org: org} do
+      sp = SAMLServiceProvider.new(org)
+
+      logout_xml =
+        build_logout_response_xml(sp, org, "urn:oasis:names:tc:SAML:2.0:status:Requester")
+
+      encoded = Base.encode64(logout_xml)
+      html = ~s(<form><input name="SAMLResponse" value="#{encoded}" /></form>)
+      fake_conn = %Plug.Conn{resp_body: html}
+
+      assert {:error, {:unexpected_status, "urn:oasis:names:tc:SAML:2.0:status:Requester"}} =
+               SAMLServiceProvider.validate_logout_response(sp, fake_conn)
+    end
+  end
+
   # ── Private Test Helpers ──
 
   defp build_test_response_xml(sp, org, request_id, now, expires, opts \\ []) do
@@ -331,6 +388,27 @@ defmodule AuthifyTest.SAMLServiceProviderTest do
         #{attr_xml}
       </saml2:Assertion>
     </saml2p:Response>
+    """
+    |> String.trim()
+  end
+
+  defp build_logout_response_xml(sp, org, status_code) do
+    now = DateTime.to_iso8601(DateTime.utc_now())
+
+    """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <saml2p:LogoutResponse xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
+                       xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion"
+                       ID="_logout_resp_test"
+                       InResponseTo="_logout_req_test"
+                       IssueInstant="#{now}"
+                       Destination="#{sp.sls_url}"
+                       Version="2.0">
+      <saml2:Issuer>#{AuthifyWeb.Endpoint.url()}/#{org.slug}/saml/metadata</saml2:Issuer>
+      <saml2p:Status>
+        <saml2p:StatusCode Value="#{status_code}"/>
+      </saml2p:Status>
+    </saml2p:LogoutResponse>
     """
     |> String.trim()
   end

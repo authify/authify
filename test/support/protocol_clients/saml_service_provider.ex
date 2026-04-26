@@ -57,6 +57,29 @@ defmodule AuthifyTest.SAMLServiceProvider do
     {:ok, {Base.encode64(signed_xml), request_id}}
   end
 
+  def build_logout_request(%__MODULE__{} = sp, session_index) do
+    request_id = generate_id()
+    now = DateTime.utc_now()
+
+    unsigned_xml =
+      """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <saml2p:LogoutRequest xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
+                            xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion"
+                            ID="#{request_id}"
+                            IssueInstant="#{DateTime.to_iso8601(now)}"
+                            Version="2.0"
+                            Destination="#{AuthifyWeb.Endpoint.url()}/#{sp.org.slug}/saml/slo">
+        <saml2:Issuer>#{sp.entity_id}</saml2:Issuer>
+        <saml2p:SessionIndex>#{session_index}</saml2p:SessionIndex>
+      </saml2p:LogoutRequest>
+      """
+      |> String.trim()
+
+    signed_xml = sign_xml(unsigned_xml, sp)
+    {:ok, {Base.encode64(signed_xml), request_id}}
+  end
+
   def extract_response(%{resp_body: body}) do
     case Regex.run(~r/name="SAMLResponse" value="([^"]+)"/, body) do
       [_, b64] ->
@@ -170,6 +193,19 @@ defmodule AuthifyTest.SAMLServiceProvider do
   end
 
   # ── Private Helpers ──
+
+  def validate_logout_response(%__MODULE__{} = _sp, conn) do
+    with {:ok, response_xml} <- extract_response(conn) do
+      status =
+        response_xml
+        |> xpath(~x"//saml2p:StatusCode/@Value"s)
+
+      case status do
+        "urn:oasis:names:tc:SAML:2.0:status:Success" -> {:ok, :logged_out}
+        other -> {:error, {:unexpected_status, other}}
+      end
+    end
+  end
 
   defp maybe_verify_signature(_xml, _org, false, _conn), do: :ok
 
