@@ -361,9 +361,17 @@ defmodule Authify.SAML do
 
   @doc """
   Generates a SAML response with assertion.
+
+  Options:
+  - `:sign` — when true, signs the response assertion if a signing certificate is available
   """
-  def generate_saml_response(%Session{} = session, %ServiceProvider{} = sp, %User{} = user) do
-    Authify.SAML.XML.generate_saml_response(session, sp, user)
+  def generate_saml_response(
+        %Session{} = session,
+        %ServiceProvider{} = sp,
+        %User{} = user,
+        options \\ []
+      ) do
+    Authify.SAML.XML.generate_saml_response(session, sp, user, options)
   end
 
   @doc """

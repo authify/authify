@@ -252,7 +252,7 @@ defmodule AuthifyWeb.SAMLController do
     # Preload groups for SAML attribute generation
     user = Authify.Repo.preload(user, :groups)
 
-    case SAML.generate_saml_response(saml_session, service_provider, user) do
+    case SAML.generate_saml_response(saml_session, service_provider, user, sign: true) do
       {:ok, saml_response} ->
         # Encode the SAML response
         encoded_response = Base.encode64(saml_response)
