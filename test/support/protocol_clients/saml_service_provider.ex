@@ -1,5 +1,6 @@
 defmodule AuthifyTest.SAMLServiceProvider do
   @moduledoc false
+  import SweetXml
 
   defstruct [:private_key, :certificate, :entity_id, :acs_url, :sls_url, :org, :sp_record]
 
@@ -147,5 +148,150 @@ defmodule AuthifyTest.SAMLServiceProvider do
 
   defp generate_id do
     "_" <> (:crypto.strong_rand_bytes(20) |> Base.hex_encode32(case: :lower))
+  end
+
+  # ── Assertion Validation ──
+
+  def validate_response(%__MODULE__{} = sp, response_xml, org, opts \\ []) do
+    in_response_to = Keyword.get(opts, :in_response_to)
+    verify_sig = Keyword.get(opts, :verify_signature, true)
+    clock_skew = Keyword.get(opts, :clock_skew, 60)
+    conn = Keyword.get(opts, :conn)
+
+    with :ok <- maybe_verify_signature(response_xml, org, verify_sig, conn),
+         {:ok, assertion} <- parse_assertion(response_xml),
+         :ok <- validate_not_before(assertion.not_before, clock_skew),
+         :ok <- validate_not_on_or_after(assertion.not_on_or_after, clock_skew),
+         :ok <- validate_audience(assertion.audience, sp.entity_id),
+         :ok <- validate_recipient(assertion.recipient, sp.acs_url),
+         :ok <- validate_in_response_to(assertion.in_response_to, in_response_to) do
+      {:ok, assertion}
+    end
+  end
+
+  # ── Private Helpers ──
+
+  defp maybe_verify_signature(_xml, _org, false, _conn), do: :ok
+
+  defp maybe_verify_signature(xml, org, true, conn) do
+    if String.contains?(xml, "<ds:Signature") do
+      with {:ok, cert_pem} <- fetch_idp_cert(org, conn) do
+        fake_cert = %Authify.Accounts.Certificate{
+          certificate: cert_pem,
+          private_key: ""
+        }
+
+        case Authify.SAML.XMLSignature.verify_signature(xml, fake_cert) do
+          {:ok, true} -> :ok
+          {:ok, false} -> {:error, :signature_invalid}
+          {:error, reason} -> {:error, {:signature_error, reason}}
+        end
+      end
+    else
+      :ok
+    end
+  end
+
+  defp fetch_idp_cert(org, _conn) do
+    base_url = AuthifyWeb.Endpoint.url()
+    url = "#{base_url}/#{org.slug}/saml/metadata"
+
+    case :httpc.request(:get, {url, []}, [], body_format: :binary) do
+      {:ok, {{_, 200, _}, _headers, body}} ->
+        case Regex.run(
+               ~r/<[^:]*:X509Certificate[^>]*>([\s\S]*?)<\/[^:]*:X509Certificate>/,
+               body
+             ) do
+          [_, cert_b64] ->
+            trimmed = String.trim(cert_b64)
+
+            if trimmed == "" or String.starts_with?(trimmed, "NO_SAML") do
+              {:error, :no_idp_signing_cert}
+            else
+              {:ok, "-----BEGIN CERTIFICATE-----\n#{trimmed}\n-----END CERTIFICATE-----"}
+            end
+
+          nil ->
+            {:error, :no_idp_signing_cert}
+        end
+
+      {:ok, {{_, status, _}, _, _}} ->
+        {:error, {:http_error, status}}
+
+      {:error, reason} ->
+        {:error, {:http_error, reason}}
+    end
+  end
+
+  defp parse_assertion(response_xml) do
+    result =
+      xmap(response_xml,
+        in_response_to: ~x"//saml2p:Response/@InResponseTo"s,
+        name_id: ~x"//saml2:NameID/text()"s,
+        not_before: ~x"//saml2:Conditions/@NotBefore"s,
+        not_on_or_after: ~x"//saml2:Conditions/@NotOnOrAfter"s,
+        audience: ~x"//saml2:Audience/text()"s,
+        recipient: ~x"//saml2:SubjectConfirmationData/@Recipient"s,
+        subject_not_on_or_after: ~x"//saml2:SubjectConfirmationData/@NotOnOrAfter"s,
+        session_index: ~x"//saml2:AuthnStatement/@SessionIndex"s
+      )
+
+    attributes = extract_attribute_map(response_xml)
+    {:ok, Map.put(result, :attributes, attributes)}
+  rescue
+    _ -> {:error, :assertion_parse_failed}
+  end
+
+  defp extract_attribute_map(response_xml) do
+    response_xml
+    |> xpath(~x"//saml2:Attribute"l,
+      name: ~x"./@Name"s,
+      value: ~x"./saml2:AttributeValue/text()"s
+    )
+    |> Enum.into(%{}, fn %{name: name, value: value} -> {name, value} end)
+  rescue
+    _ -> %{}
+  end
+
+  defp validate_not_before(not_before_str, clock_skew) do
+    case DateTime.from_iso8601(not_before_str) do
+      {:ok, not_before, _} ->
+        adjusted_now = DateTime.add(DateTime.utc_now(), clock_skew, :second)
+
+        if DateTime.compare(not_before, adjusted_now) in [:lt, :eq],
+          do: :ok,
+          else: {:error, :assertion_not_yet_valid}
+
+      _ ->
+        {:error, :invalid_not_before}
+    end
+  end
+
+  defp validate_not_on_or_after(not_on_or_after_str, clock_skew) do
+    case DateTime.from_iso8601(not_on_or_after_str) do
+      {:ok, not_on_or_after, _} ->
+        adjusted_now = DateTime.add(DateTime.utc_now(), -clock_skew, :second)
+
+        if DateTime.compare(adjusted_now, not_on_or_after) in [:lt, :eq],
+          do: :ok,
+          else: {:error, :assertion_expired}
+
+      _ ->
+        {:error, :invalid_not_on_or_after}
+    end
+  end
+
+  defp validate_audience(audience, expected_entity_id) do
+    if audience == expected_entity_id, do: :ok, else: {:error, :wrong_audience}
+  end
+
+  defp validate_recipient(recipient, expected_acs_url) do
+    if recipient == expected_acs_url, do: :ok, else: {:error, :wrong_recipient}
+  end
+
+  defp validate_in_response_to(_actual, nil), do: :ok
+
+  defp validate_in_response_to(actual, expected) do
+    if actual == expected, do: :ok, else: {:error, :in_response_to_mismatch}
   end
 end

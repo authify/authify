@@ -127,4 +127,211 @@ defmodule AuthifyTest.SAMLServiceProviderTest do
       assert {:error, :invalid_base64} = SAMLServiceProvider.extract_response(fake_conn)
     end
   end
+
+  describe "validate_response/4" do
+    setup do
+      org = organization_fixture()
+      sp = SAMLServiceProvider.new(org)
+      now = DateTime.utc_now()
+      expires = DateTime.add(now, 300, :second)
+      request_id = "_req_#{:crypto.strong_rand_bytes(4) |> Base.hex_encode32(case: :lower)}"
+
+      valid_xml = build_test_response_xml(sp, org, request_id, now, expires)
+
+      %{
+        org: org,
+        sp: sp,
+        request_id: request_id,
+        valid_xml: valid_xml,
+        now: now,
+        expires: expires
+      }
+    end
+
+    test "parses a valid assertion into the expected map shape", %{
+      sp: sp,
+      org: org,
+      valid_xml: valid_xml,
+      request_id: request_id
+    } do
+      conn = build_conn()
+
+      assert {:ok, assertion} =
+               SAMLServiceProvider.validate_response(sp, valid_xml, org,
+                 in_response_to: request_id,
+                 verify_signature: false,
+                 conn: conn
+               )
+
+      assert assertion.name_id == "test-subject-id"
+      assert assertion.session_index == "test-session-1"
+      assert assertion.in_response_to == request_id
+      assert is_map(assertion.attributes)
+    end
+
+    test "rejects an expired assertion", %{sp: sp, org: org, request_id: request_id, now: now} do
+      conn = build_conn()
+      past = DateTime.add(now, -600, :second)
+      expired_xml = build_test_response_xml(sp, org, request_id, now, past)
+
+      assert {:error, :assertion_expired} =
+               SAMLServiceProvider.validate_response(sp, expired_xml, org,
+                 in_response_to: request_id,
+                 verify_signature: false,
+                 conn: conn
+               )
+    end
+
+    test "rejects a response with wrong audience", %{
+      sp: sp,
+      org: org,
+      request_id: request_id,
+      now: now,
+      expires: expires
+    } do
+      conn = build_conn()
+
+      wrong_audience_xml =
+        build_test_response_xml(sp, org, request_id, now, expires,
+          audience: "https://wrong-sp.example.com"
+        )
+
+      assert {:error, :wrong_audience} =
+               SAMLServiceProvider.validate_response(sp, wrong_audience_xml, org,
+                 in_response_to: request_id,
+                 verify_signature: false,
+                 conn: conn
+               )
+    end
+
+    test "rejects a response with wrong Recipient", %{
+      sp: sp,
+      org: org,
+      request_id: request_id,
+      now: now,
+      expires: expires
+    } do
+      conn = build_conn()
+
+      wrong_recipient_xml =
+        build_test_response_xml(sp, org, request_id, now, expires,
+          recipient: "https://attacker.example.com/acs"
+        )
+
+      assert {:error, :wrong_recipient} =
+               SAMLServiceProvider.validate_response(sp, wrong_recipient_xml, org,
+                 in_response_to: request_id,
+                 verify_signature: false,
+                 conn: conn
+               )
+    end
+
+    test "rejects a response when InResponseTo does not match", %{
+      sp: sp,
+      org: org,
+      valid_xml: valid_xml
+    } do
+      conn = build_conn()
+
+      assert {:error, :in_response_to_mismatch} =
+               SAMLServiceProvider.validate_response(sp, valid_xml, org,
+                 in_response_to: "_completely_different_id",
+                 verify_signature: false,
+                 conn: conn
+               )
+    end
+
+    test "extracts attributes from AttributeStatement", %{
+      sp: sp,
+      org: org,
+      request_id: request_id,
+      now: now,
+      expires: expires
+    } do
+      conn = build_conn()
+
+      xml_with_attrs =
+        build_test_response_xml(sp, org, request_id, now, expires,
+          attributes: [{"email", "alice@example.com"}, {"firstName", "Alice"}]
+        )
+
+      assert {:ok, assertion} =
+               SAMLServiceProvider.validate_response(sp, xml_with_attrs, org,
+                 in_response_to: request_id,
+                 verify_signature: false,
+                 conn: conn
+               )
+
+      assert assertion.attributes["email"] == "alice@example.com"
+      assert assertion.attributes["firstName"] == "Alice"
+    end
+  end
+
+  # ── Private Test Helpers ──
+
+  defp build_test_response_xml(sp, org, request_id, now, expires, opts \\ []) do
+    audience = Keyword.get(opts, :audience, sp.entity_id)
+    recipient = Keyword.get(opts, :recipient, sp.acs_url)
+    attributes = Keyword.get(opts, :attributes, [])
+    issuer = "#{AuthifyWeb.Endpoint.url()}/#{org.slug}/saml/metadata"
+    not_before = DateTime.to_iso8601(DateTime.add(now, -5, :second))
+
+    attr_xml =
+      if attributes == [] do
+        ""
+      else
+        attr_elements =
+          Enum.map_join(attributes, "\n", fn {name, value} ->
+            """
+            <saml2:Attribute Name="#{name}">
+              <saml2:AttributeValue>#{value}</saml2:AttributeValue>
+            </saml2:Attribute>
+            """
+          end)
+
+        "<saml2:AttributeStatement>#{attr_elements}</saml2:AttributeStatement>"
+      end
+
+    """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <saml2p:Response xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
+                   xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion"
+                   ID="_resp_test"
+                   InResponseTo="#{request_id}"
+                   IssueInstant="#{DateTime.to_iso8601(now)}"
+                   Destination="#{sp.acs_url}"
+                   Version="2.0">
+      <saml2:Issuer>#{issuer}</saml2:Issuer>
+      <saml2p:Status>
+        <saml2p:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+      </saml2p:Status>
+      <saml2:Assertion ID="_assert_test"
+                   IssueInstant="#{DateTime.to_iso8601(now)}"
+                   Version="2.0">
+        <saml2:Issuer>#{issuer}</saml2:Issuer>
+        <saml2:Subject>
+          <saml2:NameID Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">test-subject-id</saml2:NameID>
+          <saml2:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
+            <saml2:SubjectConfirmationData InResponseTo="#{request_id}"
+                                           NotOnOrAfter="#{DateTime.to_iso8601(expires)}"
+                                           Recipient="#{recipient}"/>
+          </saml2:SubjectConfirmation>
+        </saml2:Subject>
+        <saml2:Conditions NotBefore="#{not_before}"
+                       NotOnOrAfter="#{DateTime.to_iso8601(expires)}">
+          <saml2:AudienceRestriction>
+            <saml2:Audience>#{audience}</saml2:Audience>
+          </saml2:AudienceRestriction>
+        </saml2:Conditions>
+        <saml2:AuthnStatement SessionIndex="test-session-1">
+          <saml2:AuthnContext>
+            <saml2:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml2:AuthnContextClassRef>
+          </saml2:AuthnContext>
+        </saml2:AuthnStatement>
+        #{attr_xml}
+      </saml2:Assertion>
+    </saml2p:Response>
+    """
+    |> String.trim()
+  end
 end
