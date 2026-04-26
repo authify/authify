@@ -95,4 +95,36 @@ defmodule AuthifyTest.SAMLServiceProviderTest do
       assert byte_size(sig_bytes) == 256
     end
   end
+
+  describe "extract_response/1" do
+    test "decodes SAMLResponse from an auto-submit HTML form" do
+      xml = "<saml2p:Response>test content</saml2p:Response>"
+      encoded = Base.encode64(xml)
+
+      html_body = """
+      <html>
+      <body onload="document.forms[0].submit()">
+        <form method="post" action="https://sp.example.com/saml/acs">
+          <input type="hidden" name="SAMLResponse" value="#{encoded}" />
+          <input type="submit" value="Continue" />
+        </form>
+      </body>
+      </html>
+      """
+
+      fake_conn = %Plug.Conn{resp_body: html_body}
+      assert {:ok, ^xml} = SAMLServiceProvider.extract_response(fake_conn)
+    end
+
+    test "returns error when no SAMLResponse field is present" do
+      fake_conn = %Plug.Conn{resp_body: "<html><body>no form</body></html>"}
+      assert {:error, :saml_response_not_found} = SAMLServiceProvider.extract_response(fake_conn)
+    end
+
+    test "returns error when SAMLResponse value is invalid base64" do
+      html_body = ~s(<form><input name="SAMLResponse" value="not!!valid!!base64" /></form>)
+      fake_conn = %Plug.Conn{resp_body: html_body}
+      assert {:error, :invalid_base64} = SAMLServiceProvider.extract_response(fake_conn)
+    end
+  end
 end

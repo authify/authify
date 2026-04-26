@@ -56,6 +56,19 @@ defmodule AuthifyTest.SAMLServiceProvider do
     {:ok, {Base.encode64(signed_xml), request_id}}
   end
 
+  def extract_response(%{resp_body: body}) do
+    case Regex.run(~r/name="SAMLResponse" value="([^"]+)"/, body) do
+      [_, b64] ->
+        case Base.decode64(b64) do
+          {:ok, xml} -> {:ok, xml}
+          :error -> {:error, :invalid_base64}
+        end
+
+      nil ->
+        {:error, :saml_response_not_found}
+    end
+  end
+
   # ── Private Helpers ──
 
   defp build_authn_request_xml(sp, request_id, now) do
