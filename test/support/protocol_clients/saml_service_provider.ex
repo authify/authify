@@ -1,5 +1,7 @@
 defmodule AuthifyTest.SAMLServiceProvider do
   @moduledoc false
+  @endpoint AuthifyWeb.Endpoint
+  import Phoenix.ConnTest
   import SweetXml
 
   defstruct [:private_key, :certificate, :entity_id, :acs_url, :sls_url, :org, :sp_record]
@@ -143,8 +145,8 @@ defmodule AuthifyTest.SAMLServiceProvider do
 
     cert_b64 =
       sp.certificate
-      |> String.replace("-----BEGIN CERTIFICATE-----", "")
-      |> String.replace("-----END CERTIFICATE-----", "")
+      |> String.replace("-----BEGIN CERTIFICATE----", "")
+      |> String.replace("-----END CERTIFICATE----", "")
       |> String.replace(~r/\s/, "")
 
     signature_element =
@@ -155,7 +157,7 @@ defmodule AuthifyTest.SAMLServiceProvider do
         <ds:KeyInfo>
           <ds:X509Data>
             <ds:X509Certificate>#{cert_b64}</ds:X509Certificate>
-          </ds:KeyInfo>
+          </ds:X509Data>
         </ds:KeyInfo>
       </ds:Signature>
       """
@@ -179,9 +181,8 @@ defmodule AuthifyTest.SAMLServiceProvider do
     in_response_to = Keyword.get(opts, :in_response_to)
     verify_sig = Keyword.get(opts, :verify_signature, true)
     clock_skew = Keyword.get(opts, :clock_skew, 60)
-    conn = Keyword.get(opts, :conn)
 
-    with :ok <- maybe_verify_signature(response_xml, org, verify_sig, conn),
+    with :ok <- maybe_verify_signature(response_xml, org, verify_sig),
          {:ok, assertion} <- parse_assertion(response_xml),
          :ok <- validate_not_before(assertion.not_before, clock_skew),
          :ok <- validate_not_on_or_after(assertion.not_on_or_after, clock_skew),
@@ -207,11 +208,11 @@ defmodule AuthifyTest.SAMLServiceProvider do
     end
   end
 
-  defp maybe_verify_signature(_xml, _org, false, _conn), do: :ok
+  defp maybe_verify_signature(_xml, _org, false), do: :ok
 
-  defp maybe_verify_signature(xml, org, true, conn) do
+  defp maybe_verify_signature(xml, org, true) do
     if String.contains?(xml, "<ds:Signature") do
-      with {:ok, cert_pem} <- fetch_idp_cert(org, conn) do
+      with {:ok, cert_pem} <- fetch_idp_cert(org) do
         fake_cert = %Authify.Accounts.Certificate{
           certificate: cert_pem,
           private_key: ""
@@ -228,34 +229,27 @@ defmodule AuthifyTest.SAMLServiceProvider do
     end
   end
 
-  defp fetch_idp_cert(org, _conn) do
-    base_url = AuthifyWeb.Endpoint.url()
-    url = "#{base_url}/#{org.slug}/saml/metadata"
+  defp fetch_idp_cert(org) do
+    conn = build_conn()
+    resp = get(conn, "/#{org.slug}/saml/metadata")
 
-    case :httpc.request(:get, {url, []}, [], body_format: :binary) do
-      {:ok, {{_, 200, _}, _headers, body}} ->
-        case Regex.run(
-               ~r/<[^:]*:X509Certificate[^>]*>([\s\S]*?)<\/[^:]*:X509Certificate>/,
-               body
-             ) do
-          [_, cert_b64] ->
-            trimmed = String.trim(cert_b64)
+    body = resp.resp_body
 
-            if trimmed == "" or String.starts_with?(trimmed, "NO_SAML") do
-              {:error, :no_idp_signing_cert}
-            else
-              {:ok, "-----BEGIN CERTIFICATE-----\n#{trimmed}\n-----END CERTIFICATE-----"}
-            end
+    case Regex.run(
+           ~r/<[^:]*:X509Certificate[^>]*>([\s\S]*?)<\/[^:]*:X509Certificate>/,
+           body
+         ) do
+      [_, cert_b64] ->
+        trimmed = String.trim(cert_b64)
 
-          nil ->
-            {:error, :no_idp_signing_cert}
+        if trimmed == "" or String.starts_with?(trimmed, "NO_SAML") do
+          {:error, :no_idp_signing_cert}
+        else
+          {:ok, "-----BEGIN CERTIFICATE----\n#{trimmed}\n-----END CERTIFICATE----"}
         end
 
-      {:ok, {{_, status, _}, _, _}} ->
-        {:error, {:http_error, status}}
-
-      {:error, reason} ->
-        {:error, {:http_error, reason}}
+      nil ->
+        {:error, :no_idp_signing_cert}
     end
   end
 
