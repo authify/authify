@@ -59,8 +59,7 @@ defmodule AuthifyTest.SAMLSSOIntegrationTest do
       # ── Step 4: SP extracts the SAMLResponse from the auto-submit form ─
       {:ok, response_xml} = SAMLServiceProvider.extract_response(assertion_resp)
 
-      assert String.contains?(response_xml, "Response") or
-               String.contains?(response_xml, "response")
+      assert String.contains?(response_xml, "<saml2p:Response")
 
       # ── Step 5: SP validates the response ────────────────────────────────
       assert {:ok, assertion} =

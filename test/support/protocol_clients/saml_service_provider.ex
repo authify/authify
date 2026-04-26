@@ -73,6 +73,7 @@ defmodule AuthifyTest.SAMLServiceProvider do
                             Version="2.0"
                             Destination="#{AuthifyWeb.Endpoint.url()}/#{sp.org.slug}/saml/slo">
         <saml2:Issuer>#{sp.entity_id}</saml2:Issuer>
+        <saml2:NameID Format="urn:oasis:names:tc:SAML:2.0:nameid-format:unspecified">sp-logout-subject</saml2:NameID>
         <saml2p:SessionIndex>#{session_index}</saml2p:SessionIndex>
       </saml2p:LogoutRequest>
       """
@@ -145,8 +146,8 @@ defmodule AuthifyTest.SAMLServiceProvider do
 
     cert_b64 =
       sp.certificate
-      |> String.replace("-----BEGIN CERTIFICATE----", "")
-      |> String.replace("-----END CERTIFICATE----", "")
+      |> String.replace("-----BEGIN CERTIFICATE-----", "")
+      |> String.replace("-----END CERTIFICATE-----", "")
       |> String.replace(~r/\s/, "")
 
     signature_element =
@@ -193,8 +194,6 @@ defmodule AuthifyTest.SAMLServiceProvider do
     end
   end
 
-  # ── Private Helpers ──
-
   def validate_logout_response(%__MODULE__{} = _sp, conn) do
     with {:ok, response_xml} <- extract_response(conn) do
       status =
@@ -207,6 +206,8 @@ defmodule AuthifyTest.SAMLServiceProvider do
       end
     end
   end
+
+  # ── Private Helpers ──
 
   defp maybe_verify_signature(_xml, _org, false), do: :ok
 
@@ -245,7 +246,7 @@ defmodule AuthifyTest.SAMLServiceProvider do
         if trimmed == "" or String.starts_with?(trimmed, "NO_SAML") do
           {:error, :no_idp_signing_cert}
         else
-          {:ok, "-----BEGIN CERTIFICATE----\n#{trimmed}\n-----END CERTIFICATE----"}
+          {:ok, "-----BEGIN CERTIFICATE-----\n#{trimmed}\n-----END CERTIFICATE-----"}
         end
 
       nil ->
