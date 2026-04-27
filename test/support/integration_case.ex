@@ -7,9 +7,9 @@ defmodule AuthifyWeb.IntegrationCase do
   `setup :setup_integration`.
 
   Each test receives: `%{conn: conn, org: org, admin: admin}`.
-  All four protocol client modules are imported without explicit imports
-  in the test file: OAuthClient, SAMLServiceProvider, SCIMConsumer,
-  WebAuthnAuthenticator.
+  All four protocol client modules are aliased so they can be called by name
+  without a prefix in each test file: OAuthClient, SAMLServiceProvider,
+  SCIMConsumer, WebAuthnAuthenticator.
   """
 
   use ExUnit.CaseTemplate
@@ -18,10 +18,10 @@ defmodule AuthifyWeb.IntegrationCase do
     quote do
       use AuthifyWeb.ConnCase, async: true
 
-      import AuthifyTest.OAuthClient
-      import AuthifyTest.SAMLServiceProvider
-      import AuthifyTest.SCIMConsumer
-      import AuthifyTest.WebAuthnAuthenticator
+      alias AuthifyTest.OAuthClient
+      alias AuthifyTest.SAMLServiceProvider
+      alias AuthifyTest.SCIMConsumer
+      alias AuthifyTest.WebAuthnAuthenticator
       import AuthifyWeb.IntegrationCase
 
       setup :setup_integration
