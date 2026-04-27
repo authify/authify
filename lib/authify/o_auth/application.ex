@@ -223,8 +223,11 @@ defmodule Authify.OAuth.Application do
       # Validate scopes based on application type
       valid_scopes =
         case scope_type do
-          :oauth -> Authify.Scopes.oauth_scopes() ++ Authify.Scopes.management_api_scopes()
-          :management_api -> Authify.Scopes.management_api_scopes()
+          :oauth ->
+            Authify.Scopes.oauth_scopes() ++ Authify.Scopes.management_api_scopes()
+
+          :management_api ->
+            Authify.Scopes.management_api_scopes() ++ Authify.Scopes.scim_scopes()
         end
 
       invalid_scopes = Enum.reject(scopes, &(&1 in valid_scopes))
@@ -251,9 +254,14 @@ defmodule Authify.OAuth.Application do
       # Validate scopes based on application type
       valid_scopes =
         case application.application_type do
-          "oauth2_app" -> Authify.Scopes.oauth_scopes() ++ Authify.Scopes.management_api_scopes()
-          "management_api_app" -> Authify.Scopes.management_api_scopes()
-          _ -> Authify.Scopes.oauth_scopes() ++ Authify.Scopes.management_api_scopes()
+          "oauth2_app" ->
+            Authify.Scopes.oauth_scopes() ++ Authify.Scopes.management_api_scopes()
+
+          "management_api_app" ->
+            Authify.Scopes.management_api_scopes() ++ Authify.Scopes.scim_scopes()
+
+          _ ->
+            Authify.Scopes.oauth_scopes() ++ Authify.Scopes.management_api_scopes()
         end
 
       invalid_scopes = Enum.reject(scopes, &(&1 in valid_scopes))

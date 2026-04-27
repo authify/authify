@@ -171,6 +171,21 @@ defmodule AuthifyTest.OAuthClient do
     end
   end
 
+  def create_pat(user, org, opts \\ []) do
+    scopes = Keyword.get(opts, :scopes, Authify.Scopes.pat_scopes())
+
+    case Authify.Accounts.create_personal_access_token(user, org, %{
+           "name" => "Test PAT",
+           "scopes" => scopes
+         }) do
+      {:ok, token} ->
+        {:ok, token.plaintext_token}
+
+      {:error, changeset} ->
+        {:error, {:pat_creation_failed, changeset.errors}}
+    end
+  end
+
   def validate_id_token(%__MODULE__{app: app, org: org}, id_token, opts \\ []) do
     expected_nonce = Keyword.get(opts, :nonce)
 
