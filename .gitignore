@@ -42,3 +42,6 @@ npm-debug.log
 config/dev.exs
 
 TODO.md
+
+# superpowers-generated plans and specs
+/docs
