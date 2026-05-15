@@ -40,6 +40,11 @@ defmodule AuthifyWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :oauth_api do
+    plug :accepts, ["json"]
+    plug AuthifyWeb.Plugs.RateLimiter, :oauth_rate_limit
+  end
+
   pipeline :management_api do
     plug :accepts, ["json"]
     plug AuthifyWeb.Plugs.RateLimiter, :api_rate_limit
@@ -317,7 +322,7 @@ defmodule AuthifyWeb.Router do
   end
 
   scope "/:org_slug/oauth", AuthifyWeb do
-    pipe_through [:api, :organization]
+    pipe_through [:oauth_api, :organization]
 
     post "/token", OAuthController, :token
     get "/userinfo", OAuthController, :userinfo

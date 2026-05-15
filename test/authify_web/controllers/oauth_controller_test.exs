@@ -1,5 +1,5 @@
 defmodule AuthifyWeb.OAuthControllerTest do
-  use AuthifyWeb.ConnCase, async: true
+  use AuthifyWeb.ConnCase, async: false
 
   import Authify.AccountsFixtures
   import Authify.OAuthFixtures
@@ -1261,16 +1261,42 @@ defmodule AuthifyWeb.OAuthControllerTest do
           assert true
       end
     end
+  end
 
-    @tag :skip
-    test "rate limiting for OAuth token endpoint", %{conn: conn, organization: organization} do
-      # Skipped: OAuth token endpoint needs rate limiting configured.
-      # See: https://github.com/authify/authify/issues/2
-      for _i <- 1..20 do
-        post(conn, ~p"/#{organization.slug}/oauth/token", %{})
+  describe "rate limiting" do
+    setup do
+      organization = organization_fixture()
+      Authify.RateLimitTestHelper.enable_rate_limiting()
+      %{organization: organization}
+    end
+
+    test "blocks excessive requests to OAuth token endpoint", %{
+      conn: conn,
+      organization: organization
+    } do
+      Authify.RateLimitTestHelper.clear_rate_limits()
+
+      for _i <- 1..60 do
+        result = post(conn, ~p"/#{organization.slug}/oauth/token", %{})
+        refute result.status == 429
       end
 
       conn = post(conn, ~p"/#{organization.slug}/oauth/token", %{})
+      assert response(conn, 429)
+    end
+
+    test "blocks excessive requests to OAuth userinfo endpoint", %{
+      conn: conn,
+      organization: organization
+    } do
+      Authify.RateLimitTestHelper.clear_rate_limits()
+
+      for _i <- 1..60 do
+        result = get(conn, ~p"/#{organization.slug}/oauth/userinfo")
+        refute result.status == 429
+      end
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/userinfo")
       assert response(conn, 429)
     end
   end
