@@ -12,6 +12,24 @@ defmodule AuthifyWeb.SessionControllerTest do
       assert html_response(conn, 200) =~ "Password"
     end
 
+    test "clears expired JWT from session to prevent redirect loop", %{conn: conn} do
+      # Simulate a browser that has an expired JWT in its session cookie
+      conn =
+        Plug.Test.init_test_session(conn, %{"guardian_default_token" => "expired.invalid.jwt"})
+
+      first_conn = get(conn, ~p"/login")
+
+      # Should redirect (auth error), not loop
+      assert redirected_to(first_conn) == "/login"
+
+      # The invalid JWT must be cleared from the session so the next request doesn't loop
+      assert get_session(first_conn, :guardian_default_token) == nil
+
+      # Following the redirect must render the login form (proves no loop)
+      second_conn = get(recycle(first_conn), ~p"/login")
+      assert html_response(second_conn, 200) =~ "Sign In"
+    end
+
     test "redirects to dashboard when user is already authenticated", %{conn: conn} do
       # Create organization and user
       slug = "test-org-#{System.unique_integer([:positive])}"
