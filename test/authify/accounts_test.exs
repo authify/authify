@@ -3,6 +3,8 @@ defmodule Authify.AccountsTest do
 
   alias Authify.Accounts
   alias Authify.Accounts.{Group, GroupMembership, Invitation, Organization, User}
+  alias Authify.OAuth
+  alias Authify.SAML
 
   import Authify.AccountsFixtures
 
@@ -1784,6 +1786,117 @@ defmodule Authify.AccountsTest do
       {:ok, _} = Accounts.delete_group(group)
       group_ids = Accounts.list_user_groups(user) |> Enum.map(& &1.id)
       refute group.id in group_ids
+    end
+  end
+
+  describe "get_user_accessible_applications" do
+    setup do
+      {:ok, org} = Accounts.create_organization(valid_org_attrs())
+      {:ok, user} = Accounts.create_user_with_role(valid_user_attrs(), org.id, "user")
+
+      {:ok, oauth_app} =
+        OAuth.create_application(%{
+          name: "Test OAuth App",
+          organization_id: org.id,
+          redirect_uris: "https://example.com/callback"
+        })
+
+      {:ok, saml_sp} =
+        SAML.create_service_provider(%{
+          "name" => "Test SAML SP",
+          "entity_id" => "https://test.example.com",
+          "acs_url" => "https://test.example.com/acs",
+          "organization_id" => org.id,
+          "is_active" => true
+        })
+
+      %{organization: org, user: user, oauth_app: oauth_app, saml_sp: saml_sp}
+    end
+
+    test "returns applications from active groups the user belongs to", %{
+      organization: org,
+      user: user,
+      oauth_app: oauth_app,
+      saml_sp: saml_sp
+    } do
+      {:ok, group} =
+        Accounts.create_group(%{"name" => "Active Group", "organization_id" => org.id})
+
+      {:ok, _} = Accounts.add_user_to_group(user, group)
+      {:ok, _} = Accounts.add_application_to_group(group, oauth_app.id, "oauth2")
+      {:ok, _} = Accounts.add_application_to_group(group, saml_sp.id, "saml")
+
+      result = Accounts.get_user_accessible_applications(user, org)
+
+      assert Enum.any?(result.oauth2_applications, &(&1.id == oauth_app.id))
+      assert Enum.any?(result.saml_service_providers, &(&1.id == saml_sp.id))
+    end
+
+    test "excludes applications from inactive groups", %{
+      organization: org,
+      user: user,
+      oauth_app: oauth_app,
+      saml_sp: saml_sp
+    } do
+      {:ok, group} =
+        Accounts.create_group(%{
+          "name" => "Inactive Group",
+          "organization_id" => org.id,
+          "is_active" => false
+        })
+
+      {:ok, _} = Accounts.add_user_to_group(user, group)
+      {:ok, _} = Accounts.add_application_to_group(group, oauth_app.id, "oauth2")
+      {:ok, _} = Accounts.add_application_to_group(group, saml_sp.id, "saml")
+
+      result = Accounts.get_user_accessible_applications(user, org)
+
+      refute Enum.any?(result.oauth2_applications, &(&1.id == oauth_app.id))
+      refute Enum.any?(result.saml_service_providers, &(&1.id == saml_sp.id))
+    end
+
+    test "returns only apps from active groups when user belongs to both active and inactive groups",
+         %{organization: org, user: user, oauth_app: oauth_app, saml_sp: saml_sp} do
+      {:ok, active_group} =
+        Accounts.create_group(%{"name" => "Active Group", "organization_id" => org.id})
+
+      {:ok, inactive_group} =
+        Accounts.create_group(%{
+          "name" => "Inactive Group",
+          "organization_id" => org.id,
+          "is_active" => false
+        })
+
+      {:ok, oauth_app_inactive} =
+        OAuth.create_application(%{
+          name: "Inactive Group App",
+          organization_id: org.id,
+          redirect_uris: "https://inactive.example.com/callback"
+        })
+
+      {:ok, _} = Accounts.add_user_to_group(user, active_group)
+      {:ok, _} = Accounts.add_user_to_group(user, inactive_group)
+      {:ok, _} = Accounts.add_application_to_group(active_group, oauth_app.id, "oauth2")
+      {:ok, _} = Accounts.add_application_to_group(active_group, saml_sp.id, "saml")
+
+      {:ok, _} =
+        Accounts.add_application_to_group(inactive_group, oauth_app_inactive.id, "oauth2")
+
+      result = Accounts.get_user_accessible_applications(user, org)
+
+      assert Enum.any?(result.oauth2_applications, &(&1.id == oauth_app.id))
+      assert Enum.any?(result.saml_service_providers, &(&1.id == saml_sp.id))
+      refute Enum.any?(result.oauth2_applications, &(&1.id == oauth_app_inactive.id))
+    end
+
+    test "returns empty maps when user has no group memberships", %{
+      organization: org,
+      user: user
+    } do
+      result = Accounts.get_user_accessible_applications(user, org)
+
+      assert result.oauth2_applications == []
+      assert result.saml_service_providers == []
     end
   end
 end
