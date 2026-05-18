@@ -1620,10 +1620,12 @@ defmodule Authify.Accounts do
   Gets user accessible applications through their groups.
   """
   def get_user_accessible_applications(%User{} = user, %Organization{} = organization) do
-    # Get all groups that the user belongs to
+    # Get all active groups that the user belongs to
     user_group_ids =
       from(gm in GroupMembership,
-        where: gm.user_id == ^user.id,
+        join: g in Group,
+        on: g.id == gm.group_id,
+        where: gm.user_id == ^user.id and g.is_active == true,
         select: gm.group_id
       )
       |> Repo.all()

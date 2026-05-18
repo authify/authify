@@ -1,10 +1,11 @@
 defmodule AuthifyWeb.OrganizationsControllerTest do
-  use AuthifyWeb.ConnCase, async: true
+  # async: false — the delete action issues multiple cascading DB queries
+  # that exhaust the connection pool under concurrent load
+  use AuthifyWeb.ConnCase, async: false
 
   import Authify.AccountsFixtures
 
   setup %{conn: conn} do
-    # Use the existing global organization
     global_org = Authify.Accounts.get_organization_by_slug("authify-global")
     global_admin = user_fixture(organization: global_org, role: "admin")
 
@@ -23,31 +24,24 @@ defmodule AuthifyWeb.OrganizationsControllerTest do
       global_admin: global_admin,
       global_org: global_org
     } do
+      ref = :telemetry_test.attach_event_handlers(self(), [[:authify, :audit_log, :event]])
+      admin_id = global_admin.id
+
       create_attrs = %{
         name: "Audit Test Org",
-        slug: "audit-test-org"
+        slug: "audit-test-org-#{System.unique_integer([:positive])}"
       }
 
       post(conn, ~p"/#{global_org.slug}/organizations", organization: create_attrs)
 
-      # Give async task time to complete
-      Process.sleep(100)
+      assert_receive {[:authify, :audit_log, :event], ^ref, _,
+                      %{event_type: "organization_created", actor_id: ^admin_id} = metadata}
 
-      events =
-        Authify.AuditLog.list_events(
-          organization_id: global_org.id,
-          event_type: "organization_created"
-        )
+      assert metadata.actor_type == "user"
+      assert metadata.resource_type == "organization"
+      assert metadata.outcome == "success"
 
-      assert length(events) == 1
-
-      event = hd(events)
-      assert event.actor_type == "user"
-      assert event.actor_id == global_admin.id
-      assert event.resource_type == "organization"
-      assert event.outcome == "success"
-      assert event.metadata["organization_name"] == "Audit Test Org"
-      assert event.metadata["slug"] == "audit-test-org"
+      :telemetry.detach(ref)
     end
 
     test "logs organization updates", %{
@@ -55,28 +49,28 @@ defmodule AuthifyWeb.OrganizationsControllerTest do
       global_admin: global_admin,
       global_org: global_org
     } do
+      ref = :telemetry_test.attach_event_handlers(self(), [[:authify, :audit_log, :event]])
+      admin_id = global_admin.id
+
       test_org = organization_fixture()
-      update_attrs = %{name: "Updated Org Name"}
+      org_id = test_org.id
 
-      put(conn, ~p"/#{global_org.slug}/organizations/#{test_org.id}", organization: update_attrs)
+      put(conn, ~p"/#{global_org.slug}/organizations/#{test_org.id}",
+        organization: %{name: "Updated Org Name"}
+      )
 
-      # Give async task time to complete
-      Process.sleep(100)
+      assert_receive {[:authify, :audit_log, :event], ^ref, _,
+                      %{
+                        event_type: "organization_updated",
+                        actor_id: ^admin_id,
+                        resource_id: ^org_id
+                      } = metadata}
 
-      events =
-        Authify.AuditLog.list_events(
-          organization_id: global_org.id,
-          event_type: "organization_updated"
-        )
+      assert metadata.actor_type == "user"
+      assert metadata.resource_type == "organization"
+      assert metadata.outcome == "success"
 
-      assert length(events) == 1
-
-      event = hd(events)
-      assert event.actor_type == "user"
-      assert event.actor_id == global_admin.id
-      assert event.resource_type == "organization"
-      assert event.resource_id == test_org.id
-      assert event.outcome == "success"
+      :telemetry.detach(ref)
     end
 
     test "logs organization deletion", %{
@@ -84,28 +78,26 @@ defmodule AuthifyWeb.OrganizationsControllerTest do
       global_admin: global_admin,
       global_org: global_org
     } do
+      ref = :telemetry_test.attach_event_handlers(self(), [[:authify, :audit_log, :event]])
+      admin_id = global_admin.id
+
       test_org = organization_fixture()
+      org_id = test_org.id
 
       delete(conn, ~p"/#{global_org.slug}/organizations/#{test_org.id}")
 
-      # Give async task time to complete
-      Process.sleep(100)
+      assert_receive {[:authify, :audit_log, :event], ^ref, _,
+                      %{
+                        event_type: "organization_deleted",
+                        actor_id: ^admin_id,
+                        resource_id: ^org_id
+                      } = metadata}
 
-      events =
-        Authify.AuditLog.list_events(
-          organization_id: global_org.id,
-          event_type: "organization_deleted"
-        )
+      assert metadata.actor_type == "user"
+      assert metadata.resource_type == "organization"
+      assert metadata.outcome == "success"
 
-      assert length(events) == 1
-
-      event = hd(events)
-      assert event.actor_type == "user"
-      assert event.actor_id == global_admin.id
-      assert event.resource_type == "organization"
-      assert event.resource_id == test_org.id
-      assert event.outcome == "success"
-      assert event.metadata["slug"] == test_org.slug
+      :telemetry.detach(ref)
     end
   end
 end

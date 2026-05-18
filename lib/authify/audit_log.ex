@@ -68,9 +68,32 @@ defmodule Authify.AuditLog do
   def log_event(event_type, attrs) when is_binary(event_type) do
     attrs = Map.put(attrs, :event_type, event_type)
 
-    %Event{}
-    |> Event.changeset(attrs)
-    |> Repo.insert()
+    result =
+      %Event{}
+      |> Event.changeset(attrs)
+      |> Repo.insert()
+
+    case result do
+      {:ok, event} ->
+        :telemetry.execute(
+          [:authify, :audit_log, :event],
+          %{system_time: System.system_time()},
+          %{
+            event_type: event.event_type,
+            organization_id: event.organization_id,
+            actor_id: event.actor_id,
+            actor_type: event.actor_type,
+            resource_type: event.resource_type,
+            resource_id: event.resource_id,
+            outcome: event.outcome
+          }
+        )
+
+      _ ->
+        :ok
+    end
+
+    result
   end
 
   @doc """
