@@ -595,5 +595,41 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
                "Error updating some settings"
     end
+
+    test "accepts sign_audit_logs boolean setting", %{conn: conn} do
+      organization = organization_fixture()
+      admin = user_fixture(%{organization: organization, role: "admin"})
+
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> patch(~p"/#{organization.slug}/settings/configuration", %{
+          "settings" => %{
+            "sign_audit_logs" => "true"
+          }
+        })
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/settings/configuration"
+
+      assert Authify.Configurations.get_organization_setting(organization, :sign_audit_logs) ==
+               true
+    end
+
+    test "rejects sign_audit_logs non-boolean", %{conn: conn} do
+      organization = organization_fixture()
+      admin = user_fixture(%{organization: organization, role: "admin"})
+
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> patch(~p"/#{organization.slug}/settings/configuration", %{
+          "settings" => %{
+            "sign_audit_logs" => "not-a-bool"
+          }
+        })
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+               "Error updating some settings"
+    end
   end
 end
