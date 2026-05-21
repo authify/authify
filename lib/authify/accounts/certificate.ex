@@ -9,7 +9,7 @@ defmodule Authify.Accounts.Certificate do
 
   alias Authify.Accounts.Organization
 
-  @valid_usages ["saml_signing", "saml_encryption", "oauth_signing"]
+  @valid_usages ["saml_signing", "saml_encryption", "oauth_signing", "audit_signing"]
 
   @derive {Jason.Encoder, except: [:__meta__, :organization, :private_key, :deleted_at]}
   schema "certificates" do

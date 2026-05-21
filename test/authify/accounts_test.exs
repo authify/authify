@@ -1336,6 +1336,37 @@ defmodule Authify.AccountsTest do
     end
   end
 
+  describe "audit signing certificate" do
+    setup do
+      organization = organization_fixture()
+      %{organization: organization}
+    end
+
+    test "get_or_generate_audit_signing_certificate/1 generates cert if none exists", %{
+      organization: org
+    } do
+      {:ok, cert} = Accounts.get_or_generate_audit_signing_certificate(org.id)
+
+      assert cert.usage == "audit_signing"
+      assert cert.is_active == true
+      assert cert.organization_id == org.id
+    end
+
+    test "get_or_generate_audit_signing_certificate/1 returns existing active cert", %{
+      organization: org
+    } do
+      {:ok, cert1} = Accounts.get_or_generate_audit_signing_certificate(org.id)
+      {:ok, cert2} = Accounts.get_or_generate_audit_signing_certificate(org.id)
+
+      assert cert1.id == cert2.id
+    end
+
+    test "generate_certificate/2 accepts audit_signing usage", %{organization: org} do
+      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "audit_signing"})
+      assert cert.usage == "audit_signing"
+    end
+  end
+
   describe "groups" do
     setup do
       {:ok, org} = Accounts.create_organization(valid_org_attrs())

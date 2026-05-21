@@ -1324,6 +1324,7 @@ defmodule Authify.Accounts do
         "saml_signing" -> "SAML Signing"
         "saml_encryption" -> "SAML Encryption"
         "oauth_signing" -> "OAuth Signing"
+        "audit_signing" -> "Audit Signing"
         _ -> "Certificate"
       end
 
@@ -1338,6 +1339,7 @@ defmodule Authify.Accounts do
         "saml_signing" -> "SAML Signing Certificate"
         "saml_encryption" -> "SAML Encryption Certificate"
         "oauth_signing" -> "OAuth Signing Certificate"
+        "audit_signing" -> "Audit Signing Certificate"
         _ -> "Certificate"
       end
 
@@ -1428,7 +1430,7 @@ defmodule Authify.Accounts do
     from(c in Certificate,
       where:
         c.organization_id == ^organization.id and c.usage == "saml_signing" and
-          c.is_active == true,
+          c.is_active == true and is_nil(c.deleted_at),
       limit: 1
     )
     |> Repo.one()
@@ -1441,7 +1443,7 @@ defmodule Authify.Accounts do
     from(c in Certificate,
       where:
         c.organization_id == ^organization.id and c.usage == "oauth_signing" and
-          c.is_active == true,
+          c.is_active == true and is_nil(c.deleted_at),
       limit: 1
     )
     |> Repo.one()
@@ -1458,6 +1460,49 @@ defmodule Authify.Accounts do
           "is_active" => true,
           "validity_days" => 365
         })
+
+      cert ->
+        {:ok, cert}
+    end
+  end
+
+  @doc """
+  Gets the active audit signing certificate for an organization by org ID.
+  """
+  def get_active_audit_signing_certificate(org_id) when is_integer(org_id) do
+    from(c in Certificate,
+      where:
+        c.organization_id == ^org_id and c.usage == "audit_signing" and
+          c.is_active == true and is_nil(c.deleted_at),
+      limit: 1
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Gets the active audit signing certificate, auto-generating one if none exists.
+  """
+  def get_or_generate_audit_signing_certificate(org_id) when is_integer(org_id) do
+    case get_active_audit_signing_certificate(org_id) do
+      nil ->
+        organization = Repo.get!(Organization, org_id)
+
+        result =
+          generate_certificate(organization, %{
+            "usage" => "audit_signing",
+            "is_active" => true,
+            "validity_days" => 365
+          })
+
+        if match?({:ok, _}, result) do
+          key_cache_mod = :"Elixir.Authify.AuditLog.KeyCache"
+
+          if function_exported?(key_cache_mod, :invalidate, 1) do
+            :erlang.apply(key_cache_mod, :invalidate, [org_id])
+          end
+        end
+
+        result
 
       cert ->
         {:ok, cert}
