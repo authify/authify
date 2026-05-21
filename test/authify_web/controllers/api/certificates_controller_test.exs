@@ -2,6 +2,7 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
   use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
+  alias Authify.Accounts
   alias Authify.AuditLog
 
   setup %{conn: conn} do
@@ -490,6 +491,48 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
                  "type" => "resource_not_found"
                }
              } = json_response(conn, 404)
+    end
+  end
+
+  describe "DELETE /certificates/:id (soft-delete)" do
+    test "marks certificate as deleted but does not remove it", %{conn: conn, organization: org} do
+      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
+
+      conn = delete(conn, ~p"/#{org.slug}/api/certificates/#{cert.id}")
+      assert response(conn, 204)
+
+      # Row still in DB with deleted_at set
+      raw = Authify.Repo.get(Authify.Accounts.Certificate, cert.id)
+      assert raw.deleted_at != nil
+    end
+
+    test "returns 404 when certificate already soft-deleted", %{conn: conn, organization: org} do
+      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Accounts.delete_certificate(cert)
+
+      conn = delete(conn, ~p"/#{org.slug}/api/certificates/#{cert.id}")
+      assert json_response(conn, 404)["error"]["type"] == "resource_not_found"
+    end
+  end
+
+  describe "GET /certificates/:id/download/certificate for soft-deleted" do
+    test "returns PEM for a soft-deleted certificate", %{conn: conn, organization: org} do
+      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Accounts.delete_certificate(cert)
+
+      conn = get(conn, ~p"/#{org.slug}/api/certificates/#{cert.id}/download/certificate")
+      assert response(conn, 200) =~ "BEGIN CERTIFICATE"
+    end
+
+    test "returns 404 for private_key download of soft-deleted certificate", %{
+      conn: conn,
+      organization: org
+    } do
+      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Accounts.delete_certificate(cert)
+
+      conn = get(conn, ~p"/#{org.slug}/api/certificates/#{cert.id}/download/private_key")
+      assert json_response(conn, 404)["error"]["type"] == "resource_not_found"
     end
   end
 

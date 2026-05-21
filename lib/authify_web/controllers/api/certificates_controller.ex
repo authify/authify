@@ -393,8 +393,13 @@ defmodule AuthifyWeb.API.CertificatesController do
       :ok ->
         organization = conn.assigns.current_organization
 
+        # Public certificate PEM must remain accessible even for soft-deleted certs
+        # (needed for offline verification of signed audit log events)
+        include_deleted = type == "certificate"
+
         try do
-          certificate = Accounts.get_certificate!(id, organization)
+          certificate =
+            Accounts.get_certificate!(id, organization, include_deleted: include_deleted)
 
           {content, filename} =
             case type do
