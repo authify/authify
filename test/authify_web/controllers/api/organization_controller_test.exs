@@ -126,6 +126,31 @@ defmodule AuthifyWeb.API.OrganizationControllerTest do
       assert event.metadata["schema"] == "organization"
       assert event.metadata["source"] == "api"
     end
+
+    test "accepts sign_audit_logs boolean setting", %{conn: conn, organization: organization} do
+      conn =
+        put(conn, "/#{organization.slug}/api/organization/configuration", %{
+          "settings" => %{
+            "sign_audit_logs" => "true"
+          }
+        })
+
+      assert %{"data" => %{"type" => "configuration"}} = json_response(conn, 200)
+
+      assert Authify.Configurations.get_organization_setting(organization, :sign_audit_logs) ==
+               true
+    end
+
+    test "rejects sign_audit_logs non-boolean value", %{conn: conn, organization: organization} do
+      conn =
+        put(conn, "/#{organization.slug}/api/organization/configuration", %{
+          "settings" => %{
+            "sign_audit_logs" => "not-a-bool"
+          }
+        })
+
+      assert %{"error" => %{"type" => "validation_error"}} = json_response(conn, 422)
+    end
   end
 
   # Note: PUT /api/organization and /api/organization/settings endpoints have been
