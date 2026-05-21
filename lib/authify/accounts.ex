@@ -1270,7 +1270,7 @@ defmodule Authify.Accounts do
   """
   def list_certificates(%Organization{id: org_id}) do
     from(c in Certificate,
-      where: c.organization_id == ^org_id,
+      where: c.organization_id == ^org_id and is_nil(c.deleted_at),
       order_by: [desc: c.inserted_at]
     )
     |> Repo.all()
@@ -1279,7 +1279,9 @@ defmodule Authify.Accounts do
   @doc """
   Gets a single certificate.
   """
-  def get_certificate!(id), do: Repo.get!(Certificate, id)
+  def get_certificate!(id) do
+    Repo.one!(from c in Certificate, where: c.id == ^id and is_nil(c.deleted_at))
+  end
 
   @doc """
   Creates a certificate.
@@ -1363,8 +1365,15 @@ defmodule Authify.Accounts do
   @doc """
   Gets a certificate with organization verification.
   """
-  def get_certificate!(id, organization) do
-    certificate = get_certificate!(id)
+  def get_certificate!(id, organization, opts \\ []) do
+    include_deleted = Keyword.get(opts, :include_deleted, false)
+
+    certificate =
+      if include_deleted do
+        Repo.get!(Certificate, id)
+      else
+        Repo.one!(from c in Certificate, where: c.id == ^id and is_nil(c.deleted_at))
+      end
 
     if certificate.organization_id == organization.id do
       certificate
@@ -1407,7 +1416,9 @@ defmodule Authify.Accounts do
   Deletes a certificate.
   """
   def delete_certificate(certificate) do
-    Repo.delete(certificate)
+    certificate
+    |> Ecto.Changeset.change(deleted_at: DateTime.utc_now() |> DateTime.truncate(:second))
+    |> Repo.update()
   end
 
   @doc """

@@ -1279,6 +1279,63 @@ defmodule Authify.AccountsTest do
     end
   end
 
+  describe "certificate soft-delete" do
+    setup do
+      organization = organization_fixture()
+      %{organization: organization}
+    end
+
+    test "delete_certificate/1 sets deleted_at and does not remove the row", %{organization: org} do
+      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
+
+      {:ok, deleted} = Accounts.delete_certificate(cert)
+
+      assert deleted.deleted_at != nil
+      # Row still exists in DB
+      assert Authify.Repo.get(Authify.Accounts.Certificate, cert.id) != nil
+    end
+
+    test "list_certificates/1 excludes soft-deleted certificates", %{organization: org} do
+      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Accounts.delete_certificate(cert)
+
+      certs = Accounts.list_certificates(org)
+      ids = Enum.map(certs, & &1.id)
+      refute cert.id in ids
+    end
+
+    test "get_certificate!/1 raises for soft-deleted certificate", %{organization: org} do
+      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Accounts.delete_certificate(cert)
+
+      assert_raise Ecto.NoResultsError, fn ->
+        Accounts.get_certificate!(cert.id)
+      end
+    end
+
+    test "get_certificate!/2 with include_deleted: true finds soft-deleted cert", %{
+      organization: org
+    } do
+      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Accounts.delete_certificate(cert)
+
+      found = Accounts.get_certificate!(cert.id, org, include_deleted: true)
+      assert found.id == cert.id
+      assert found.deleted_at != nil
+    end
+
+    test "get_certificate!/2 without include_deleted raises for soft-deleted cert", %{
+      organization: org
+    } do
+      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Accounts.delete_certificate(cert)
+
+      assert_raise Ecto.NoResultsError, fn ->
+        Accounts.get_certificate!(cert.id, org)
+      end
+    end
+  end
+
   describe "groups" do
     setup do
       {:ok, org} = Accounts.create_organization(valid_org_attrs())
