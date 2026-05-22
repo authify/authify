@@ -128,7 +128,19 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.AuditLogs do
                               ip_address: %{type: "string"},
                               user_agent: %{type: "string"},
                               metadata: %{type: "object"},
-                              inserted_at: %{type: "string", format: "date-time"}
+                              inserted_at: %{type: "string", format: "date-time"},
+                              signature: %{
+                                type: :string,
+                                nullable: true,
+                                description:
+                                  "Base64-encoded RSA-SHA256 signature of the canonical event payload. Null if signing is not enabled for this organization."
+                              },
+                              signing_certificate_id: %{
+                                type: :integer,
+                                nullable: true,
+                                description:
+                                  "ID of the certificate used to sign this event. Retrieve the public PEM via the signing_certificate link for offline verification."
+                              }
                             }
                           }
                         }
@@ -204,7 +216,31 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.AuditLogs do
                             ip_address: %{type: "string"},
                             user_agent: %{type: "string"},
                             metadata: %{type: "object"},
-                            inserted_at: %{type: "string", format: "date-time"}
+                            inserted_at: %{type: "string", format: "date-time"},
+                            signature: %{
+                              type: :string,
+                              nullable: true,
+                              description:
+                                "Base64-encoded RSA-SHA256 signature of the canonical event payload. Null if signing is not enabled for this organization."
+                            },
+                            signing_certificate_id: %{
+                              type: :integer,
+                              nullable: true,
+                              description:
+                                "ID of the certificate used to sign this event. Retrieve the public PEM via the signing_certificate link for offline verification."
+                            }
+                          }
+                        },
+                        links: %{
+                          type: "object",
+                          properties: %{
+                            self: %{type: "string"},
+                            signing_certificate: %{
+                              type: :string,
+                              nullable: true,
+                              description:
+                                "URL to download the public certificate PEM used to sign this event. Present only when signature is non-null."
+                            }
                           }
                         }
                       }
