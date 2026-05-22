@@ -394,6 +394,59 @@ defmodule Authify.AuditLogTest do
     end
   end
 
+  describe "audit log signing" do
+    setup do
+      org = organization_fixture()
+
+      base_attrs = %{
+        organization_id: org.id,
+        actor_type: "user",
+        actor_id: 1,
+        outcome: "success"
+      }
+
+      %{org: org, base_attrs: base_attrs}
+    end
+
+    test "log_event/2 does NOT sign when sign_audit_logs is false (default)", %{base_attrs: attrs} do
+      {:ok, event} = AuditLog.log_event(:login_success, attrs)
+
+      assert event.signature == nil
+      assert event.signing_certificate_id == nil
+    end
+
+    test "log_event/2 signs event when sign_audit_logs is true", %{org: org, base_attrs: attrs} do
+      Authify.Configurations.set_organization_setting(org, :sign_audit_logs, true)
+
+      {:ok, event} = AuditLog.log_event(:login_success, attrs)
+
+      assert is_binary(event.signature)
+      assert is_integer(event.signing_certificate_id)
+    end
+
+    test "signed event passes verification", %{org: org, base_attrs: attrs} do
+      Authify.Configurations.set_organization_setting(org, :sign_audit_logs, true)
+
+      {:ok, event} = AuditLog.log_event(:login_success, attrs)
+      {:ok, cert} = Authify.Accounts.get_or_generate_audit_signing_certificate(org.id)
+
+      assert :ok == Authify.AuditLog.Signer.verify(event, cert.certificate)
+    end
+
+    test "log_event_async/2 signs event when sign_audit_logs is true", %{
+      org: org,
+      base_attrs: attrs
+    } do
+      Authify.Configurations.set_organization_setting(org, :sign_audit_logs, true)
+
+      :ok = AuditLog.log_event_async(:login_success, attrs)
+
+      # In test env, async falls back to sync — query the DB
+      [event] = AuditLog.list_events(organization_id: org.id)
+      assert is_binary(event.signature)
+    end
+  end
+
   describe "get_event_stats/1" do
     test "returns statistics for events" do
       org = organization_fixture()
