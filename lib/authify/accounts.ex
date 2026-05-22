@@ -1494,13 +1494,7 @@ defmodule Authify.Accounts do
             "validity_days" => 365
           })
 
-        if match?({:ok, _}, result) do
-          key_cache_mod = :"Elixir.Authify.AuditLog.KeyCache"
-
-          if function_exported?(key_cache_mod, :invalidate, 1) do
-            :erlang.apply(key_cache_mod, :invalidate, [org_id])
-          end
-        end
+        if match?({:ok, _}, result), do: Authify.AuditLog.KeyCache.invalidate(org_id)
 
         result
 

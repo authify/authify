@@ -15,6 +15,7 @@ defmodule Authify.Application do
          [Application.get_env(:libcluster, :topologies, []), [name: Authify.ClusterSupervisor]]},
         Authify.RateLimit,
         Authify.Configurations.Cache,
+        Authify.AuditLog.KeyCache,
         {Phoenix.PubSub, name: Authify.PubSub},
         {Oban, Application.fetch_env!(:authify, Oban)}
       ] ++
