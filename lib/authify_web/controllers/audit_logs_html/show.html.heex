@@ -170,6 +170,62 @@
             </div>
           </div>
         <% end %>
+
+        <div class="card mb-4">
+          <div class="card-header d-flex align-items-center gap-2">
+            <i class="bi bi-shield-lock"></i>
+            <h5 class="mb-0">Cryptographic Signature</h5>
+          </div>
+          <div class="card-body">
+            <%= if @event.signature do %>
+              <div class="mb-3">
+                <span class="badge bg-success">
+                  <i class="bi bi-shield-check me-1"></i>Signed
+                </span>
+              </div>
+              <div class="mb-3">
+                <strong>Signature:</strong>
+                <div class="mt-1 d-flex align-items-start gap-2">
+                  <code
+                    id="sig-value"
+                    class="text-break small"
+                    style="word-break: break-all; font-size: 0.75rem;"
+                  >
+                    {@event.signature}
+                  </code>
+                  <button
+                    class="btn btn-sm btn-outline-secondary flex-shrink-0"
+                    onclick={"navigator.clipboard.writeText('#{@event.signature}')"}
+                    title="Copy full signature"
+                  >
+                    <i class="bi bi-clipboard"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="mb-0">
+                <strong>Signing Certificate:</strong>
+                <div class="mt-1">
+                  <a
+                    href={
+                      ~p"/#{@organization.slug}/api/certificates/#{@event.signing_certificate_id}/download/certificate"
+                    }
+                    class="btn btn-sm btn-outline-primary"
+                  >
+                    <i class="bi bi-download me-1"></i>Download PEM
+                  </a>
+                  <small class="text-muted ms-2">for offline verification</small>
+                </div>
+              </div>
+            <% else %>
+              <span class="badge bg-secondary">
+                <i class="bi bi-shield me-1"></i>Unsigned
+              </span>
+              <p class="text-muted small mt-2 mb-0">
+                This event was recorded before cryptographic signing was enabled, or signing is not currently active for this organization.
+              </p>
+            <% end %>
+          </div>
+        </div>
       </div>
     </div>
   </:main>

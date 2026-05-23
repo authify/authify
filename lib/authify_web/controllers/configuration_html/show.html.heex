@@ -253,6 +253,26 @@
                       class="form-check-input"
                       type="checkbox"
                       role="switch"
+                      id="sign_audit_logs"
+                      name="settings[sign_audit_logs]"
+                      value="true"
+                      checked={@settings[:sign_audit_logs] == true}
+                    />
+                    <label class="form-check-label" for="sign_audit_logs">
+                      <strong>Sign Audit Logs</strong>
+                    </label>
+                  </div>
+                  <small class="text-muted ms-4">
+                    Cryptographically sign each audit log event with this organization's audit signing certificate (RSA-SHA256). Signatures are included in API responses and can be verified offline using the linked public certificate PEM.
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
                       id="scim_inbound_provisioning_enabled"
                       name="settings[scim_inbound_provisioning_enabled]"
                       value="true"
