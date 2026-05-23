@@ -17,6 +17,8 @@ defmodule Authify.AuditLog do
   import Ecto.Query, warn: false
 
   alias Authify.AuditLog.Event
+  alias Authify.AuditLog.Signer
+  alias Authify.Configurations
   alias Authify.Repo
 
   @doc """
@@ -66,14 +68,10 @@ defmodule Authify.AuditLog do
   end
 
   def log_event(event_type, attrs) when is_binary(event_type) do
+    org_id = Map.get(attrs, :organization_id) || Map.get(attrs, "organization_id")
     attrs = Map.put(attrs, :event_type, event_type)
 
-    result =
-      %Event{}
-      |> Event.changeset(attrs)
-      |> Repo.insert()
-
-    case result do
+    case %Event{} |> Event.changeset(attrs) |> Repo.insert() do
       {:ok, event} ->
         :telemetry.execute(
           [:authify, :audit_log, :event],
@@ -89,11 +87,11 @@ defmodule Authify.AuditLog do
           }
         )
 
-      _ ->
-        :ok
-    end
+        {:ok, maybe_sign_event(event, org_id)}
 
-    result
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -376,6 +374,24 @@ defmodule Authify.AuditLog do
     |> Repo.all()
     |> Map.new()
   end
+
+  defp maybe_sign_event(event, org_id) when is_integer(org_id) do
+    if Configurations.get_setting("Organization", org_id, :sign_audit_logs) do
+      case Signer.sign(event, org_id) do
+        {:ok, signature, cert_id} ->
+          event
+          |> Event.signature_changeset(%{signature: signature, signing_certificate_id: cert_id})
+          |> Repo.update!()
+
+        {:error, _reason} ->
+          event
+      end
+    else
+      event
+    end
+  end
+
+  defp maybe_sign_event(event, _org_id), do: event
 
   @doc """
   Gets a single event by ID, raising if not found.

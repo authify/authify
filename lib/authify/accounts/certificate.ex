@@ -9,9 +9,9 @@ defmodule Authify.Accounts.Certificate do
 
   alias Authify.Accounts.Organization
 
-  @valid_usages ["saml_signing", "saml_encryption", "oauth_signing"]
+  @valid_usages ["saml_signing", "saml_encryption", "oauth_signing", "audit_signing"]
 
-  @derive {Jason.Encoder, except: [:__meta__, :organization, :private_key]}
+  @derive {Jason.Encoder, except: [:__meta__, :organization, :private_key, :deleted_at]}
   schema "certificates" do
     field :name, :string
     field :usage, :string
@@ -19,6 +19,7 @@ defmodule Authify.Accounts.Certificate do
     field :certificate, :string
     field :expires_at, :utc_datetime
     field :is_active, :boolean, default: false
+    field :deleted_at, :utc_datetime
 
     belongs_to :organization, Organization
 

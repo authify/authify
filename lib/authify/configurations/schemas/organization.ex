@@ -61,6 +61,18 @@ defmodule Authify.Configurations.Schemas.Organization do
           validation_fn: nil
         },
         %{
+          name: :sign_audit_logs,
+          description:
+            "Cryptographically sign audit log events with the organization's audit signing " <>
+              "certificate for compliance verification. When enabled, each new audit event is " <>
+              "signed with RSA-SHA256; the signature and a link to the public certificate are " <>
+              "included in API responses.",
+          value_type: :boolean,
+          default_value: false,
+          required: false,
+          validation_fn: nil
+        },
+        %{
           name: :scim_inbound_provisioning_enabled,
           description:
             "Enable SCIM 2.0 Service Provider endpoints - allows external identity providers and HR systems to provision users and groups into this organization",

@@ -108,7 +108,7 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Certificates do
         name: %{type: "string", description: "Certificate name"},
         usage: %{
           type: "string",
-          enum: ["saml_signing", "saml_encryption", "oauth_signing"],
+          enum: ["saml_signing", "saml_encryption", "oauth_signing", "audit_signing"],
           description: "Certificate usage type"
         },
         certificate: %{
@@ -177,7 +177,7 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Certificates do
             name: %{type: "string", description: "Certificate name"},
             usage: %{
               type: "string",
-              enum: ["saml_signing", "saml_encryption", "oauth_signing"],
+              enum: ["saml_signing", "saml_encryption", "oauth_signing", "audit_signing"],
               description: "Certificate usage type"
             },
             generate_new: %{

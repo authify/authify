@@ -49,7 +49,8 @@ defmodule AuthifyWeb.API.AuditLogsController do
 
         render_collection_response(conn, audit_logs,
           resource_type: "audit_log",
-          page_info: page_info
+          page_info: page_info,
+          extra_links_fn: signing_cert_links_fn(organization.slug)
         )
 
       {:error, response} ->
@@ -70,7 +71,10 @@ defmodule AuthifyWeb.API.AuditLogsController do
 
         case AuditLog.get_event(id, organization_id: organization.id) do
           {:ok, event} ->
-            render_api_response(conn, event, resource_type: "audit_log")
+            render_api_response(conn, event,
+              resource_type: "audit_log",
+              extra_links_fn: signing_cert_links_fn(organization.slug)
+            )
 
           {:error, :not_found} ->
             render_error_response(
@@ -110,6 +114,19 @@ defmodule AuthifyWeb.API.AuditLogsController do
     case DateTime.from_iso8601(date_string) do
       {:ok, datetime, _offset} -> Keyword.put(opts, key, datetime)
       {:error, _} -> opts
+    end
+  end
+
+  defp signing_cert_links_fn(org_slug) do
+    fn event ->
+      if event.signing_certificate_id do
+        %{
+          signing_certificate:
+            "/#{org_slug}/api/certificates/#{event.signing_certificate_id}/download/certificate"
+        }
+      else
+        %{}
+      end
     end
   end
 end

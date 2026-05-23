@@ -62,6 +62,8 @@ defmodule Authify.AuditLog.Event do
              :outcome,
              :metadata,
              :organization_id,
+             :signature,
+             :signing_certificate_id,
              :inserted_at
            ]}
 
@@ -76,6 +78,8 @@ defmodule Authify.AuditLog.Event do
     field :user_agent, :string
     field :outcome, :string
     field :metadata, :map
+    field :signature, :string
+    field :signing_certificate_id, :integer
 
     belongs_to :organization, Organization
 
@@ -103,6 +107,11 @@ defmodule Authify.AuditLog.Event do
     |> validate_inclusion(:actor_type, Enum.map(@actor_types, &to_string/1))
     |> validate_inclusion(:outcome, Enum.map(@outcome_types, &to_string/1))
     |> foreign_key_constraint(:organization_id)
+  end
+
+  @doc false
+  def signature_changeset(event, attrs) do
+    cast(event, attrs, [:signature, :signing_certificate_id])
   end
 
   @doc """

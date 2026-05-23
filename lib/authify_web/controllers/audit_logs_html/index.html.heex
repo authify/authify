@@ -145,6 +145,7 @@
                 <th>Actor</th>
                 <th>Outcome</th>
                 <th>IP Address</th>
+                <th></th>
                 <th>Details</th>
               </tr>
             </thead>
@@ -172,6 +173,16 @@
                   </td>
                   <td class="text-nowrap">
                     {event.ip_address || "N/A"}
+                  </td>
+                  <td class="text-center">
+                    <%= if event.signature do %>
+                      <i
+                        class="bi bi-shield-check text-success"
+                        title="Cryptographically signed"
+                        style="font-size: 1.1rem;"
+                      >
+                      </i>
+                    <% end %>
                   </td>
                   <td>
                     <a

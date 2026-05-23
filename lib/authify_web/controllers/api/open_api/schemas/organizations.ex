@@ -188,7 +188,13 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Organizations do
                   format: "email",
                   description: "Organization contact email"
                 },
-                logo_url: %{type: "string", format: "uri", description: "Organization logo URL"}
+                logo_url: %{type: "string", format: "uri", description: "Organization logo URL"},
+                sign_audit_logs: %{
+                  type: "boolean",
+                  description:
+                    "When true, each new audit event is signed with the organization's audit_signing certificate using RSA-SHA256. Signatures are included in API responses and can be verified offline using the linked public certificate PEM.",
+                  default: false
+                }
               }
             }
           ]

@@ -293,4 +293,79 @@ defmodule AuthifyWeb.API.AuditLogsControllerTest do
              } = json_response(conn, 403)
     end
   end
+
+  describe "audit log signature in API responses" do
+    setup %{conn: conn} do
+      org = organization_fixture()
+
+      Authify.Configurations.set_organization_setting(org, :sign_audit_logs, true)
+
+      {:ok, signed_event} =
+        Authify.AuditLog.log_event(:login_success, %{
+          organization_id: org.id,
+          actor_type: "user",
+          actor_id: 1,
+          outcome: "success"
+        })
+
+      Authify.Configurations.set_organization_setting(org, :sign_audit_logs, false)
+
+      {:ok, unsigned_event} =
+        Authify.AuditLog.log_event(:login_failure, %{
+          organization_id: org.id,
+          actor_type: "user",
+          actor_id: 1,
+          outcome: "failure"
+        })
+
+      conn =
+        conn
+        |> put_req_header("accept", "application/vnd.authify.v1+json")
+        |> put_req_header("content-type", "application/vnd.authify.v1+json")
+        |> assign(:current_organization, org)
+        |> assign(:api_authenticated, true)
+        |> assign(:current_scopes, ["audit_logs:read"])
+
+      %{conn: conn, org: org, signed_event: signed_event, unsigned_event: unsigned_event}
+    end
+
+    test "show includes signature and signing_certificate_id for signed event",
+         %{conn: conn, org: org, signed_event: signed_event} do
+      conn = get(conn, ~p"/#{org.slug}/api/audit-logs/#{signed_event.id}")
+      data = json_response(conn, 200)["data"]
+
+      assert data["attributes"]["signature"] != nil
+      assert data["attributes"]["signing_certificate_id"] != nil
+    end
+
+    test "show includes signing_certificate link for signed event",
+         %{conn: conn, org: org, signed_event: signed_event} do
+      conn = get(conn, ~p"/#{org.slug}/api/audit-logs/#{signed_event.id}")
+      data = json_response(conn, 200)["data"]
+      cert_id = signed_event.signing_certificate_id
+
+      assert data["links"]["signing_certificate"] ==
+               "/#{org.slug}/api/certificates/#{cert_id}/download/certificate"
+    end
+
+    test "show returns null signature fields and no signing_certificate link for unsigned event",
+         %{conn: conn, org: org, unsigned_event: unsigned_event} do
+      conn = get(conn, ~p"/#{org.slug}/api/audit-logs/#{unsigned_event.id}")
+      data = json_response(conn, 200)["data"]
+
+      assert data["attributes"]["signature"] == nil
+      assert data["attributes"]["signing_certificate_id"] == nil
+      refute Map.has_key?(data["links"], "signing_certificate")
+    end
+
+    test "index includes signing_certificate link for signed events",
+         %{conn: conn, org: org, signed_event: signed_event} do
+      conn = get(conn, ~p"/#{org.slug}/api/audit-logs")
+      items = json_response(conn, 200)["data"]
+
+      signed = Enum.find(items, &(&1["id"] == to_string(signed_event.id)))
+      assert signed["attributes"]["signature"] != nil
+      assert signed["links"]["signing_certificate"] != nil
+    end
+  end
 end

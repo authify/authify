@@ -227,9 +227,17 @@ defmodule AuthifyWeb.API.BaseController do
     org_slug = get_org_slug(conn)
     base_path = "/#{org_slug}/api/#{pluralize_resource_type(resource_type)}"
 
-    %{
+    base = %{
       self: "#{base_path}/#{resource.id}"
     }
+
+    extra =
+      case opts[:extra_links_fn] do
+        nil -> %{}
+        fun -> fun.(resource)
+      end
+
+    Map.merge(base, extra)
   end
 
   defp pluralize_resource_type("organization"), do: "organization"
