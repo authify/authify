@@ -207,26 +207,6 @@ defmodule AuthifyWeb.SessionController do
     end
   end
 
-  # Determines the appropriate dashboard path based on user role and organization
-  defp get_dashboard_path_for_user(user, organization) do
-    # Load user organizations to check role
-    user = Accounts.get_user_with_organizations!(user.id)
-
-    # Check if user is an admin in this organization or global admin
-    if admin_user?(user, organization) do
-      ~p"/#{organization.slug}/dashboard"
-    else
-      ~p"/#{organization.slug}/user/dashboard"
-    end
-  end
-
-  # Helper to determine if user has admin privileges
-  defp admin_user?(user, organization) do
-    # Check if user is admin in current organization or global admin
-    Authify.Accounts.User.admin?(user, organization.id) or
-      Authify.Accounts.User.global_admin?(user)
-  end
-
   # Routes user after successful password authentication based on MFA status
   defp route_after_authentication(conn, user, organization) do
     if Accounts.User.mfa_enabled?(user) do
@@ -297,7 +277,7 @@ defmodule AuthifyWeb.SessionController do
     |> put_session(:current_organization_id, organization.id)
     |> clear_mfa_session()
     |> put_flash(:info, "Welcome back!")
-    |> redirect(to: get_dashboard_path_for_user(user, organization))
+    |> redirect(to: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(user, organization))
   end
 
   # Clear MFA-related session keys
