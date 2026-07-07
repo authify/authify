@@ -148,7 +148,9 @@ defmodule AuthifyWeb.MfaController do
         # User already had codes, just redirect to dashboard
         conn
         |> put_flash(:info, "TOTP has been successfully enabled!")
-        |> redirect(to: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(updated_user, organization))
+        |> redirect(
+          to: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(updated_user, organization)
+        )
       end
     else
       # Voluntary setup
@@ -646,7 +648,9 @@ defmodule AuthifyWeb.MfaController do
     |> put_session(:current_organization_id, organization.id)
     |> clear_mfa_session()
     |> put_flash(:info, "Welcome back!")
-    |> redirect(to: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(updated_user, organization))
+    |> redirect(
+      to: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(updated_user, organization)
+    )
   end
 
   defp handle_verification_result(
