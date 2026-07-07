@@ -5,7 +5,6 @@ defmodule Authify.Accounts do
 
   import Ecto.Query, warn: false
   import Ecto.Changeset, only: [get_change: 2, get_field: 2]
-  alias Authify.Repo
 
   alias Authify.Accounts.{
     Certificate,
@@ -18,6 +17,9 @@ defmodule Authify.Accounts do
     User,
     UserEmail
   }
+
+  alias Authify.FilterSort
+  alias Authify.Repo
 
   alias Authify.SCIM.{AttributeMapper, FilterParser, QueryFilter}
 
@@ -58,50 +60,17 @@ defmodule Authify.Accounts do
     maybe_filter_organization_by_status(query, opts[:status])
   end
 
-  defp maybe_filter_organization_by_status(query, nil),
-    do: where(query, [o], o.active == true)
+  defp maybe_filter_organization_by_status(query, status),
+    do: FilterSort.apply_status_filter(query, :active, status)
 
-  defp maybe_filter_organization_by_status(query, ""),
-    do: where(query, [o], o.active == true)
+  defp apply_organization_search(query, search),
+    do: FilterSort.apply_multi_text_filter(query, [:name, :slug], search)
 
-  defp maybe_filter_organization_by_status(query, "all"), do: query
-  defp maybe_filter_organization_by_status(query, true), do: where(query, [o], o.active == true)
+  @organization_sort_fields [:name, :slug, :inserted_at, :updated_at]
 
-  defp maybe_filter_organization_by_status(query, "true"),
-    do: where(query, [o], o.active == true)
-
-  defp maybe_filter_organization_by_status(query, false),
-    do: where(query, [o], o.active == false)
-
-  defp maybe_filter_organization_by_status(query, "false"),
-    do: where(query, [o], o.active == false)
-
-  defp maybe_filter_organization_by_status(query, _), do: where(query, [o], o.active == true)
-
-  defp apply_organization_search(query, nil), do: query
-  defp apply_organization_search(query, ""), do: query
-
-  defp apply_organization_search(query, search_term) when is_binary(search_term) do
-    search_pattern = "%#{search_term}%"
-
-    where(
-      query,
-      [o],
-      like(o.name, ^search_pattern) or like(o.slug, ^search_pattern)
-    )
-  end
-
-  defp apply_organization_sorting(query, nil, _), do: order_by(query, [o], asc: o.name)
-  defp apply_organization_sorting(query, "", _), do: order_by(query, [o], asc: o.name)
-
-  defp apply_organization_sorting(query, sort_field, order)
-       when sort_field in [:name, :slug, :inserted_at, :updated_at] do
-    order_atom = if order == :desc or order == "desc", do: :desc, else: :asc
-    order_by(query, [o], ^[{order_atom, sort_field}])
-  end
-
-  defp apply_organization_sorting(query, _sort_field, _order),
-    do: order_by(query, [o], asc: o.name)
+  defp apply_organization_sorting(query, sort, order),
+    do:
+      FilterSort.apply_sort(query, sort, order, @organization_sort_fields, default: [asc: :name])
 
   @doc """
   Gets a single organization.
@@ -209,14 +178,8 @@ defmodule Authify.Accounts do
 
   defp maybe_filter_by_role(query, _), do: query
 
-  defp maybe_filter_by_status(query, nil), do: where(query, [u], u.active == true)
-  defp maybe_filter_by_status(query, ""), do: where(query, [u], u.active == true)
-  defp maybe_filter_by_status(query, "all"), do: query
-  defp maybe_filter_by_status(query, true), do: where(query, [u], u.active == true)
-  defp maybe_filter_by_status(query, "true"), do: where(query, [u], u.active == true)
-  defp maybe_filter_by_status(query, false), do: where(query, [u], u.active == false)
-  defp maybe_filter_by_status(query, "false"), do: where(query, [u], u.active == false)
-  defp maybe_filter_by_status(query, _), do: where(query, [u], u.active == true)
+  defp maybe_filter_by_status(query, status),
+    do: FilterSort.apply_status_filter(query, :active, status)
 
   defp apply_user_search(query, nil), do: query
   defp apply_user_search(query, ""), do: query
@@ -2104,49 +2067,19 @@ defmodule Authify.Accounts do
     maybe_filter_org_stats_by_status(query, opts[:status])
   end
 
-  defp maybe_filter_org_stats_by_status(query, nil),
-    do: where(query, [o], o.active == true)
+  defp maybe_filter_org_stats_by_status(query, status),
+    do: FilterSort.apply_status_filter(query, :active, status)
 
-  defp maybe_filter_org_stats_by_status(query, ""),
-    do: where(query, [o], o.active == true)
+  defp apply_org_stats_search(query, search),
+    do: FilterSort.apply_multi_text_filter(query, [:name, :slug], search)
 
-  defp maybe_filter_org_stats_by_status(query, "all"), do: query
-  defp maybe_filter_org_stats_by_status(query, true), do: where(query, [o], o.active == true)
+  @org_stats_sort_fields [:name, :slug, :inserted_at, :updated_at]
 
-  defp maybe_filter_org_stats_by_status(query, "true"),
-    do: where(query, [o], o.active == true)
-
-  defp maybe_filter_org_stats_by_status(query, false), do: where(query, [o], o.active == false)
-
-  defp maybe_filter_org_stats_by_status(query, "false"),
-    do: where(query, [o], o.active == false)
-
-  defp maybe_filter_org_stats_by_status(query, _), do: where(query, [o], o.active == true)
-
-  defp apply_org_stats_search(query, nil), do: query
-  defp apply_org_stats_search(query, ""), do: query
-
-  defp apply_org_stats_search(query, search_term) when is_binary(search_term) do
-    search_pattern = "%#{search_term}%"
-
-    where(
-      query,
-      [o],
-      like(o.name, ^search_pattern) or like(o.slug, ^search_pattern)
-    )
-  end
-
-  defp apply_org_stats_sorting(query, nil, _), do: order_by(query, [o], desc: o.inserted_at)
-  defp apply_org_stats_sorting(query, "", _), do: order_by(query, [o], desc: o.inserted_at)
-
-  defp apply_org_stats_sorting(query, sort_field, order)
-       when sort_field in [:name, :slug, :inserted_at, :updated_at] do
-    order_atom = if order == :desc or order == "desc", do: :desc, else: :asc
-    order_by(query, [o], ^[{order_atom, sort_field}])
-  end
-
-  defp apply_org_stats_sorting(query, _sort_field, _order),
-    do: order_by(query, [o], desc: o.inserted_at)
+  defp apply_org_stats_sorting(query, sort, order),
+    do:
+      FilterSort.apply_sort(query, sort, order, @org_stats_sort_fields,
+        default: [desc: :inserted_at]
+      )
 
   @doc """
   Gets system stats.
@@ -2490,55 +2423,16 @@ defmodule Authify.Accounts do
     maybe_filter_group_by_status(query, opts[:status])
   end
 
-  defp maybe_filter_group_by_status(query, nil),
-    do: query
+  defp maybe_filter_group_by_status(query, status),
+    do: FilterSort.apply_status_filter(query, :is_active, status, default_all: true)
 
-  defp maybe_filter_group_by_status(query, ""),
-    do: query
+  defp apply_group_search(query, search),
+    do: FilterSort.apply_multi_text_filter(query, [:name, :description], search)
 
-  defp maybe_filter_group_by_status(query, "all"), do: query
+  @group_sort_fields [:name, :description, :is_active, :inserted_at, :updated_at]
 
-  defp maybe_filter_group_by_status(query, true),
-    do: where(query, [g], g.is_active == true)
-
-  defp maybe_filter_group_by_status(query, "true"),
-    do: where(query, [g], g.is_active == true)
-
-  defp maybe_filter_group_by_status(query, false),
-    do: where(query, [g], g.is_active == false)
-
-  defp maybe_filter_group_by_status(query, "false"),
-    do: where(query, [g], g.is_active == false)
-
-  defp maybe_filter_group_by_status(query, _),
-    do: query
-
-  defp apply_group_search(query, nil), do: query
-  defp apply_group_search(query, ""), do: query
-
-  defp apply_group_search(query, search_term) when is_binary(search_term) do
-    search_pattern = "%#{search_term}%"
-
-    where(
-      query,
-      [g],
-      like(g.name, ^search_pattern) or like(g.description, ^search_pattern)
-    )
-  end
-
-  defp apply_group_sorting(query, nil, _),
-    do: order_by(query, [g], asc: g.name)
-
-  defp apply_group_sorting(query, "", _), do: order_by(query, [g], asc: g.name)
-
-  defp apply_group_sorting(query, sort_field, order)
-       when sort_field in [:name, :description, :is_active, :inserted_at, :updated_at] do
-    order_atom = if order == :asc or order == "asc", do: :asc, else: :desc
-    order_by(query, [g], ^[{order_atom, sort_field}])
-  end
-
-  defp apply_group_sorting(query, _sort_field, _order),
-    do: order_by(query, [g], asc: g.name)
+  defp apply_group_sorting(query, sort, order),
+    do: FilterSort.apply_sort(query, sort, order, @group_sort_fields, default: [asc: :name])
 
   @doc """
   Gets a single group by ID within an organization.

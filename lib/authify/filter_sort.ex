@@ -129,6 +129,43 @@ defmodule Authify.FilterSort do
   def apply_boolean_filter(query, _field, _value), do: query
 
   @doc """
+  Applies a common active/inactive status filter to a query.
+
+  Handles these input values consistently:
+    * `nil`, `""`, fallback → filter where field == true (active-only)
+    * `"all"` → no filter (return query unchanged)
+    * `true`, `"true"` → filter where field == true
+    * `false`, `"false"` → filter where field == false
+
+  ## Options
+    * `:default_all` — when `true`, the default behavior returns the query unchanged
+      instead of filtering for active-only (useful for resources that default to showing all).
+
+  ## Examples
+
+     iex> apply_status_filter(User, :active, nil)
+      #Ecto.Query<...> where field == true
+
+     iex> apply_status_filter(Group, :is_active, nil, default_all: true)
+      #Ecto.Query<...> (unchanged)
+  """
+  def apply_status_filter(query, field, value \\ nil, opts \\ []) do
+    default_all = Keyword.get(opts, :default_all, false)
+
+    case value do
+      nil when default_all -> query
+      "" when default_all -> query
+      "all" -> query
+      true -> where(query, [q], field(q, ^field) == true)
+      "true" -> where(query, [q], field(q, ^field) == true)
+      false -> where(query, [q], field(q, ^field) == false)
+      "false" -> where(query, [q], field(q, ^field) == false)
+      _ when default_all -> query
+      _ -> where(query, [q], field(q, ^field) == true)
+    end
+  end
+
+  @doc """
   Parses filter parameters from Phoenix params.
 
   Expects filters in the format: `filter[field_name]=value`
@@ -161,6 +198,8 @@ defmodule Authify.FilterSort do
   defp normalize_field(field) when is_atom(field), do: field
   defp normalize_field(_), do: nil
 
+  defp normalize_order(:desc), do: :desc
+  defp normalize_order(:asc), do: :asc
   defp normalize_order("desc"), do: :desc
   defp normalize_order("DESC"), do: :desc
   defp normalize_order(_), do: :asc

@@ -50,28 +50,8 @@ defmodule Authify.SAML do
     maybe_filter_saml_provider_by_status(query, opts[:status])
   end
 
-  defp maybe_filter_saml_provider_by_status(query, nil),
-    do: where(query, [sp], sp.is_active == true)
-
-  defp maybe_filter_saml_provider_by_status(query, ""),
-    do: where(query, [sp], sp.is_active == true)
-
-  defp maybe_filter_saml_provider_by_status(query, "all"), do: query
-
-  defp maybe_filter_saml_provider_by_status(query, true),
-    do: where(query, [sp], sp.is_active == true)
-
-  defp maybe_filter_saml_provider_by_status(query, "true"),
-    do: where(query, [sp], sp.is_active == true)
-
-  defp maybe_filter_saml_provider_by_status(query, false),
-    do: where(query, [sp], sp.is_active == false)
-
-  defp maybe_filter_saml_provider_by_status(query, "false"),
-    do: where(query, [sp], sp.is_active == false)
-
-  defp maybe_filter_saml_provider_by_status(query, _),
-    do: where(query, [sp], sp.is_active == true)
+  defp maybe_filter_saml_provider_by_status(query, status),
+    do: FilterSort.apply_status_filter(query, :is_active, status)
 
   @doc """
   Returns a paginated list of service providers for an organization.
