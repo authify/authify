@@ -277,9 +277,7 @@ defmodule AuthifyWeb.SessionController do
     |> put_session(:current_organization_id, organization.id)
     |> clear_mfa_session()
     |> put_flash(:info, "Welcome back!")
-    |> redirect(
-      to: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(user, organization)
-    )
+    |> redirect(to: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(user, organization))
   end
 
   # Clear MFA-related session keys
