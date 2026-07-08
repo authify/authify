@@ -4,10 +4,10 @@ defmodule Authify.OAuth do
   """
 
   import Ecto.Query, warn: false
-  alias Authify.Repo
-
   alias Authify.Accounts.{Organization, User}
+  alias Authify.FilterSort
   alias Authify.OAuth.{AccessToken, Application, AuthorizationCode, RefreshToken, UserGrant}
+  alias Authify.Repo
 
   @doc """
   Returns the list of applications for an organization.
@@ -63,41 +63,19 @@ defmodule Authify.OAuth do
     maybe_filter_application_by_status(query, opts[:status])
   end
 
-  defp maybe_filter_application_by_status(query, nil), do: where(query, [a], a.is_active == true)
-  defp maybe_filter_application_by_status(query, ""), do: where(query, [a], a.is_active == true)
-  defp maybe_filter_application_by_status(query, "all"), do: query
-  defp maybe_filter_application_by_status(query, true), do: where(query, [a], a.is_active == true)
+  defp maybe_filter_application_by_status(query, status),
+    do: FilterSort.apply_status_filter(query, :is_active, status)
 
-  defp maybe_filter_application_by_status(query, "true"),
-    do: where(query, [a], a.is_active == true)
+  defp apply_application_search(query, search),
+    do: FilterSort.apply_text_filter(query, :name, search)
 
-  defp maybe_filter_application_by_status(query, false),
-    do: where(query, [a], a.is_active == false)
+  @application_sort_fields [:name, :client_id, :inserted_at, :updated_at]
 
-  defp maybe_filter_application_by_status(query, "false"),
-    do: where(query, [a], a.is_active == false)
-
-  defp maybe_filter_application_by_status(query, _), do: where(query, [a], a.is_active == true)
-
-  defp apply_application_search(query, nil), do: query
-  defp apply_application_search(query, ""), do: query
-
-  defp apply_application_search(query, search_term) when is_binary(search_term) do
-    search_pattern = "%#{search_term}%"
-    where(query, [a], like(a.name, ^search_pattern))
-  end
-
-  defp apply_application_sorting(query, nil, _), do: order_by(query, [a], desc: a.inserted_at)
-  defp apply_application_sorting(query, "", _), do: order_by(query, [a], desc: a.inserted_at)
-
-  defp apply_application_sorting(query, sort_field, order)
-       when sort_field in [:name, :client_id, :inserted_at, :updated_at] do
-    order_atom = if order == :asc or order == "asc", do: :asc, else: :desc
-    order_by(query, [a], ^[{order_atom, sort_field}])
-  end
-
-  defp apply_application_sorting(query, _sort_field, _order),
-    do: order_by(query, [a], desc: a.inserted_at)
+  defp apply_application_sorting(query, sort, order),
+    do:
+      FilterSort.apply_sort(query, sort, order, @application_sort_fields,
+        default: [desc: :inserted_at]
+      )
 
   @doc """
   Returns the list of Management API applications for an organization.
