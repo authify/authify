@@ -38,102 +38,38 @@ defmodule Authify.Email do
   defp invitation_html_body(invitation, invited_by, organization, accept_url) do
     invited_by_email = User.get_primary_email_value(invited_by)
 
+    content = """
+    <h2>You've been invited to join #{organization.name}</h2>
+
+    <p>Hello,</p>
+
+    <p>
+      <strong>#{invited_by.first_name} #{invited_by.last_name}</strong> (#{invited_by_email})
+      has invited you to join <strong>#{organization.name}</strong> on Authify as a
+      <strong>#{String.capitalize(invitation.role)}</strong>.
+    </p>
+
+    <p>Click the button below to accept the invitation and create your account:</p>
+
+    <p style="text-align: center;">
+      <a href="#{accept_url}" class="button">Accept Invitation</a>
+    </p>
+
+    <p style="font-size: 14px; color: #6c757d;">
+      Or copy and paste this link into your browser:<br>
+      <a href="#{accept_url}">#{accept_url}</a>
+    </p>
+
+    <div class="notice">
+      <strong>⏰ This invitation expires on #{format_datetime(invitation.expires_at)}</strong>
+    </div>
+
+    <p>
+      If you weren't expecting this invitation, you can safely ignore this email.
+    </p>
     """
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-          line-height: 1.6;
-          color: #333;
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 20px;
-        }
-        .header {
-          text-align: center;
-          padding: 20px 0;
-          border-bottom: 2px solid #0d6efd;
-        }
-        .logo {
-          width: 64px;
-          height: 64px;
-        }
-        .content {
-          padding: 30px 0;
-        }
-        .button {
-          display: inline-block;
-          padding: 12px 24px;
-          background-color: #0d6efd;
-          color: #ffffff;
-          text-decoration: none;
-          border-radius: 5px;
-          margin: 20px 0;
-        }
-        .footer {
-          margin-top: 40px;
-          padding-top: 20px;
-          border-top: 1px solid #dee2e6;
-          font-size: 14px;
-          color: #6c757d;
-        }
-        .expiry-notice {
-          background-color: #fff3cd;
-          border-left: 4px solid #ffc107;
-          padding: 12px;
-          margin: 20px 0;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>Authify</h1>
-      </div>
 
-      <div class="content">
-        <h2>You've been invited to join #{organization.name}</h2>
-
-        <p>Hello,</p>
-
-        <p>
-          <strong>#{invited_by.first_name} #{invited_by.last_name}</strong> (#{invited_by_email})
-          has invited you to join <strong>#{organization.name}</strong> on Authify as a
-          <strong>#{String.capitalize(invitation.role)}</strong>.
-        </p>
-
-        <p>Click the button below to accept the invitation and create your account:</p>
-
-        <p style="text-align: center;">
-          <a href="#{accept_url}" class="button">Accept Invitation</a>
-        </p>
-
-        <p style="font-size: 14px; color: #6c757d;">
-          Or copy and paste this link into your browser:<br>
-          <a href="#{accept_url}">#{accept_url}</a>
-        </p>
-
-        <div class="expiry-notice">
-          <strong>⏰ This invitation expires on #{format_datetime(invitation.expires_at)}</strong>
-        </div>
-
-        <p>
-          If you weren't expecting this invitation, you can safely ignore this email.
-        </p>
-      </div>
-
-      <div class="footer">
-        <p>
-          This email was sent by #{organization.name} via Authify.<br>
-          Questions? Contact <a href="mailto:#{invited_by_email}">#{invited_by_email}</a>
-        </p>
-      </div>
-    </body>
-    </html>
-    """
+    email_layout(content, email_footer(organization, invited_by_email))
   end
 
   defp invitation_text_body(invitation, invited_by, organization, accept_url) do
@@ -180,7 +116,7 @@ defmodule Authify.Email do
     organization = invitation.organization
 
     # In development, send to local mailbox even without SMTP
-    if dev_mode?() do
+    if dev_or_test_mode?() do
       invitation
       |> invitation_email(accept_url)
       |> Mailer.deliver()
@@ -225,98 +161,38 @@ defmodule Authify.Email do
   end
 
   defp password_reset_html_body(user, organization, reset_url) do
+    content = """
+    <h2>Password Reset Request</h2>
+
+    <p>Hello #{user.first_name},</p>
+
+    <p>
+      We received a request to reset your password for your account at
+      <strong>#{organization.name}</strong>.
+    </p>
+
+    <p>Click the button below to reset your password:</p>
+
+    <p style="text-align: center;">
+      <a href="#{reset_url}" class="button">Reset Password</a>
+    </p>
+
+    <p style="font-size: 14px; color: #6c757d;">
+      Or copy and paste this link into your browser:<br>
+      <a href="#{reset_url}">#{reset_url}</a>
+    </p>
+
+    <div class="notice">
+      <strong>⏰ This link expires in 24 hours</strong>
+    </div>
+
+    <div class="notice">
+      <strong>🔒 Security Notice:</strong> If you didn't request this password reset,
+      please ignore this email. Your password will not be changed.
+    </div>
     """
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-          line-height: 1.6;
-          color: #333;
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 20px;
-        }
-        .header {
-          text-align: center;
-          padding: 20px 0;
-          border-bottom: 2px solid #0d6efd;
-        }
-        .content {
-          padding: 30px 0;
-        }
-        .button {
-          display: inline-block;
-          padding: 12px 24px;
-          background-color: #0d6efd;
-          color: #ffffff;
-          text-decoration: none;
-          border-radius: 5px;
-          margin: 20px 0;
-        }
-        .footer {
-          margin-top: 40px;
-          padding-top: 20px;
-          border-top: 1px solid #dee2e6;
-          font-size: 14px;
-          color: #6c757d;
-        }
-        .security-notice {
-          background-color: #fff3cd;
-          border-left: 4px solid #ffc107;
-          padding: 12px;
-          margin: 20px 0;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>Authify</h1>
-      </div>
 
-      <div class="content">
-        <h2>Password Reset Request</h2>
-
-        <p>Hello #{user.first_name},</p>
-
-        <p>
-          We received a request to reset your password for your account at
-          <strong>#{organization.name}</strong>.
-        </p>
-
-        <p>Click the button below to reset your password:</p>
-
-        <p style="text-align: center;">
-          <a href="#{reset_url}" class="button">Reset Password</a>
-        </p>
-
-        <p style="font-size: 14px; color: #6c757d;">
-          Or copy and paste this link into your browser:<br>
-          <a href="#{reset_url}">#{reset_url}</a>
-        </p>
-
-        <div class="security-notice">
-          <strong>⏰ This link expires in 24 hours</strong>
-        </div>
-
-        <div class="security-notice">
-          <strong>🔒 Security Notice:</strong> If you didn't request this password reset,
-          please ignore this email. Your password will not be changed.
-        </div>
-      </div>
-
-      <div class="footer">
-        <p>
-          This email was sent by #{organization.name} via Authify.<br>
-          If you have questions, please contact your organization administrator.
-        </p>
-      </div>
-    </body>
-    </html>
-    """
+    email_layout(content, email_footer(organization))
   end
 
   defp password_reset_text_body(user, organization, reset_url) do
@@ -361,7 +237,7 @@ defmodule Authify.Email do
     organization = user.organization
 
     # In development, send to local mailbox even without SMTP
-    if dev_mode?() do
+    if dev_or_test_mode?() do
       user
       |> password_reset_email(reset_url)
       |> Mailer.deliver()
@@ -406,97 +282,37 @@ defmodule Authify.Email do
   end
 
   defp email_verification_html_body(user, organization, verification_url) do
+    content = """
+    <h2>Verify Your Email Address</h2>
+
+    <p>Hello #{user.first_name},</p>
+
+    <p>
+      Welcome to <strong>#{organization.name}</strong>! Please verify your email address
+      to activate your account.
+    </p>
+
+    <p>Click the button below to verify your email:</p>
+
+    <p style="text-align: center;">
+      <a href="#{verification_url}" class="button">Verify Email</a>
+    </p>
+
+    <p style="font-size: 14px; color: #6c757d;">
+      Or copy and paste this link into your browser:<br>
+      <a href="#{verification_url}">#{verification_url}</a>
+    </p>
+
+    <div class="notice">
+      <strong>⏰ This verification link expires in 24 hours</strong>
+    </div>
+
+    <p>
+      If you didn't create an account, you can safely ignore this email.
+    </p>
     """
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-          line-height: 1.6;
-          color: #333;
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 20px;
-        }
-        .header {
-          text-align: center;
-          padding: 20px 0;
-          border-bottom: 2px solid #0d6efd;
-        }
-        .content {
-          padding: 30px 0;
-        }
-        .button {
-          display: inline-block;
-          padding: 12px 24px;
-          background-color: #0d6efd;
-          color: #ffffff;
-          text-decoration: none;
-          border-radius: 5px;
-          margin: 20px 0;
-        }
-        .footer {
-          margin-top: 40px;
-          padding-top: 20px;
-          border-top: 1px solid #dee2e6;
-          font-size: 14px;
-          color: #6c757d;
-        }
-        .expiry-notice {
-          background-color: #fff3cd;
-          border-left: 4px solid #ffc107;
-          padding: 12px;
-          margin: 20px 0;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>Authify</h1>
-      </div>
 
-      <div class="content">
-        <h2>Verify Your Email Address</h2>
-
-        <p>Hello #{user.first_name},</p>
-
-        <p>
-          Welcome to <strong>#{organization.name}</strong>! Please verify your email address
-          to activate your account.
-        </p>
-
-        <p>Click the button below to verify your email:</p>
-
-        <p style="text-align: center;">
-          <a href="#{verification_url}" class="button">Verify Email</a>
-        </p>
-
-        <p style="font-size: 14px; color: #6c757d;">
-          Or copy and paste this link into your browser:<br>
-          <a href="#{verification_url}">#{verification_url}</a>
-        </p>
-
-        <div class="expiry-notice">
-          <strong>⏰ This verification link expires in 24 hours</strong>
-        </div>
-
-        <p>
-          If you didn't create an account, you can safely ignore this email.
-        </p>
-      </div>
-
-      <div class="footer">
-        <p>
-          This email was sent by #{organization.name} via Authify.<br>
-          If you have questions, please contact your organization administrator.
-        </p>
-      </div>
-    </body>
-    </html>
-    """
+    email_layout(content, email_footer(organization))
   end
 
   defp email_verification_text_body(user, organization, verification_url) do
@@ -560,14 +376,109 @@ defmodule Authify.Email do
     end
   end
 
-  # Check if running in development or test mode
-  defp dev_or_test_mode? do
-    Application.get_env(:authify, :env) in [:dev, :test]
+  # ── Shared email layout helpers ──────────────────────────────────────
+
+  defp shared_css do
+    """
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      text-align: center;
+      padding: 20px 0;
+      border-bottom: 2px solid #0d6efd;
+    }
+    .content {
+      padding: 30px 0;
+    }
+    .button {
+      display: inline-block;
+      padding: 12px 24px;
+      background-color: #0d6efd;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+    .notice {
+      background-color: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 12px;
+      margin: 20px 0;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #dee2e6;
+      font-size: 14px;
+      color: #6c757d;
+    }
+    """
   end
 
-  # Check if running in development mode
-  defp dev_mode? do
-    Application.get_env(:authify, :env) == :dev
+  defp email_header do
+    """
+    <div class="header">
+      <h1>Authify</h1>
+    </div>
+    """
+  end
+
+  defp email_footer(organization) do
+    """
+    <div class="footer">
+      <p>
+        This email was sent by #{organization.name} via Authify.<br>
+        If you have questions, please contact your organization administrator.
+      </p>
+    </div>
+    """
+  end
+
+  defp email_footer(organization, contact_email) do
+    """
+    <div class="footer">
+      <p>
+        This email was sent by #{organization.name} via Authify.<br>
+        Questions? Contact <a href="mailto:#{contact_email}">#{contact_email}</a>
+      </p>
+    </div>
+    """
+  end
+
+  defp email_layout(content, footer) do
+    """
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+    #{shared_css()}
+      </style>
+    </head>
+    <body>
+    #{email_header()}
+
+      <div class="content">
+    #{content}
+      </div>
+
+    #{footer}
+    </body>
+    </html>
+    """
+  end
+
+  # ── Internal helpers ─────────────────────────────────────────────────
+
+  defp dev_or_test_mode? do
+    Application.get_env(:authify, :env) in [:dev, :test]
   end
 
   # Get from address from organization settings, or use dev/test default
