@@ -646,7 +646,7 @@ defmodule AuthifyWeb.MfaController do
     conn
     |> Authify.Guardian.Plug.sign_in(updated_user)
     |> put_session(:current_organization_id, organization.id)
-    |> clear_mfa_session()
+    |> AuthifyWeb.Auth.Navigation.clear_mfa_session()
     |> put_flash(:info, "Welcome back!")
     |> redirect(
       to: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(updated_user, organization)
@@ -817,14 +817,6 @@ defmodule AuthifyWeb.MfaController do
     end
   end
 
-  defp clear_mfa_session(conn) do
-    conn
-    |> delete_session(:mfa_pending_user_id)
-    |> delete_session(:mfa_pending_organization_id)
-    |> delete_session(:mfa_pending_timestamp)
-    |> delete_session(:mfa_setup_secret)
-  end
-
   # Determines the context for MFA setup (mandatory vs voluntary)
   # Returns {:ok, user, organization} or {:error, conn_with_redirect}
   defp get_setup_context(conn) do
@@ -863,21 +855,6 @@ defmodule AuthifyWeb.MfaController do
     else
       conn
     end
-  end
-
-  defp complete_mfa_login(conn, user, organization) do
-    # Clear rate limit on successful login
-    MFA.clear_rate_limit(user)
-
-    # Sign in and set organization
-    conn
-    |> Authify.Guardian.Plug.sign_in(user)
-    |> put_session(:current_organization_id, organization.id)
-    |> clear_mfa_session()
-  end
-
-  defp redirect_after_mfa_success(organization) do
-    "/#{organization.slug}/dashboard"
   end
 
   defp get_authentication_challenge(conn) do
@@ -925,11 +902,11 @@ defmodule AuthifyWeb.MfaController do
       }
     )
 
-    conn = complete_mfa_login(conn, user, organization)
+    conn = AuthifyWeb.Auth.Navigation.complete_mfa_login(conn, user, organization)
 
     json(conn, %{
       success: true,
-      redirect_url: redirect_after_mfa_success(organization)
+      redirect_url: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(user, organization)
     })
   end
 
