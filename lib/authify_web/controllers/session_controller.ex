@@ -175,7 +175,7 @@ defmodule AuthifyWeb.SessionController do
     conn =
       conn
       |> Guardian.Plug.sign_out()
-      |> clear_mfa_session()
+      |> AuthifyWeb.Auth.Navigation.clear_mfa_session()
 
     # Check if this is part of SAML Single Logout completion
     if slo_complete == "true" do
@@ -275,17 +275,8 @@ defmodule AuthifyWeb.SessionController do
     |> Guardian.Plug.sign_out()
     |> Guardian.Plug.sign_in(user)
     |> put_session(:current_organization_id, organization.id)
-    |> clear_mfa_session()
+    |> AuthifyWeb.Auth.Navigation.clear_mfa_session()
     |> put_flash(:info, "Welcome back!")
     |> redirect(to: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(user, organization))
-  end
-
-  # Clear MFA-related session keys
-  defp clear_mfa_session(conn) do
-    conn
-    |> delete_session(:mfa_pending_user_id)
-    |> delete_session(:mfa_pending_organization_id)
-    |> delete_session(:mfa_pending_timestamp)
-    |> delete_session(:mfa_setup_secret)
   end
 end
