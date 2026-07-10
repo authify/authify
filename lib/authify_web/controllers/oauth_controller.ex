@@ -7,7 +7,7 @@ defmodule AuthifyWeb.OAuthController do
   alias Authify.Accounts.User
   alias Authify.Configurations
   alias Authify.OAuth
-  alias AuthifyWeb.OAuthController.AuditLogger
+  alias AuthifyWeb.Audit.OAuth, as: AuditOAuth
 
   @doc """
   OAuth2 Authorization endpoint.
@@ -85,7 +85,7 @@ defmodule AuthifyWeb.OAuthController do
     organization = conn.assigns.current_organization
 
     if user do
-      AuditLogger.log_authorization_denied(conn, organization, user, params)
+      AuditOAuth.log_authorization_denied(conn, organization, user, params)
     end
 
     handle_consent_denial(conn, organization, params)
@@ -128,7 +128,7 @@ defmodule AuthifyWeb.OAuthController do
     # Create or update user grant for this application
     case OAuth.create_or_update_user_grant(user, application, scopes) do
       {:ok, _grant} ->
-        AuditLogger.log_authorization_success(
+        AuditOAuth.log_authorization_success(
           conn,
           organization,
           user,
@@ -149,7 +149,7 @@ defmodule AuthifyWeb.OAuthController do
         # Log error but don't block the OAuth flow
         Logger.warning("Failed to create user grant for user=#{user.id} app=#{application.id}")
 
-        AuditLogger.log_authorization_success(
+        AuditOAuth.log_authorization_success(
           conn,
           organization,
           user,
@@ -395,7 +395,7 @@ defmodule AuthifyWeb.OAuthController do
            Map.merge(pkce_params, nonce_params)
          ) do
       {:ok, auth_code} ->
-        AuditLogger.log_authorization_auto_approved(
+        AuditOAuth.log_authorization_auto_approved(
           conn,
           organization,
           user,
@@ -460,7 +460,7 @@ defmodule AuthifyWeb.OAuthController do
       access_token = result.access_token
       refresh_token = result.refresh_token
 
-      AuditLogger.log_token_grant_success(
+      AuditOAuth.log_token_grant_success(
         conn,
         organization,
         application,
@@ -476,7 +476,7 @@ defmodule AuthifyWeb.OAuthController do
       json(conn, response)
     else
       {:error, error} ->
-        AuditLogger.log_token_grant_failure(
+        AuditOAuth.log_token_grant_failure(
           conn,
           organization,
           params,
@@ -556,7 +556,7 @@ defmodule AuthifyWeb.OAuthController do
       access_token = result.access_token
       new_refresh_token = result.refresh_token
 
-      AuditLogger.log_token_grant_success(
+      AuditOAuth.log_token_grant_success(
         conn,
         organization,
         application,
@@ -570,7 +570,7 @@ defmodule AuthifyWeb.OAuthController do
       json(conn, response)
     else
       {:error, error} ->
-        AuditLogger.log_token_grant_failure(conn, organization, params, error, "refresh_token")
+        AuditOAuth.log_token_grant_failure(conn, organization, params, error, "refresh_token")
         handle_refresh_token_error(conn, error)
     end
   end
@@ -614,7 +614,7 @@ defmodule AuthifyWeb.OAuthController do
            validate_client_credentials(params["client_id"], params["client_secret"], organization),
          {:ok, scopes} <- validate_requested_scopes(application, params["scope"]),
          {:ok, access_token} <- OAuth.create_management_api_access_token(application, scopes) do
-      AuditLogger.log_token_grant_success(
+      AuditOAuth.log_token_grant_success(
         conn,
         organization,
         application,
@@ -626,7 +626,7 @@ defmodule AuthifyWeb.OAuthController do
       json(conn, build_token_response(access_token))
     else
       {:error, error} ->
-        AuditLogger.log_token_grant_failure(
+        AuditOAuth.log_token_grant_failure(
           conn,
           organization,
           params,

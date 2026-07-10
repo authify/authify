@@ -1,8 +1,8 @@
 defmodule AuthifyWeb.SAMLController do
   use AuthifyWeb, :controller
 
-  alias Authify.AuditLog
   alias Authify.SAML
+  alias AuthifyWeb.Audit.SAML, as: SAMLAudit
 
   # Helper to escape HTML and convert to string
   defp html_escape_to_string(value) when is_binary(value) do
@@ -136,25 +136,7 @@ defmodule AuthifyWeb.SAMLController do
 
   defp log_saml_assertion_issued(conn, organization, current_user, saml_session) do
     sp = saml_session.service_provider
-
-    AuditLog.log_event_async(:saml_assertion_issued, %{
-      organization_id: organization.id,
-      actor_type: "user",
-      actor_id: current_user.id,
-      actor_name: "#{current_user.first_name} #{current_user.last_name}",
-      resource_type: "saml_assertion",
-      resource_id: saml_session.id,
-      outcome: "success",
-      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-      metadata: %{
-        service_provider_id: sp.id,
-        service_provider_name: sp.name,
-        entity_id: sp.entity_id,
-        session_id: saml_session.session_id,
-        relay_state: saml_session.relay_state
-      }
-    })
+    SAMLAudit.log_assertion_issued(conn, organization, current_user, sp, saml_session)
   end
 
   @doc """
@@ -359,21 +341,7 @@ defmodule AuthifyWeb.SAMLController do
         :ok
 
       current_user ->
-        AuditLog.log_event_async(:saml_slo_completed, %{
-          organization_id: organization.id,
-          actor_type: "user",
-          actor_id: current_user.id,
-          actor_name: "#{current_user.first_name} #{current_user.last_name}",
-          outcome: "success",
-          ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-          user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-          metadata: %{
-            service_provider_id: sp.id,
-            service_provider_name: sp.name,
-            entity_id: sp.entity_id,
-            initiator: "service_provider"
-          }
-        })
+        SAMLAudit.log_slo_completed(conn, organization, current_user, sp)
 
         :ok
     end

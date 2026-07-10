@@ -5,8 +5,8 @@ defmodule AuthifyWeb.UsersController do
 
   alias Authify.Accounts
   alias Authify.Accounts.User
-  alias Authify.AuditLog
   alias Authify.LocaleHelpers
+  alias AuthifyWeb.Audit.Users, as: UsersAudit
 
   # Safely convert string to atom, only for known valid values
   defp safe_to_atom(string)
@@ -540,21 +540,7 @@ defmodule AuthifyWeb.UsersController do
 
   # Private helper for audit logging to reduce repetition
   defp log_audit_event(conn, event_type, target_user, metadata) do
-    organization = conn.assigns.current_organization
-    current_user = conn.assigns.current_user
-
-    AuditLog.log_event_async(event_type, %{
-      organization_id: organization.id,
-      actor_type: "user",
-      actor_id: current_user.id,
-      actor_name: "#{current_user.first_name} #{current_user.last_name}",
-      resource_type: "user",
-      resource_id: target_user && target_user.id,
-      outcome: "success",
-      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-      metadata: metadata
-    })
+    UsersAudit.log_user_event(conn, event_type, target_user, metadata)
   end
 
   # Helper to normalize email params: convert "email" => value to "emails" => [...]

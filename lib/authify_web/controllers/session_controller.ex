@@ -2,10 +2,10 @@ defmodule AuthifyWeb.SessionController do
   use AuthifyWeb, :controller
 
   alias Authify.Accounts
-  alias Authify.AuditLog
   alias Authify.Configurations
   alias Authify.Guardian
   alias Authify.MFA
+  alias AuthifyWeb.Audit.Sessions
 
   def new(conn, params) do
     # If user is already authenticated with a valid organization, redirect to their dashboard
@@ -120,27 +120,11 @@ defmodule AuthifyWeb.SessionController do
   end
 
   defp log_login_success(conn, organization, user) do
-    AuditLog.log_event_async(:login_success, %{
-      organization_id: organization.id,
-      actor_type: "user",
-      actor_id: user.id,
-      actor_name: "#{user.first_name} #{user.last_name}",
-      outcome: "success",
-      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first()
-    })
+    Sessions.log_login_success(conn, organization, user)
   end
 
   defp log_login_failure(conn, organization, email, reason) do
-    AuditLog.log_event_async(:login_failure, %{
-      organization_id: organization.id,
-      actor_type: "user",
-      actor_name: email,
-      outcome: "failure",
-      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-      metadata: %{reason: to_string(reason), attempted_email: email}
-    })
+    Sessions.log_login_failure(conn, organization, email, reason)
   end
 
   defp render_login_error(conn, org_slug, allow_org_registration, error_message) do
@@ -159,16 +143,7 @@ defmodule AuthifyWeb.SessionController do
 
     # Log logout event if user is present
     if current_user do
-      AuditLog.log_event_async(:logout, %{
-        organization_id: current_user.organization_id,
-        actor_type: "user",
-        actor_id: current_user.id,
-        actor_name: "#{current_user.first_name} #{current_user.last_name}",
-        outcome: "success",
-        ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-        user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-        metadata: %{saml_slo: slo_complete == "true"}
-      })
+      Sessions.log_logout(conn, current_user, slo_complete)
     end
 
     # Sign out the user from Guardian and clear MFA session

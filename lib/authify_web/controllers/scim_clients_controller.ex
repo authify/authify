@@ -1,8 +1,8 @@
 defmodule AuthifyWeb.ScimClientsController do
   use AuthifyWeb, :controller
 
-  alias Authify.AuditLog
   alias Authify.SCIMClient.{Client, HTTPClient, Provisioner, ScimClient}
+  alias AuthifyWeb.Audit.SCIM
 
   def index(conn, _params) do
     organization = conn.assigns.current_organization
@@ -204,24 +204,6 @@ defmodule AuthifyWeb.ScimClientsController do
   # Private helper functions
 
   defp log_scim_client_event(conn, event_type, scim_client, metadata) do
-    organization = conn.assigns.current_organization
-    current_user = conn.assigns.current_user
-
-    AuditLog.log_event_async(event_type, %{
-      organization_id: organization.id,
-      actor_type: "user",
-      actor_id: current_user.id,
-      actor_name: "#{current_user.first_name} #{current_user.last_name}",
-      resource_type: "scim_client",
-      resource_id: scim_client.id,
-      outcome: "success",
-      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-      metadata:
-        Map.merge(metadata, %{
-          client_name: scim_client.name,
-          client_id: scim_client.id
-        })
-    })
+    SCIM.log_scim_client_event(conn, event_type, scim_client, metadata)
   end
 end
