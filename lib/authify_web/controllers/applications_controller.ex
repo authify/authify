@@ -1,10 +1,10 @@
 defmodule AuthifyWeb.ApplicationsController do
   use AuthifyWeb, :controller
 
-  alias Authify.AuditLog
   alias Authify.Configurations
   alias Authify.OAuth
   alias Authify.OAuth.Application
+  alias AuthifyWeb.Audit.OAuth, as: AuditOAuth
 
   # Safely convert string to atom, only for known valid values
   defp safe_to_atom(string)
@@ -175,24 +175,6 @@ defmodule AuthifyWeb.ApplicationsController do
 
   # Helper for audit logging OAuth applications
   defp log_application_event(conn, event_type, application, metadata) do
-    organization = conn.assigns.current_organization
-    current_user = conn.assigns.current_user
-
-    AuditLog.log_event_async(event_type, %{
-      organization_id: organization.id,
-      actor_type: "user",
-      actor_id: current_user.id,
-      actor_name: "#{current_user.first_name} #{current_user.last_name}",
-      resource_type: "oauth_application",
-      resource_id: application.id,
-      outcome: "success",
-      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-      metadata:
-        Map.merge(metadata, %{
-          application_name: application.name,
-          application_id: application.id
-        })
-    })
+    AuditOAuth.log_application_event(conn, event_type, application, metadata)
   end
 end

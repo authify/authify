@@ -2,7 +2,7 @@ defmodule AuthifyWeb.OrganizationsController do
   use AuthifyWeb, :controller
 
   alias Authify.Accounts
-  alias Authify.AuditLog
+  alias AuthifyWeb.Audit.Organizations
 
   # Safely convert string to atom, only for known valid values
   defp safe_to_atom(string)
@@ -188,25 +188,7 @@ defmodule AuthifyWeb.OrganizationsController do
 
   # Helper for audit logging organizations
   defp log_organization_event(conn, event_type, target_organization, metadata) do
-    organization = conn.assigns.current_organization
-    current_user = conn.assigns.current_user
-
-    AuditLog.log_event_async(event_type, %{
-      organization_id: organization.id,
-      actor_type: "user",
-      actor_id: current_user.id,
-      actor_name: "#{current_user.first_name} #{current_user.last_name}",
-      resource_type: "organization",
-      resource_id: target_organization.id,
-      outcome: "success",
-      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-      user_agent: Plug.Conn.get_req_header(conn, "user-agent") |> List.first(),
-      metadata:
-        Map.merge(metadata, %{
-          organization_name: target_organization.name,
-          organization_id: target_organization.id
-        })
-    })
+    Organizations.log_organization_event(conn, event_type, target_organization, metadata)
   end
 
   def switch_to_organization(conn, %{"id" => id}) do
