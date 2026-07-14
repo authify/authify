@@ -21,7 +21,7 @@
               <i class="bi bi-plus-circle"></i> Invite User
             </a>
           <% end %>
-          <%= if Authify.Accounts.User.admin?(@user, @organization.id) || Authify.Accounts.User.super_admin?(@user) do %>
+          <%= if @is_admin do %>
             <a href={~p"/#{@current_organization.slug}/users/new"} class="btn btn-primary btn-sm">
               <i class="bi bi-person-plus"></i> Create User
             </a>
