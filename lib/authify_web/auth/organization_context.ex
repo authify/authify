@@ -37,6 +37,12 @@ defmodule AuthifyWeb.Auth.OrganizationContext do
         conn
         |> assign(:current_user, user_with_org)
         |> assign(:current_organization, organization)
+        |> assign(
+          :is_admin,
+          Authify.Accounts.User.super_admin?(user_with_org) or
+            Authify.Accounts.User.admin?(user_with_org, organization.id)
+        )
+        |> assign(:is_super_admin, Authify.Accounts.User.super_admin?(user_with_org))
     end
   end
 
