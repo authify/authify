@@ -68,14 +68,11 @@ defmodule AuthifyWeb.Auth.OrganizationContext do
   Ensures the user is an admin of their organization.
   """
   def require_admin(conn, _opts \\ []) do
-    current_user = conn.assigns[:current_user]
-    current_organization = conn.assigns[:current_organization]
-
-    if current_user && current_organization &&
-         (Authify.Accounts.User.super_admin?(current_user) ||
-            Authify.Accounts.User.admin?(current_user, current_organization.id)) do
+    if conn.assigns[:is_admin] do
       conn
     else
+      current_organization = conn.assigns[:current_organization]
+
       conn
       |> put_flash(:error, "Access denied. Admin privileges required.")
       |> redirect(to: "/#{current_organization.slug}/dashboard")
@@ -87,12 +84,11 @@ defmodule AuthifyWeb.Auth.OrganizationContext do
   Ensures the user is a super admin (global Authify admin).
   """
   def require_super_admin(conn, _opts \\ []) do
-    current_user = conn.assigns[:current_user]
-    current_organization = conn.assigns[:current_organization]
-
-    if current_user && Authify.Accounts.User.super_admin?(current_user) do
+    if conn.assigns[:is_super_admin] do
       conn
     else
+      current_organization = conn.assigns[:current_organization]
+
       conn
       |> put_flash(:error, "Access denied. Super admin privileges required.")
       |> redirect(to: "/#{current_organization.slug}/dashboard")

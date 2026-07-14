@@ -18,7 +18,8 @@ defmodule AuthifyWeb.ConfigurationController do
       end
 
     # Filter quota settings based on user permissions
-    settings = filter_settings_by_permission(schema_name, all_settings, user)
+    settings =
+      filter_settings_by_permission(schema_name, all_settings, conn.assigns[:is_super_admin])
 
     # For global org, derive authify_domain from CNAME (if set)
     authify_domain =
@@ -52,12 +53,12 @@ defmodule AuthifyWeb.ConfigurationController do
       settings: settings_with_base_domain,
       authify_domain: authify_domain,
       custom_domains: custom_domains,
-      is_super_admin: Authify.Accounts.User.super_admin?(user),
+      is_super_admin: conn.assigns[:is_super_admin],
       page_title: "Configuration"
     )
   end
 
-  defp filter_settings_by_permission(schema_name, settings, user) do
+  defp filter_settings_by_permission(schema_name, settings, is_super_admin) do
     # Only filter for organization schema (global schema has no quota settings)
     if schema_name == "organization" do
       schema_module = Authify.Configurations.Schemas.Organization
@@ -69,7 +70,7 @@ defmodule AuthifyWeb.ConfigurationController do
         |> Enum.map(& &1.name)
 
       # If not a super admin, remove quota settings from the map
-      if Authify.Accounts.User.super_admin?(user) do
+      if is_super_admin do
         settings
       else
         Map.drop(settings, super_admin_only_settings)

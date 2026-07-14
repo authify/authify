@@ -55,10 +55,18 @@ defmodule AuthifyWeb.LiveAuth do
       user_with_org = Accounts.get_user_with_organizations!(user.id)
       organization = get_current_organization(session, user_with_org)
 
+      is_admin =
+        Accounts.User.super_admin?(user_with_org) or
+          Accounts.User.admin?(user_with_org, organization.id)
+
+      is_super_admin = Accounts.User.super_admin?(user_with_org)
+
       socket =
         socket
         |> assign(:current_user, user_with_org)
         |> assign(:current_organization, organization)
+        |> assign(:is_admin, is_admin)
+        |> assign(:is_super_admin, is_super_admin)
 
       {:cont, socket}
     else
@@ -68,14 +76,11 @@ defmodule AuthifyWeb.LiveAuth do
   end
 
   def on_mount(:require_admin, _params, _session, socket) do
-    current_user = socket.assigns[:current_user]
-    current_organization = socket.assigns[:current_organization]
-
-    if current_user && current_organization &&
-         (Accounts.User.super_admin?(current_user) ||
-            Accounts.User.admin?(current_user, current_organization.id)) do
+    if socket.assigns[:is_admin] do
       {:cont, socket}
     else
+      current_organization = socket.assigns[:current_organization]
+
       socket =
         socket
         |> put_flash(:error, "Access denied. Admin privileges required.")
@@ -86,12 +91,11 @@ defmodule AuthifyWeb.LiveAuth do
   end
 
   def on_mount(:require_super_admin, _params, _session, socket) do
-    current_user = socket.assigns[:current_user]
-    current_organization = socket.assigns[:current_organization]
-
-    if current_user && Accounts.User.super_admin?(current_user) do
+    if socket.assigns[:is_super_admin] do
       {:cont, socket}
     else
+      current_organization = socket.assigns[:current_organization]
+
       socket =
         socket
         |> put_flash(:error, "Access denied. Super admin privileges required.")
