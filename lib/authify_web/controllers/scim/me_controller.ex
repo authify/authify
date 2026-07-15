@@ -13,7 +13,6 @@ defmodule AuthifyWeb.SCIM.MeController do
 
   use AuthifyWeb.SCIM.BaseController
 
-  alias Authify.Accounts
   alias Authify.SCIM.{Provisioning, ResourceFormatter}
   alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
 
