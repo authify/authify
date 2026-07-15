@@ -16,8 +16,8 @@ defmodule AuthifyWeb.SCIM.Mappers do
   - emails array
   - active status
 
-  Returns a map suitable for passing to Accounts.create_user_scim/2 or
-  Accounts.update_user_scim/2.
+  Returns a map suitable for passing to Provisioning.create_user_scim/2 or
+  Provisioning.update_user_scim/2.
   """
   def map_user_attrs(params) do
     %{}
@@ -35,8 +35,8 @@ defmodule AuthifyWeb.SCIM.Mappers do
   - displayName
   - externalId
 
-  Returns a map suitable for passing to Accounts.create_group_scim/2 or
-  Accounts.update_group_scim/2.
+  Returns a map suitable for passing to Provisioning.create_group_scim/2 or
+  Provisioning.update_group_scim/2.
   """
   def map_group_attrs(params) do
     %{}
