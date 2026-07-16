@@ -13,8 +13,7 @@ defmodule AuthifyWeb.SCIM.MeController do
 
   use AuthifyWeb.SCIM.BaseController
 
-  alias Authify.Accounts
-  alias Authify.SCIM.ResourceFormatter
+  alias Authify.SCIM.{Provisioning, ResourceFormatter}
   alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
 
   @doc """
@@ -72,7 +71,7 @@ defmodule AuthifyWeb.SCIM.MeController do
                  "externalId"
                ) do
             :ok ->
-              case Accounts.update_user_scim(user, attrs) do
+              case Provisioning.update_user_scim(user, attrs) do
                 {:ok, updated_user} ->
                   updated_user = Authify.Repo.preload(updated_user, :groups)
                   base_url = Helpers.build_base_url(conn)

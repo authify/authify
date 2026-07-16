@@ -4,6 +4,7 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
   import Authify.AccountsFixtures
 
   alias Authify.Accounts
+  alias Authify.SCIM.Provisioning
 
   setup %{conn: conn} do
     organization = organization_fixture()
@@ -174,7 +175,7 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
       user: user
     } do
       # Set initial external_id
-      {:ok, user} = Accounts.update_user_scim(user, %{external_id: "original123"})
+      {:ok, user} = Provisioning.update_user_scim(user, %{external_id: "original123"})
 
       update_params = %{
         "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
@@ -201,7 +202,9 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
     } do
       # Set a specific timestamp for testing
       past_time = DateTime.add(DateTime.utc_now(), -3600, :second)
-      {:ok, user} = Accounts.update_user_scim(user, %{active: true, scim_updated_at: past_time})
+
+      {:ok, user} =
+        Provisioning.update_user_scim(user, %{active: true, scim_updated_at: past_time})
 
       # Reload conn with timestamped user
       conn = assign(conn, :current_user, user)

@@ -3,11 +3,9 @@ defmodule Authify.SCIM.QueryFilterTest do
 
   import Ecto.Query
   import Authify.AccountsFixtures
-  alias Authify.Accounts.User
 
-  alias Authify.Accounts
   alias Authify.Accounts.User
-  alias Authify.SCIM.QueryFilter
+  alias Authify.SCIM.{Provisioning, QueryFilter}
 
   describe "apply_filter/3" do
     setup do
@@ -40,10 +38,16 @@ defmodule Authify.SCIM.QueryFilterTest do
       organization = organization_fixture()
 
       {:ok, matching_user} =
-        Accounts.create_user_scim(scim_user_attrs(email: "match@example.com"), organization.id)
+        Provisioning.create_user_scim(
+          scim_user_attrs(email: "match@example.com"),
+          organization.id
+        )
 
       {:ok, _other_user} =
-        Accounts.create_user_scim(scim_user_attrs(email: "other@example.com"), organization.id)
+        Provisioning.create_user_scim(
+          scim_user_attrs(email: "other@example.com"),
+          organization.id
+        )
 
       base_query =
         from(u in User,

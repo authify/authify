@@ -8,7 +8,7 @@ defmodule AuthifyWeb.SCIM.GroupsController do
   use AuthifyWeb.SCIM.BaseController
 
   alias Authify.Accounts
-  alias Authify.SCIM.ResourceFormatter
+  alias Authify.SCIM.{Provisioning, ResourceFormatter}
   alias AuthifyWeb.Helpers.AuditHelper
   alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
 
@@ -36,9 +36,9 @@ defmodule AuthifyWeb.SCIM.GroupsController do
         ]
 
         # Fetch groups and count
-        case Accounts.list_groups_scim(organization.id, opts) do
+        case Provisioning.list_groups_scim(organization.id, opts) do
           {:ok, groups} ->
-            case Accounts.count_groups_scim(organization.id, filter: params["filter"]) do
+            case Provisioning.count_groups_scim(organization.id, filter: params["filter"]) do
               {:ok, total} ->
                 base_url = Helpers.build_base_url(conn)
 
@@ -118,7 +118,7 @@ defmodule AuthifyWeb.SCIM.GroupsController do
         attrs = Mappers.map_group_attrs(params)
 
         # Create group via SCIM-specific function
-        case Accounts.create_group_scim(attrs, organization.id) do
+        case Provisioning.create_group_scim(attrs, organization.id) do
           {:ok, group} ->
             AuditHelper.log_event_async(
               conn,
@@ -288,7 +288,7 @@ defmodule AuthifyWeb.SCIM.GroupsController do
                "externalId"
              ) do
           :ok ->
-            case Accounts.update_group_scim(group, attrs) do
+            case Provisioning.update_group_scim(group, attrs) do
               {:ok, updated_group} ->
                 AuditHelper.log_event_async(
                   conn,

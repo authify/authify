@@ -9,6 +9,7 @@ defmodule AuthifyWeb.SCIM.PatchOperations do
   """
 
   alias Authify.Accounts
+  alias Authify.SCIM.Provisioning
   alias AuthifyWeb.SCIM.{Helpers, Mappers}
 
   @doc """
@@ -44,13 +45,13 @@ defmodule AuthifyWeb.SCIM.PatchOperations do
   defp apply_single_user_patch_op(user, %{"op" => "replace", "path" => path, "value" => value}) do
     case normalize_path(path) do
       "active" ->
-        Accounts.update_user_scim(user, %{active: value})
+        Provisioning.update_user_scim(user, %{active: value})
 
       "name.givenname" ->
-        Accounts.update_user_scim(user, %{first_name: value})
+        Provisioning.update_user_scim(user, %{first_name: value})
 
       "name.familyname" ->
-        Accounts.update_user_scim(user, %{last_name: value})
+        Provisioning.update_user_scim(user, %{last_name: value})
 
       _ ->
         {:error, "Unsupported PATCH path: #{path}"}
@@ -61,7 +62,7 @@ defmodule AuthifyWeb.SCIM.PatchOperations do
        when is_map(value) do
     # Replace operation with no path - update entire resource
     attrs = Mappers.map_user_attrs(value)
-    Accounts.update_user_scim(user, attrs)
+    Provisioning.update_user_scim(user, attrs)
   end
 
   defp apply_single_user_patch_op(_user, op) do
@@ -77,7 +78,7 @@ defmodule AuthifyWeb.SCIM.PatchOperations do
        ) do
     case normalize_path(path) do
       "displayname" ->
-        Accounts.update_group_scim(group, %{name: value})
+        Provisioning.update_group_scim(group, %{name: value})
 
       _ ->
         {:error, "Unsupported PATCH path: #{path}"}
@@ -88,7 +89,7 @@ defmodule AuthifyWeb.SCIM.PatchOperations do
        when is_map(value) do
     # Replace operation with no path - update entire resource
     attrs = Mappers.map_group_attrs(value)
-    Accounts.update_group_scim(group, attrs)
+    Provisioning.update_group_scim(group, attrs)
   end
 
   defp apply_single_group_patch_op(

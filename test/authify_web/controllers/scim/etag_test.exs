@@ -3,8 +3,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
 
   import Authify.AccountsFixtures
 
-  alias Authify.Accounts
-  alias Authify.SCIM.Version
+  alias Authify.SCIM.{Provisioning, Version}
 
   setup %{conn: conn} do
     organization = organization_fixture()
@@ -302,7 +301,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       user = user_fixture(organization: organization, email: "test@example.com")
 
       # Initialize scim_updated_at by doing an initial SCIM update
-      {:ok, user} = Accounts.update_user_scim(user, %{active: true})
+      {:ok, user} = Provisioning.update_user_scim(user, %{active: true})
 
       # Wait to ensure clean timestamp
       Process.sleep(1100)
@@ -389,7 +388,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
 
       # Update the user directly via Accounts context
       {:ok, _updated_user} =
-        Accounts.update_user_scim(user, %{active: false, scim_updated_at: DateTime.utc_now()})
+        Provisioning.update_user_scim(user, %{active: false, scim_updated_at: DateTime.utc_now()})
 
       # Get new version
       conn = build_conn()

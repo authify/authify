@@ -1753,26 +1753,6 @@ defmodule Authify.AccountsTest do
 
       assert %Ecto.Changeset{} = Accounts.change_group(group)
     end
-
-    test "get_group_by_external_id/2 finds group by external_id", %{organization: org} do
-      {:ok, group} =
-        Accounts.create_group(%{
-          "name" => "ExtLookup",
-          "organization_id" => org.id,
-          "external_id" => "lookup-ext-id"
-        })
-
-      found = Accounts.get_group_by_external_id("lookup-ext-id", org.id)
-      assert found.id == group.id
-    end
-
-    test "get_group_by_external_id/2 returns nil when not found", %{organization: org} do
-      assert Accounts.get_group_by_external_id("nonexistent", org.id) == nil
-    end
-
-    test "get_group_by_external_id/2 returns nil for nil arguments" do
-      assert Accounts.get_group_by_external_id(nil, nil) == nil
-    end
   end
 
   describe "group memberships" do

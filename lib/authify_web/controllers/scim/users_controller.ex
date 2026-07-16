@@ -8,7 +8,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
   use AuthifyWeb.SCIM.BaseController
 
   alias Authify.Accounts
-  alias Authify.SCIM.ResourceFormatter
+  alias Authify.SCIM.{Provisioning, ResourceFormatter}
   alias AuthifyWeb.Helpers.AuditHelper
   alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
 
@@ -36,9 +36,9 @@ defmodule AuthifyWeb.SCIM.UsersController do
         ]
 
         # Fetch users and count
-        case Accounts.list_users_scim(organization.id, opts) do
+        case Provisioning.list_users_scim(organization.id, opts) do
           {:ok, users} ->
-            case Accounts.count_users_scim(organization.id, filter: params["filter"]) do
+            case Provisioning.count_users_scim(organization.id, filter: params["filter"]) do
               {:ok, total} ->
                 base_url = Helpers.build_base_url(conn)
 
@@ -118,7 +118,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
         attrs = Mappers.map_user_attrs(params)
 
         # Create user via SCIM-specific function
-        case Accounts.create_user_scim(attrs, organization.id) do
+        case Provisioning.create_user_scim(attrs, organization.id) do
           {:ok, user} ->
             AuditHelper.log_event_async(
               conn,
@@ -289,7 +289,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
                "externalId"
              ) do
           :ok ->
-            case Accounts.update_user_scim(user, attrs) do
+            case Provisioning.update_user_scim(user, attrs) do
               {:ok, updated_user} ->
                 AuditHelper.log_event_async(
                   conn,
@@ -345,7 +345,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
           user ->
             case Helpers.validate_resource_organization(user, organization) do
               :ok ->
-                case Accounts.update_user_scim(user, %{active: false}) do
+                case Provisioning.update_user_scim(user, %{active: false}) do
                   {:ok, deleted_user} ->
                     AuditHelper.log_event_async(
                       conn,

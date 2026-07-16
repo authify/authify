@@ -9,7 +9,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
   use AuthifyWeb.SCIM.BaseController
 
   alias Authify.Accounts
-  alias Authify.SCIM.ResourceFormatter
+  alias Authify.SCIM.{Provisioning, ResourceFormatter}
   alias AuthifyWeb.Helpers.AuditHelper
   alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
 
@@ -186,7 +186,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
     # Map SCIM data to user attributes
     attrs = Mappers.map_user_attrs(data)
 
-    case Accounts.create_user_scim(attrs, organization.id) do
+    case Provisioning.create_user_scim(attrs, organization.id) do
       {:ok, user} ->
         user = Authify.Repo.preload(user, :groups)
         base_url = Helpers.build_base_url(conn)
@@ -217,7 +217,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
   defp execute_operation("POST", :group, nil, data, bulk_id, organization, conn) do
     attrs = Mappers.map_group_attrs(data)
 
-    case Accounts.create_group_scim(attrs, organization.id) do
+    case Provisioning.create_group_scim(attrs, organization.id) do
       {:ok, group} ->
         group = Authify.Repo.preload(group, :users)
         base_url = Helpers.build_base_url(conn)
@@ -255,7 +255,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
           :ok ->
             attrs = Mappers.map_user_attrs(data)
 
-            case Accounts.update_user_scim(user, attrs) do
+            case Provisioning.update_user_scim(user, attrs) do
               {:ok, _updated_user} ->
                 response = %{
                   method: "PUT",
@@ -294,7 +294,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
           :ok ->
             attrs = Mappers.map_group_attrs(data)
 
-            case Accounts.update_group_scim(group, attrs) do
+            case Provisioning.update_group_scim(group, attrs) do
               {:ok, _updated_group} ->
                 response = %{
                   method: "PUT",
@@ -332,7 +332,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
       user ->
         case Helpers.validate_resource_organization(user, organization) do
           :ok ->
-            case Accounts.update_user_scim(user, %{active: false}) do
+            case Provisioning.update_user_scim(user, %{active: false}) do
               {:ok, _user} ->
                 response = %{
                   method: "DELETE",
