@@ -16,8 +16,9 @@ defmodule AuthifyWeb.API.ScimClientsController do
 
     if has_read do
       organization = conn.assigns.current_organization
-      page = String.to_integer(params["page"] || "1")
-      per_page = String.to_integer(params["per_page"] || "25")
+
+      {page, per_page} =
+        AuthifyWeb.Controllers.Shared.ResourceHelpers.parse_api_pagination(params)
 
       {scim_clients, total} =
         Client.list_scim_clients(organization.id, page: page, per_page: per_page)
@@ -299,8 +300,9 @@ defmodule AuthifyWeb.API.ScimClientsController do
 
       try do
         scim_client = Client.get_scim_client!(id, organization.id)
-        page = String.to_integer(params["page"] || "1")
-        per_page = String.to_integer(params["per_page"] || "50")
+
+        {page, per_page} =
+          AuthifyWeb.Controllers.Shared.ResourceHelpers.parse_api_pagination(params, 50)
 
         {logs, total} = Client.list_sync_logs(scim_client.id, page: page, per_page: per_page)
 

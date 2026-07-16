@@ -14,8 +14,9 @@ defmodule AuthifyWeb.API.CertificatesController do
     case ensure_scope(conn, "certificates:read") do
       :ok ->
         organization = conn.assigns.current_organization
-        page = String.to_integer(params["page"] || "1")
-        per_page = min(String.to_integer(params["per_page"] || "25"), 100)
+
+        {page, per_page} =
+          AuthifyWeb.Controllers.Shared.ResourceHelpers.parse_api_pagination(params)
 
         # Get all certificates (filtering by usage will be added later)
         certificates = Accounts.list_certificates(organization)

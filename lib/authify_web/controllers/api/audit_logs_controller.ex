@@ -25,8 +25,9 @@ defmodule AuthifyWeb.API.AuditLogsController do
     case ensure_scope(conn, "audit_logs:read") do
       :ok ->
         organization = conn.assigns.current_organization
-        page = String.to_integer(params["page"] || "1")
-        per_page = min(String.to_integer(params["per_page"] || "25"), 100)
+
+        {page, per_page} =
+          AuthifyWeb.Controllers.Shared.ResourceHelpers.parse_api_pagination(params)
 
         # Build filter options
         filter_opts =

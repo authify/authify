@@ -13,6 +13,7 @@ defmodule AuthifyWeb.API.BaseController do
     quote do
       use AuthifyWeb, :controller
       import AuthifyWeb.API.BaseController
+      alias AuthifyWeb.Controllers.Shared.ResourceHelpers
     end
   end
 

@@ -36,8 +36,8 @@ defmodule AuthifyWeb.API.ApplicationsController do
     has_mgmt_read = "management_app:read" in scopes or "management_app:write" in scopes
 
     if has_oauth_read or has_mgmt_read do
-      page = String.to_integer(params["page"] || "1")
-      per_page = String.to_integer(params["per_page"] || "25")
+      {page, per_page} =
+        AuthifyWeb.Controllers.Shared.ResourceHelpers.parse_api_pagination(params)
 
       # Determine which application types the user can see
       allowed_types =
