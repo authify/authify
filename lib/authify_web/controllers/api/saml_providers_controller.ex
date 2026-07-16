@@ -7,8 +7,7 @@ defmodule AuthifyWeb.API.SAMLProvidersController do
   def index(conn, params) do
     organization = conn.assigns.current_organization
 
-    page = String.to_integer(params["page"] || "1")
-    per_page = String.to_integer(params["per_page"] || "25")
+    {page, per_page} = AuthifyWeb.Controllers.Shared.ResourceHelpers.parse_api_pagination(params)
 
     {saml_providers, total} =
       SAML.list_service_providers_paginated(organization, page: page, per_page: per_page)

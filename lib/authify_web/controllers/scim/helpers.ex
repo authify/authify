@@ -309,11 +309,10 @@ defmodule AuthifyWeb.SCIM.Helpers do
       {:error, :not_found}
   """
   def validate_resource_organization(resource, organization) do
-    if resource.organization_id == organization.id do
-      :ok
-    else
-      {:error, :not_found}
-    end
+    AuthifyWeb.Controllers.Shared.ResourceHelpers.validate_resource_organization(
+      resource,
+      organization
+    )
   end
 
   @doc """
