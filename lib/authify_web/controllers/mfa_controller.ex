@@ -5,6 +5,7 @@ defmodule AuthifyWeb.MfaController do
 
   alias Authify.{Accounts, MFA, Organizations, Repo}
   alias Authify.Accounts.User
+  alias Authify.MFA.Flow
   alias AuthifyWeb.Helpers.AuditHelper
 
   # ============================================================================
@@ -34,17 +35,10 @@ defmodule AuthifyWeb.MfaController do
       # Generate TOTP secret
       case MFA.setup_totp(current_user) do
         {:ok, secret} ->
-          # Generate TOTP URI
-          totp_uri = generate_totp_uri(current_user, secret, organization)
-
-          # Generate QR code from URI
-          qr_code_data_uri = generate_qr_code(totp_uri)
-
-          # Format secret for manual entry
-          manual_entry_key = format_secret_for_manual_entry(secret)
-
           # Store secret in session temporarily (for verification)
           current_user_with_emails = Authify.Repo.preload(current_user, :emails)
+
+          setup_data = Flow.prepare_totp_setup(current_user_with_emails, secret, organization)
 
           conn
           |> put_session(:mfa_setup_secret, secret)
@@ -53,9 +47,9 @@ defmodule AuthifyWeb.MfaController do
             user_email: User.get_primary_email_value(current_user_with_emails),
             organization: organization,
             secret: secret,
-            totp_uri: totp_uri,
-            qr_code_data_uri: qr_code_data_uri,
-            manual_entry_key: manual_entry_key,
+            totp_uri: setup_data.totp_uri,
+            qr_code_data_uri: setup_data.qr_code_data_uri,
+            manual_entry_key: setup_data.manual_entry_key,
             error: nil
           )
 
@@ -204,9 +198,7 @@ defmodule AuthifyWeb.MfaController do
 
   defp render_setup_with_error(conn, current_user, organization, secret, flash_message, error) do
     current_user_with_emails = Authify.Repo.preload(current_user, :emails)
-    totp_uri = generate_totp_uri(current_user_with_emails, secret, organization)
-    qr_code_data_uri = generate_qr_code(totp_uri)
-    manual_entry_key = format_secret_for_manual_entry(secret)
+    setup_data = Flow.prepare_totp_setup(current_user_with_emails, secret, organization)
 
     conn
     |> put_flash(:error, flash_message)
@@ -215,9 +207,9 @@ defmodule AuthifyWeb.MfaController do
       user_email: User.get_primary_email_value(current_user_with_emails),
       organization: organization,
       secret: secret,
-      totp_uri: totp_uri,
-      qr_code_data_uri: qr_code_data_uri,
-      manual_entry_key: manual_entry_key,
+      totp_uri: setup_data.totp_uri,
+      qr_code_data_uri: setup_data.qr_code_data_uri,
+      manual_entry_key: setup_data.manual_entry_key,
       error: error
     )
   end
@@ -245,26 +237,16 @@ defmodule AuthifyWeb.MfaController do
         # Check for active lockout
         case MFA.check_lockout(user) do
           {:ok, :no_lockout} ->
-            # Determine which MFA methods are available
-            has_totp = Accounts.User.totp_enabled?(user)
-            has_webauthn = not Enum.empty?(MFA.WebAuthn.list_credentials(user))
-
-            # Prefer WebAuthn if available (more secure - phishing-resistant)
-            default_method =
-              cond do
-                has_webauthn -> :webauthn
-                has_totp -> :totp
-                true -> :totp
-              end
+            methods = Flow.detect_available_methods(user)
 
             render(conn, :verify_form,
               user: user,
               organization: organization,
               error: nil,
               attempts_remaining: nil,
-              default_method: default_method,
-              has_totp: has_totp,
-              has_webauthn: has_webauthn
+              default_method: methods.default_method,
+              has_totp: methods.has_totp,
+              has_webauthn: methods.has_webauthn
             )
 
           {:error, {:locked, _locked_until}} ->
@@ -678,7 +660,7 @@ defmodule AuthifyWeb.MfaController do
         "Invalid code. This is your last attempt before lockout."
       end
 
-    mfa_method_assigns = get_mfa_method_assigns(user)
+    mfa_method_assigns = Flow.detect_available_methods(user)
 
     conn
     |> put_flash(:error, error_message)
@@ -716,7 +698,7 @@ defmodule AuthifyWeb.MfaController do
          _use_backup,
          remaining_attempts
        ) do
-    mfa_method_assigns = get_mfa_method_assigns(user)
+    mfa_method_assigns = Flow.detect_available_methods(user)
 
     conn
     |> put_flash(:error, "No backup codes available.")
@@ -740,7 +722,7 @@ defmodule AuthifyWeb.MfaController do
          _use_backup,
          remaining_attempts
        ) do
-    mfa_method_assigns = get_mfa_method_assigns(user)
+    mfa_method_assigns = Flow.detect_available_methods(user)
 
     conn
     |> put_flash(:error, "Verification failed. Please try again.")
@@ -755,66 +737,10 @@ defmodule AuthifyWeb.MfaController do
     )
   end
 
-  defp generate_totp_uri(user, secret, organization) do
-    # Format: otpauth://totp/Authify:user@example.com?secret=BASE32&issuer=OrgName
-    label = "#{organization.name}:#{User.get_primary_email_value(user)}"
-    issuer = organization.name
-    # Base32-encode the binary secret for the URI (without padding per TOTP spec)
-    base32_secret = Base.encode32(secret, padding: false)
-
-    "otpauth://totp/#{URI.encode(label)}?secret=#{base32_secret}&issuer=#{URI.encode(issuer)}"
-  end
-
-  defp generate_qr_code(uri) do
-    # Generate QR code as PNG data URI from the otpauth:// URI
-    uri
-    |> EQRCode.encode()
-    |> EQRCode.png()
-    |> Base.encode64()
-  end
-
-  defp format_secret_for_manual_entry(secret) do
-    # Base32-encode the binary secret first, then format as groups of 4 for readability
-    secret
-    |> Base.encode32(padding: false)
-    |> String.graphemes()
-    |> Enum.chunk_every(4)
-    |> Enum.map_join(" ", &Enum.join/1)
-  end
-
-  defp get_mfa_method_assigns(user) do
-    # Determine which MFA methods are available
-    has_totp = Accounts.User.totp_enabled?(user)
-    has_webauthn = not Enum.empty?(MFA.WebAuthn.list_credentials(user))
-
-    # Prefer WebAuthn if available (more secure - phishing-resistant)
-    default_method =
-      cond do
-        has_webauthn -> :webauthn
-        has_totp -> :totp
-        true -> :totp
-      end
-
-    %{
-      default_method: default_method,
-      has_totp: has_totp,
-      has_webauthn: has_webauthn
-    }
-  end
-
   defp create_trusted_device_token(conn, user) do
-    device_info = %{
-      ip_address: to_string(:inet_parse.ntoa(conn.remote_ip)),
-      user_agent: get_user_agent(conn)
-    }
-
-    case MFA.create_trusted_device(user, device_info) do
-      {:ok, _device, token} ->
-        token
-
-      {:error, _} ->
-        nil
-    end
+    ip = to_string(:inet_parse.ntoa(conn.remote_ip))
+    user_agent = get_user_agent(conn)
+    Flow.create_trusted_device(user, ip, user_agent)
   end
 
   # Determines the context for MFA setup (mandatory vs voluntary)
@@ -921,20 +847,7 @@ defmodule AuthifyWeb.MfaController do
 
     json(conn, %{
       success: false,
-      error: format_webauthn_error(reason)
+      error: Flow.format_webauthn_error(reason)
     })
   end
-
-  defp format_webauthn_error(:invalid_challenge), do: "Invalid or expired challenge"
-  defp format_webauthn_error(:challenge_already_used), do: "Challenge has already been used"
-  defp format_webauthn_error(:challenge_expired), do: "Challenge has expired"
-  defp format_webauthn_error(:challenge_mismatch), do: "Challenge verification failed"
-
-  defp format_webauthn_error(:invalid_sign_count),
-    do: "Security key may be cloned (invalid sign count)"
-
-  defp format_webauthn_error(:credential_not_found), do: "Security key not recognized"
-  defp format_webauthn_error(:credential_not_owned), do: "Security key not owned by this user"
-  defp format_webauthn_error(:decryption_failed), do: "Failed to decrypt credential data"
-  defp format_webauthn_error(_), do: "Authentication failed"
 end
