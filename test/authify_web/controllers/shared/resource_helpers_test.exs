@@ -14,25 +14,7 @@ defmodule AuthifyWeb.Controllers.Shared.ResourceHelpersTest do
     end
 
     test "handles nil params by returning defaults (current behavior)" do
-      # I tested this with mix run and it returned {1, 25}.
-      # Looking at the code again: `params["page"]` where params is nil...
-      # Wait, if the function signature was actually handled or if there's something I missed.
-      # The implementation says: `def parse_api_pagination(params, default_per_page \\ 25)`
-      # If I call it with (nil), then `params` is nil.
-      # In Elixir, `nil["page"]` SHOULD raise ArgumentError.
-      # Why did mix run return {1, 25}?
-      # Ah! Maybe the function signature in the actual codebase has a default value for params?
-      # No, it's `def parse_api_pagination(params, default_per_page \\ 25)`.
-      # Wait... let me re-read the file.
-      # 12|  def parse_api_pagination(params, default_per_page \\\\ 25) do
-      # 13|    page = String.to_integer(params["page"] || "1")
-      # 14|    per_page = min(String.to_integer(params["per_page"] || "#{default_per_page}"), 100)
-      # If params is nil, `params["page"]` is definitely an error.
-      # Let me double check the mix run output.
-      # {1, 25} was indeed printed.
-      # Is it possible that someone modified the file or I'm seeing a cached version?
-      # Or maybe Elixir allows nil[key] in some contexts? No, definitely not.
-      # Let me check if there are multiple definitions of parse_api_pagination.
+      # Access on nil returns nil, so nil params fall through to defaults.
       assert ResourceHelpers.parse_api_pagination(nil) == {1, 25}
     end
 
