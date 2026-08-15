@@ -16,12 +16,12 @@ defmodule AuthifyWeb.HealthController do
   """
 
   @cache_table :health_check_cache
-  @cache_ttl_seconds 1
+  @cache_ttl_ms 1_000
 
   @doc """
   Health check endpoint that verifies:
   - Application is running
-  - Database connectivity (cached for #{@cache_ttl_seconds} second)
+  - Database connectivity (cached for 1 second)
 
   Returns 200 OK if healthy, 503 Service Unavailable if unhealthy.
   """
@@ -80,7 +80,7 @@ defmodule AuthifyWeb.HealthController do
 
   defp cache_health_status(status) do
     ensure_cache_table_exists()
-    :ets.insert(@cache_table, {:health_status, status, System.monotonic_time(:second)})
+    :ets.insert(@cache_table, {:health_status, status, System.monotonic_time(:millisecond)})
   rescue
     ArgumentError ->
       # If table creation fails due to race condition, ignore
@@ -88,8 +88,8 @@ defmodule AuthifyWeb.HealthController do
   end
 
   defp cache_fresh?(cached_at) do
-    now = System.monotonic_time(:second)
-    now - cached_at < @cache_ttl_seconds
+    now = System.monotonic_time(:millisecond)
+    now - cached_at < @cache_ttl_ms
   end
 
   defp ensure_cache_table_exists do
