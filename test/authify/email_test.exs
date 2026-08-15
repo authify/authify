@@ -1,7 +1,6 @@
 defmodule Authify.EmailTest do
   use Authify.DataCase, async: true
 
-  import Swoosh.TestAssertions
   import Authify.AccountsFixtures
 
   alias Authify.Email
