@@ -4,6 +4,8 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
   import Authify.AccountsFixtures
 
   alias Authify.Accounts
+
+  alias Authify.Groups
   alias Authify.SCIM.Provisioning
 
   setup %{conn: conn} do
@@ -88,7 +90,7 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
 
     test "includes user groups in response", %{conn: conn, organization: organization, user: user} do
       group = group_fixture(organization: organization, name: "Test Group")
-      Accounts.add_user_to_group(user, group)
+      Groups.add_user_to_group(user, group)
 
       conn = get(conn, "/#{organization.slug}/scim/v2/Me")
 

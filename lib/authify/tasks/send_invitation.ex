@@ -9,7 +9,7 @@ defmodule Authify.Tasks.SendInvitation do
 
   require Logger
 
-  alias Authify.{Accounts, Email, Repo}
+  alias Authify.{Email, Invitations, Repo}
 
   @impl true
   def execute(task) do
@@ -17,11 +17,11 @@ defmodule Authify.Tasks.SendInvitation do
 
     # Load invitation with required associations
     invitation =
-      Accounts.get_invitation!(invitation_id)
+      Invitations.get_invitation!(invitation_id)
       |> Repo.preload([:organization, invited_by: :emails])
 
     # Build accept URL from invitation
-    accept_url = Accounts.build_invitation_accept_url(invitation)
+    accept_url = Invitations.build_invitation_accept_url(invitation)
 
     case Email.send_invitation_email(invitation, accept_url) do
       {:ok, metadata} ->

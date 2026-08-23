@@ -174,7 +174,7 @@ defmodule AuthifyTest.OAuthClient do
   def create_pat(user, org, opts \\ []) do
     scopes = Keyword.get(opts, :scopes, Authify.Scopes.pat_scopes())
 
-    case Authify.Accounts.create_personal_access_token(user, org, %{
+    case Authify.PersonalAccessTokens.create_personal_access_token(user, org, %{
            "name" => "Test PAT",
            "scopes" => scopes
          }) do

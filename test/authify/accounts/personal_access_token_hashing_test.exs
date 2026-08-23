@@ -1,8 +1,8 @@
 defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
   use Authify.DataCase, async: true
 
-  alias Authify.Accounts
   alias Authify.Accounts.PersonalAccessToken
+  alias Authify.PersonalAccessTokens
 
   import Authify.AccountsFixtures
 
@@ -15,7 +15,7 @@ defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
 
     test "creates PAT with hashed token", %{user: user, organization: organization} do
       {:ok, token} =
-        Accounts.create_personal_access_token(user, organization, %{
+        PersonalAccessTokens.create_personal_access_token(user, organization, %{
           "name" => "Test Token",
           "scopes" => ["users:read", "users:write"]
         })
@@ -34,7 +34,7 @@ defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
 
     test "plaintext token is not stored in database", %{user: user, organization: organization} do
       {:ok, token} =
-        Accounts.create_personal_access_token(user, organization, %{
+        PersonalAccessTokens.create_personal_access_token(user, organization, %{
           "name" => "Test Token",
           "scopes" => ["users:read"]
         })
@@ -42,7 +42,7 @@ defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
       plaintext_token = token.plaintext_token
 
       # Reload from database
-      reloaded_token = Accounts.get_personal_access_token!(token.id, user)
+      reloaded_token = PersonalAccessTokens.get_personal_access_token!(token.id, user)
 
       # Plaintext token should not be in database
       assert is_nil(reloaded_token.plaintext_token)
@@ -103,7 +103,7 @@ defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
       user = user_for_organization_fixture(organization)
 
       {:ok, token} =
-        Accounts.create_personal_access_token(user, organization, %{
+        PersonalAccessTokens.create_personal_access_token(user, organization, %{
           "name" => "Auth Test Token",
           "scopes" => ["users:read", "users:write"]
         })
@@ -120,7 +120,8 @@ defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
       plaintext_token: plaintext_token,
       user: user
     } do
-      {:ok, authenticated_token} = Accounts.authenticate_personal_access_token(plaintext_token)
+      {:ok, authenticated_token} =
+        PersonalAccessTokens.authenticate_personal_access_token(plaintext_token)
 
       assert authenticated_token.user.id == user.id
       assert authenticated_token.name == "Auth Test Token"
@@ -129,12 +130,14 @@ defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
     test "fails authentication with wrong token", %{} do
       wrong_token = "authify_pat_wrongtokenwrongtokenwrongtokenwron"
 
-      assert {:error, :invalid_token} = Accounts.authenticate_personal_access_token(wrong_token)
+      assert {:error, :invalid_token} =
+               PersonalAccessTokens.authenticate_personal_access_token(wrong_token)
     end
 
     test "fails authentication with hashed token (not plaintext)", %{token: token} do
       # Trying to authenticate with the hash should fail
-      assert {:error, :invalid_token} = Accounts.authenticate_personal_access_token(token.token)
+      assert {:error, :invalid_token} =
+               PersonalAccessTokens.authenticate_personal_access_token(token.token)
     end
 
     test "fails authentication with invalid format", %{} do
@@ -147,7 +150,7 @@ defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
 
       for invalid_token <- invalid_tokens do
         assert {:error, :invalid_token} =
-                 Accounts.authenticate_personal_access_token(invalid_token)
+                 PersonalAccessTokens.authenticate_personal_access_token(invalid_token)
       end
     end
 
@@ -157,7 +160,7 @@ defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
     } do
       # Create an expired token
       {:ok, expired_token} =
-        Accounts.create_personal_access_token(user, organization, %{
+        PersonalAccessTokens.create_personal_access_token(user, organization, %{
           "name" => "Expired Token",
           "scopes" => ["users:read"],
           "expires_at" => DateTime.utc_now() |> DateTime.add(-1, :day)
@@ -166,7 +169,8 @@ defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
       plaintext = expired_token.plaintext_token
 
       # Should fail authentication
-      assert {:error, :invalid_token} = Accounts.authenticate_personal_access_token(plaintext)
+      assert {:error, :invalid_token} =
+               PersonalAccessTokens.authenticate_personal_access_token(plaintext)
     end
 
     test "fails authentication with inactive token", %{
@@ -175,7 +179,7 @@ defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
     } do
       # Create an inactive token
       {:ok, inactive_token} =
-        Accounts.create_personal_access_token(user, organization, %{
+        PersonalAccessTokens.create_personal_access_token(user, organization, %{
           "name" => "Inactive Token",
           "scopes" => ["users:read"],
           "is_active" => false
@@ -184,7 +188,8 @@ defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
       plaintext = inactive_token.plaintext_token
 
       # Should fail authentication
-      assert {:error, :invalid_token} = Accounts.authenticate_personal_access_token(plaintext)
+      assert {:error, :invalid_token} =
+               PersonalAccessTokens.authenticate_personal_access_token(plaintext)
     end
 
     test "updates last_used_at on successful authentication", %{
@@ -196,10 +201,11 @@ defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
       assert is_nil(token.last_used_at)
 
       # Authenticate
-      {:ok, _authenticated_token} = Accounts.authenticate_personal_access_token(plaintext_token)
+      {:ok, _authenticated_token} =
+        PersonalAccessTokens.authenticate_personal_access_token(plaintext_token)
 
       # Reload and check last_used_at
-      reloaded = Accounts.get_personal_access_token!(token.id, user)
+      reloaded = PersonalAccessTokens.get_personal_access_token!(token.id, user)
       assert reloaded.last_used_at
       assert DateTime.diff(reloaded.last_used_at, DateTime.utc_now(), :second) < 5
     end

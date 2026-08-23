@@ -8,9 +8,9 @@ defmodule Authify.AuditLog.Signer do
   offline verification.
   """
 
-  alias Authify.Accounts
   alias Authify.AuditLog.Event
   alias Authify.AuditLog.KeyCache
+  alias Authify.Certificates
 
   @doc """
   Returns a deterministic JSON binary for the signable fields of an event.
@@ -86,8 +86,8 @@ defmodule Authify.AuditLog.Signer do
         {:ok, private_key, cert_id}
 
       :miss ->
-        with {:ok, cert} <- Accounts.get_or_generate_audit_signing_certificate(org_id),
-             {:ok, pem} <- Accounts.decrypt_certificate_private_key(cert),
+        with {:ok, cert} <- Certificates.get_or_generate_audit_signing_certificate(org_id),
+             {:ok, pem} <- Certificates.decrypt_certificate_private_key(cert),
              {:ok, private_key} <- decode_private_key(pem) do
           KeyCache.put(org_id, private_key, cert.id)
           {:ok, private_key, cert.id}

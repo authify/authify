@@ -15,6 +15,7 @@ defmodule AuthifyWeb.Plugs.SCIMETagValidation do
   import Phoenix.Controller, only: [json: 2]
 
   alias Authify.Accounts
+  alias Authify.Groups
   alias Authify.SCIM.ResourceFormatter
   alias Authify.SCIM.Version
 
@@ -128,7 +129,7 @@ defmodule AuthifyWeb.Plugs.SCIMETagValidation do
   defp fetch_group(conn, group_id) do
     org = conn.assigns[:current_organization]
 
-    case Accounts.get_group(group_id) do
+    case Groups.get_group(group_id) do
       nil ->
         {:error, :not_found}
 

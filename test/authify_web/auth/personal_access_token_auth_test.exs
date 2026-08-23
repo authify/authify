@@ -5,6 +5,7 @@ defmodule AuthifyWeb.Auth.PersonalAccessTokenAuthTest do
 
   alias Authify.Accounts
   alias Authify.Accounts.User
+  alias Authify.PersonalAccessTokens
 
   # Helper function to create a user with PAT for testing
   defp create_user_with_token(scopes \\ "profile:read profile:write") do
@@ -12,7 +13,7 @@ defmodule AuthifyWeb.Auth.PersonalAccessTokenAuthTest do
     organization = Accounts.get_organization!(user.organization_id)
 
     {:ok, token} =
-      Accounts.create_personal_access_token(user, organization, %{
+      PersonalAccessTokens.create_personal_access_token(user, organization, %{
         "name" => "Test API Token",
         "scopes" => scopes
       })
@@ -74,7 +75,7 @@ defmodule AuthifyWeb.Auth.PersonalAccessTokenAuthTest do
       assert json_response(conn, 200)
 
       # Check that last_used_at was updated
-      updated_token = Accounts.get_personal_access_token!(token.id, user)
+      updated_token = PersonalAccessTokens.get_personal_access_token!(token.id, user)
       assert updated_token.last_used_at
       assert DateTime.diff(DateTime.utc_now(), updated_token.last_used_at, :second) < 5
     end
@@ -86,7 +87,7 @@ defmodule AuthifyWeb.Auth.PersonalAccessTokenAuthTest do
       yesterday = DateTime.utc_now() |> DateTime.add(-1, :day) |> DateTime.truncate(:second)
 
       {:ok, expired_token} =
-        Accounts.create_personal_access_token(user, organization, %{
+        PersonalAccessTokens.create_personal_access_token(user, organization, %{
           "name" => "Expired Token",
           "scopes" => "profile:read",
           "expires_at" => yesterday

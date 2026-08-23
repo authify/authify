@@ -17,7 +17,7 @@ defmodule AuthifyWeb.IdPCertificateIntegrationTest do
 
       # Generate a certificate
       {:ok, cert} =
-        Authify.Accounts.generate_certificate(org, %{
+        Authify.Certificates.generate_certificate(org, %{
           "name" => "Primary Certificate",
           "is_active" => true
         })
@@ -29,7 +29,7 @@ defmodule AuthifyWeb.IdPCertificateIntegrationTest do
       assert cert.private_key
 
       # List certificates for the organization
-      certs = Authify.Accounts.list_certificates(org)
+      certs = Authify.Certificates.list_certificates(org)
       assert length(certs) == 1
       assert hd(certs).id == cert.id
     end
@@ -39,7 +39,7 @@ defmodule AuthifyWeb.IdPCertificateIntegrationTest do
 
       # Generate a SAML signing certificate
       {:ok, cert} =
-        Authify.Accounts.generate_saml_signing_certificate(org, %{
+        Authify.Certificates.generate_saml_signing_certificate(org, %{
           "name" => "SAML Signing Cert"
         })
 
@@ -48,10 +48,10 @@ defmodule AuthifyWeb.IdPCertificateIntegrationTest do
       cert =
         if cert.is_active,
           do: cert,
-          else: elem(Authify.Accounts.update_certificate(cert, %{"is_active" => true}), 1)
+          else: elem(Authify.Certificates.update_certificate(cert, %{"is_active" => true}), 1)
 
       # Retrieve active certificate
-      active_cert = Authify.Accounts.get_active_saml_signing_certificate(org)
+      active_cert = Authify.Certificates.get_active_saml_signing_certificate(org)
       assert active_cert.id == cert.id
       assert active_cert.usage == "saml_signing"
     end
@@ -62,24 +62,24 @@ defmodule AuthifyWeb.IdPCertificateIntegrationTest do
       org_b = organization_fixture(%{slug: "org-b-#{n}"})
 
       {:ok, cert_a} =
-        Authify.Accounts.generate_certificate(org_a, %{
+        Authify.Certificates.generate_certificate(org_a, %{
           "name" => "Certificate A",
           "is_active" => true
         })
 
       {:ok, _cert_b} =
-        Authify.Accounts.generate_certificate(org_b, %{
+        Authify.Certificates.generate_certificate(org_b, %{
           "name" => "Certificate B",
           "is_active" => true
         })
 
       # Org A can only see its own cert
-      certs_a = Authify.Accounts.list_certificates(org_a)
+      certs_a = Authify.Certificates.list_certificates(org_a)
       assert length(certs_a) == 1
       assert hd(certs_a).id == cert_a.id
 
       # Org B can only see its own cert
-      certs_b = Authify.Accounts.list_certificates(org_b)
+      certs_b = Authify.Certificates.list_certificates(org_b)
       assert length(certs_b) == 1
       refute hd(certs_b).id == cert_a.id
     end
@@ -88,7 +88,7 @@ defmodule AuthifyWeb.IdPCertificateIntegrationTest do
       org = organization_fixture()
 
       {:ok, cert} =
-        Authify.Accounts.generate_certificate(org, %{
+        Authify.Certificates.generate_certificate(org, %{
           "name" => "Test Certificate",
           "is_active" => true
         })
@@ -97,13 +97,13 @@ defmodule AuthifyWeb.IdPCertificateIntegrationTest do
 
       # Deactivate
       {:ok, updated_cert} =
-        Authify.Accounts.update_certificate(cert, %{"is_active" => false})
+        Authify.Certificates.update_certificate(cert, %{"is_active" => false})
 
       assert updated_cert.is_active == false
 
       # Reactivate
       {:ok, reactivated_cert} =
-        Authify.Accounts.update_certificate(updated_cert, %{"is_active" => true})
+        Authify.Certificates.update_certificate(updated_cert, %{"is_active" => true})
 
       assert reactivated_cert.is_active == true
     end
@@ -112,20 +112,20 @@ defmodule AuthifyWeb.IdPCertificateIntegrationTest do
       org = organization_fixture()
 
       {:ok, cert} =
-        Authify.Accounts.generate_certificate(org, %{
+        Authify.Certificates.generate_certificate(org, %{
           "name" => "Temporary Certificate",
           "is_active" => true
         })
 
       # Certificate exists
-      certs_before = Authify.Accounts.list_certificates(org)
+      certs_before = Authify.Certificates.list_certificates(org)
       assert length(certs_before) == 1
 
       # Delete it
-      {:ok, _deleted} = Authify.Accounts.delete_certificate(cert)
+      {:ok, _deleted} = Authify.Certificates.delete_certificate(cert)
 
       # Certificate is gone
-      certs_after = Authify.Accounts.list_certificates(org)
+      certs_after = Authify.Certificates.list_certificates(org)
       assert Enum.empty?(certs_after)
     end
   end

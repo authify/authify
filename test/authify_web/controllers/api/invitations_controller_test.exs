@@ -10,7 +10,7 @@ defmodule AuthifyWeb.API.InvitationsControllerTest do
 
     # Create some test invitations
     {:ok, invitation1} =
-      Authify.Accounts.create_invitation(%{
+      Authify.Invitations.create_invitation(%{
         "email" => "pending@example.com",
         "role" => "user",
         "organization_id" => organization.id,
@@ -18,7 +18,7 @@ defmodule AuthifyWeb.API.InvitationsControllerTest do
       })
 
     {:ok, invitation2} =
-      Authify.Accounts.create_invitation(%{
+      Authify.Invitations.create_invitation(%{
         "email" => "admin-invite@example.com",
         "role" => "admin",
         "organization_id" => organization.id,
@@ -27,7 +27,7 @@ defmodule AuthifyWeb.API.InvitationsControllerTest do
 
     # Accept one invitation to test filtering
     {:ok, _accepted_invitation} =
-      Authify.Accounts.update_invitation(invitation2, %{
+      Authify.Invitations.update_invitation(invitation2, %{
         "accepted_at" => DateTime.utc_now()
       })
 

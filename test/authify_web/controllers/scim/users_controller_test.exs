@@ -5,6 +5,8 @@ defmodule AuthifyWeb.SCIM.UsersControllerTest do
 
   alias Authify.Accounts
 
+  alias Authify.Groups
+
   setup %{conn: conn} do
     organization = organization_fixture()
     admin_user = user_fixture(organization: organization, role: "admin")
@@ -191,7 +193,7 @@ defmodule AuthifyWeb.SCIM.UsersControllerTest do
     test "includes groups in user response", %{conn: conn, organization: organization} do
       user = user_fixture(organization: organization)
       group = group_fixture(organization: organization, name: "Engineering")
-      Accounts.add_user_to_group(user, group)
+      Groups.add_user_to_group(user, group)
 
       conn = get(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}")
       response = json_response(conn, 200)

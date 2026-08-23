@@ -1,26 +1,26 @@
 defmodule AuthifyWeb.CertificatesController do
   use AuthifyWeb, :controller
 
-  alias Authify.Accounts
   alias Authify.Accounts.Certificate
+  alias Authify.Certificates
   alias AuthifyWeb.Helpers.AuditHelper
 
   def index(conn, _params) do
     organization = conn.assigns.current_organization
-    certificates = Accounts.list_certificates(organization)
+    certificates = Certificates.list_certificates(organization)
 
     render(conn, :index, certificates: certificates)
   end
 
   def show(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
-    certificate = Accounts.get_certificate!(id, organization)
+    certificate = Certificates.get_certificate!(id, organization)
 
     render(conn, :show, certificate: certificate)
   end
 
   def new(conn, _params) do
-    changeset = Accounts.change_certificate(%Certificate{})
+    changeset = Certificates.change_certificate(%Certificate{})
     render(conn, :new, changeset: changeset)
   end
 
@@ -32,7 +32,7 @@ defmodule AuthifyWeb.CertificatesController do
   end
 
   defp create_certificate_for_organization(conn, organization, certificate_params, true) do
-    case Accounts.generate_certificate(organization, certificate_params) do
+    case Certificates.generate_certificate(organization, certificate_params) do
       {:ok, certificate} ->
         handle_web_certificate_success(conn, certificate, true, "generated")
 
@@ -42,7 +42,7 @@ defmodule AuthifyWeb.CertificatesController do
   end
 
   defp create_certificate_for_organization(conn, organization, certificate_params, false) do
-    case Accounts.create_certificate(organization, certificate_params) do
+    case Certificates.create_certificate(organization, certificate_params) do
       {:ok, certificate} ->
         handle_web_certificate_success(conn, certificate, false, "created")
 
@@ -80,17 +80,17 @@ defmodule AuthifyWeb.CertificatesController do
 
   def edit(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
-    certificate = Accounts.get_certificate!(id, organization)
-    changeset = Accounts.change_certificate(certificate)
+    certificate = Certificates.get_certificate!(id, organization)
+    changeset = Certificates.change_certificate(certificate)
 
     render(conn, :edit, certificate: certificate, changeset: changeset)
   end
 
   def update(conn, %{"id" => id, "certificate" => certificate_params}) do
     organization = conn.assigns.current_organization
-    certificate = Accounts.get_certificate!(id, organization)
+    certificate = Certificates.get_certificate!(id, organization)
 
-    case Accounts.update_certificate(certificate, certificate_params) do
+    case Certificates.update_certificate(certificate, certificate_params) do
       {:ok, updated_certificate} ->
         maybe_log_activation_change(conn, certificate, updated_certificate, certificate_params,
           source: "web"
@@ -114,9 +114,9 @@ defmodule AuthifyWeb.CertificatesController do
 
   def delete(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
-    certificate = Accounts.get_certificate!(id, organization)
+    certificate = Certificates.get_certificate!(id, organization)
 
-    {:ok, _certificate} = Accounts.delete_certificate(certificate)
+    {:ok, _certificate} = Certificates.delete_certificate(certificate)
 
     AuditHelper.log_certificate_event(conn, :certificate_deleted, certificate,
       extra_metadata: %{source: "web"}
@@ -129,7 +129,7 @@ defmodule AuthifyWeb.CertificatesController do
 
   def download(conn, %{"id" => id, "type" => type}) when type in ["certificate", "private_key"] do
     organization = conn.assigns.current_organization
-    certificate = Accounts.get_certificate!(id, organization)
+    certificate = Certificates.get_certificate!(id, organization)
 
     # Check access permissions
     current_user = conn.assigns.current_user
@@ -165,9 +165,9 @@ defmodule AuthifyWeb.CertificatesController do
 
   def activate(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
-    certificate = Accounts.get_certificate!(id, organization)
+    certificate = Certificates.get_certificate!(id, organization)
 
-    case Accounts.update_certificate(certificate, %{"is_active" => true}) do
+    case Certificates.update_certificate(certificate, %{"is_active" => true}) do
       {:ok, updated_certificate} ->
         AuditHelper.log_certificate_event(conn, :certificate_activated, updated_certificate,
           previous_state: %{"is_active" => certificate.is_active},
@@ -195,9 +195,9 @@ defmodule AuthifyWeb.CertificatesController do
 
   def deactivate(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
-    certificate = Accounts.get_certificate!(id, organization)
+    certificate = Certificates.get_certificate!(id, organization)
 
-    case Accounts.update_certificate(certificate, %{"is_active" => false}) do
+    case Certificates.update_certificate(certificate, %{"is_active" => false}) do
       {:ok, updated_certificate} ->
         AuditHelper.log_certificate_event(conn, :certificate_deactivated, updated_certificate,
           previous_state: %{"is_active" => certificate.is_active},

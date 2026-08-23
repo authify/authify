@@ -2,6 +2,8 @@ defmodule AuthifyWeb.MaintenanceController do
   use AuthifyWeb, :controller
 
   alias Authify.Accounts
+  alias Authify.Invitations
+  alias Authify.Stats
   alias Authify.Tasks
 
   # All actions require being in the global organization
@@ -89,9 +91,9 @@ defmodule AuthifyWeb.MaintenanceController do
   defp get_database_stats do
     %{
       total_records: %{
-        organizations: Accounts.count_organizations(),
-        users: Accounts.count_users(),
-        invitations: Accounts.count_invitations()
+        organizations: Stats.count_organizations(),
+        users: Stats.count_users(),
+        invitations: Invitations.count_invitations()
       },
       storage_usage: %{
         database_size_mb: get_database_size(),
@@ -114,10 +116,10 @@ defmodule AuthifyWeb.MaintenanceController do
     now = DateTime.utc_now()
 
     %{
-      expired_invitations: Accounts.count_expired_invitations(),
-      cleanable_invitations: Accounts.count_cleanable_invitations(),
+      expired_invitations: Invitations.count_expired_invitations(),
+      cleanable_invitations: Invitations.count_cleanable_invitations(),
       inactive_organizations_90d:
-        Accounts.count_inactive_organizations_since(DateTime.add(now, -90, :day)),
+        Stats.count_inactive_organizations_since(DateTime.add(now, -90, :day)),
       orphaned_sessions: get_orphaned_sessions_count(),
       temp_files: get_temp_files_count()
     }

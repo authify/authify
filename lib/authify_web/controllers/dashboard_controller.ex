@@ -2,6 +2,8 @@ defmodule AuthifyWeb.DashboardController do
   use AuthifyWeb, :controller
 
   alias Authify.Accounts
+  alias Authify.Invitations
+  alias Authify.Stats
 
   def index(conn, _params) do
     user = conn.assigns.current_user
@@ -9,8 +11,8 @@ defmodule AuthifyWeb.DashboardController do
 
     if organization.slug == "authify-global" do
       # Global admin dashboard - show system-wide data
-      system_stats = Accounts.get_system_stats()
-      invitation_stats = Accounts.get_invitation_stats()
+      system_stats = Stats.get_system_stats()
+      invitation_stats = Invitations.get_invitation_stats()
 
       # Preload emails for recent users
       recent_users_with_emails = Authify.Repo.preload(system_stats.recent_users, :emails)

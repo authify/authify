@@ -2,8 +2,8 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
   use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
-  alias Authify.Accounts
   alias Authify.AuditLog
+  alias Authify.Certificates
 
   setup %{conn: conn} do
     organization = organization_fixture()
@@ -11,20 +11,20 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
 
     # Generate test certificates directly using the existing functionality
     {:ok, certificate1} =
-      Authify.Accounts.generate_saml_signing_certificate(organization, %{
+      Authify.Certificates.generate_saml_signing_certificate(organization, %{
         "name" => "SAML Signing Cert",
         "usage" => "saml_signing"
       })
 
     {:ok, certificate2} =
-      Authify.Accounts.generate_saml_signing_certificate(organization, %{
+      Authify.Certificates.generate_saml_signing_certificate(organization, %{
         "name" => "OAuth Signing Cert",
         "usage" => "oauth_signing"
       })
 
     # Deactivate the second certificate for testing
     {:ok, certificate2} =
-      Authify.Accounts.update_certificate(certificate2, %{"is_active" => false})
+      Authify.Certificates.update_certificate(certificate2, %{"is_active" => false})
 
     # Set up API headers and authentication as admin
     conn =
@@ -160,7 +160,7 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
     test "creates certificate with valid manual data", %{conn: conn, organization: organization} do
       # Generate a fresh certificate for manual upload test
       {:ok, temp_cert} =
-        Authify.Accounts.generate_saml_signing_certificate(organization, %{
+        Authify.Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "Temp Cert for Manual Test",
           "usage" => "saml_signing"
         })
@@ -203,7 +203,7 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
       assert event.metadata["certificate_name"] == "Test Manual Cert"
 
       # Clean up the temp certificate
-      Authify.Accounts.delete_certificate(temp_cert)
+      Authify.Certificates.delete_certificate(temp_cert)
     end
 
     test "generates new certificate when requested", %{conn: conn, organization: organization} do
@@ -457,7 +457,7 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
       organization: organization
     } do
       {:ok, certificate} =
-        Authify.Accounts.update_certificate(certificate, %{"is_active" => true})
+        Authify.Certificates.update_certificate(certificate, %{"is_active" => true})
 
       conn = patch(conn, "/#{organization.slug}/api/certificates/#{certificate.id}/deactivate")
 
@@ -496,7 +496,7 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
 
   describe "DELETE /certificates/:id (soft-delete)" do
     test "marks certificate as deleted but does not remove it", %{conn: conn, organization: org} do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
 
       conn = delete(conn, ~p"/#{org.slug}/api/certificates/#{cert.id}")
       assert response(conn, 204)
@@ -507,8 +507,8 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
     end
 
     test "returns 404 when certificate already soft-deleted", %{conn: conn, organization: org} do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
-      {:ok, _} = Accounts.delete_certificate(cert)
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Certificates.delete_certificate(cert)
 
       conn = delete(conn, ~p"/#{org.slug}/api/certificates/#{cert.id}")
       assert json_response(conn, 404)["error"]["type"] == "resource_not_found"
@@ -517,8 +517,8 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
 
   describe "GET /certificates/:id/download/certificate for soft-deleted" do
     test "returns PEM for a soft-deleted certificate", %{conn: conn, organization: org} do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
-      {:ok, _} = Accounts.delete_certificate(cert)
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Certificates.delete_certificate(cert)
 
       conn = get(conn, ~p"/#{org.slug}/api/certificates/#{cert.id}/download/certificate")
       assert response(conn, 200) =~ "BEGIN CERTIFICATE"
@@ -528,8 +528,8 @@ defmodule AuthifyWeb.API.CertificatesControllerTest do
       conn: conn,
       organization: org
     } do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
-      {:ok, _} = Accounts.delete_certificate(cert)
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Certificates.delete_certificate(cert)
 
       conn = get(conn, ~p"/#{org.slug}/api/certificates/#{cert.id}/download/private_key")
       assert json_response(conn, 404)["error"]["type"] == "resource_not_found"

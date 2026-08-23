@@ -9,6 +9,7 @@ defmodule AuthifyWeb.SCIM.PatchOperations do
   """
 
   alias Authify.Accounts
+  alias Authify.Groups
   alias Authify.SCIM.Provisioning
   alias AuthifyWeb.SCIM.{Helpers, Mappers}
 
@@ -140,7 +141,7 @@ defmodule AuthifyWeb.SCIM.PatchOperations do
         user ->
           case Helpers.validate_resource_organization(user, organization) do
             :ok ->
-              case Accounts.add_user_to_group(user, group) do
+              case Groups.add_user_to_group(user, group) do
                 {:ok, _} -> {:cont, :ok}
                 # Already a member, ignore
                 {:error, %Ecto.Changeset{}} -> {:cont, :ok}
@@ -162,7 +163,7 @@ defmodule AuthifyWeb.SCIM.PatchOperations do
       user ->
         case Helpers.validate_resource_organization(user, organization) do
           :ok ->
-            Accounts.remove_user_from_group(user, group)
+            Groups.remove_user_from_group(user, group)
             :ok
 
           {:error, :not_found} ->

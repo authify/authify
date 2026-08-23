@@ -60,7 +60,7 @@ defmodule Authify.Tasks.EventHandler do
 
         def execute(task) do
           # Load invitation and send email
-          invitation = Accounts.get_invitation!(task.params["invitation_id"])
+          invitation = Authify.Invitations.get_invitation!(task.params["invitation_id"])
           Email.send_invitation_email(invitation)
         end
       end

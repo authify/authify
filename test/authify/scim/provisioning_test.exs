@@ -3,8 +3,8 @@ defmodule Authify.SCIM.ProvisioningTest do
 
   import Authify.AccountsFixtures
 
-  alias Authify.Accounts
   alias Authify.Accounts.User
+  alias Authify.Groups
   alias Authify.SCIM.Provisioning
 
   describe "list_users_scim/2 and count_users_scim/2" do
@@ -183,7 +183,7 @@ defmodule Authify.SCIM.ProvisioningTest do
 
     test "finds group by external_id", %{organization: org} do
       {:ok, group} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           "name" => "ExtLookup",
           "organization_id" => org.id,
           "external_id" => "lookup-ext-id"

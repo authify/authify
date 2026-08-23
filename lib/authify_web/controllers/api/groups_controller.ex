@@ -3,6 +3,7 @@ defmodule AuthifyWeb.API.GroupsController do
 
   alias Authify.Accounts
   alias Authify.Accounts.User
+  alias Authify.Groups
   alias AuthifyWeb.Helpers.AuditHelper
 
   @doc """
@@ -32,9 +33,9 @@ defmodule AuthifyWeb.API.GroupsController do
           per_page: per_page
         ]
 
-        groups = Accounts.list_groups_filtered(organization, filter_opts)
+        groups = Groups.list_groups_filtered(organization, filter_opts)
         # Get total count by querying all groups
-        all_groups = Accounts.list_groups(organization)
+        all_groups = Groups.list_groups(organization)
         total_count = length(all_groups)
 
         render_collection_response(conn, groups,
@@ -92,7 +93,7 @@ defmodule AuthifyWeb.API.GroupsController do
         organization = conn.assigns.current_organization
         group_params_with_org = Map.put(group_params, "organization_id", organization.id)
 
-        case Accounts.create_group(group_params_with_org) do
+        case Groups.create_group(group_params_with_org) do
           {:ok, group} ->
             AuditHelper.log_event_async(conn, "group.created", "group", group.id, "success", %{
               "group_name" => group.name,
@@ -134,7 +135,7 @@ defmodule AuthifyWeb.API.GroupsController do
             )
 
           group ->
-            case Accounts.update_group(group, group_params) do
+            case Groups.update_group(group, group_params) do
               {:ok, updated_group} ->
                 AuditHelper.log_event_async(
                   conn,
@@ -181,7 +182,7 @@ defmodule AuthifyWeb.API.GroupsController do
             )
 
           group ->
-            case Accounts.delete_group(group) do
+            case Groups.delete_group(group) do
               {:ok, _deleted_group} ->
                 AuditHelper.log_event_async(
                   conn,
@@ -270,7 +271,7 @@ defmodule AuthifyWeb.API.GroupsController do
 
         with {:ok, group} <- fetch_group(id, organization),
              {:ok, user} <- fetch_user(user_id, organization),
-             {:ok, _membership} <- Accounts.add_user_to_group(user, group) do
+             {:ok, _membership} <- Groups.add_user_to_group(user, group) do
           AuditHelper.log_event_async(conn, "group.user_added", "group", group.id, "success", %{
             "group_name" => group.name,
             "user_id" => user.id,
@@ -318,7 +319,7 @@ defmodule AuthifyWeb.API.GroupsController do
 
         with {:ok, group} <- fetch_group(id, organization),
              {:ok, user} <- fetch_user(user_id, organization) do
-          {count, _} = Accounts.remove_user_from_group(user, group)
+          {count, _} = Groups.remove_user_from_group(user, group)
 
           if count > 0 do
             AuditHelper.log_event_async(
@@ -392,7 +393,7 @@ defmodule AuthifyWeb.API.GroupsController do
             )
 
           group ->
-            case Accounts.add_application_to_group(group, app_id, app_type) do
+            case Groups.add_application_to_group(group, app_id, app_type) do
               {:ok, _member} ->
                 AuditHelper.log_event_async(
                   conn,
@@ -441,7 +442,7 @@ defmodule AuthifyWeb.API.GroupsController do
             )
 
           group ->
-            case Accounts.remove_application_from_group(group, member_id) do
+            case Groups.remove_application_from_group(group, member_id) do
               {count, _} when count > 0 ->
                 AuditHelper.log_event_async(
                   conn,
@@ -485,7 +486,7 @@ defmodule AuthifyWeb.API.GroupsController do
   defp safe_to_atom(value), do: value
 
   defp safe_get_group(id, organization) do
-    Accounts.get_group!(id, organization)
+    Groups.get_group!(id, organization)
   rescue
     Ecto.NoResultsError -> nil
   end

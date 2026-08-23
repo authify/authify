@@ -1,7 +1,7 @@
 defmodule AuthifyWeb.API.InvitationsController do
   use AuthifyWeb.API.BaseController
 
-  alias Authify.Accounts
+  alias Authify.Invitations
   alias AuthifyWeb.Helpers.AuditHelper
 
   @doc """
@@ -19,7 +19,7 @@ defmodule AuthifyWeb.API.InvitationsController do
           AuthifyWeb.Controllers.Shared.ResourceHelpers.parse_api_pagination(params)
 
         # Get all invitations for the organization
-        invitations = Accounts.list_invitations(organization.id)
+        invitations = Invitations.list_invitations(organization.id)
 
         # Apply filtering if requested
         filtered_invitations =
@@ -66,7 +66,7 @@ defmodule AuthifyWeb.API.InvitationsController do
         organization = conn.assigns.current_organization
 
         try do
-          invitation = Accounts.get_invitation!(id)
+          invitation = Invitations.get_invitation!(id)
 
           # Ensure invitation belongs to current organization
           if invitation.organization_id == organization.id do
@@ -112,7 +112,10 @@ defmodule AuthifyWeb.API.InvitationsController do
           invitation_params
           |> Map.put("organization_id", organization.id)
 
-        case Accounts.create_invitation_and_send_email(invitation_params_with_org, current_user) do
+        case Invitations.create_invitation_and_send_email(
+               invitation_params_with_org,
+               current_user
+             ) do
           {:ok, invitation} ->
             AuditHelper.log_invitation_sent(conn, invitation,
               extra_metadata: %{"source" => "api"}
@@ -164,11 +167,11 @@ defmodule AuthifyWeb.API.InvitationsController do
         organization = conn.assigns.current_organization
 
         try do
-          invitation = Accounts.get_invitation!(id)
+          invitation = Invitations.get_invitation!(id)
 
           # Ensure invitation belongs to current organization
           if invitation.organization_id == organization.id do
-            case Accounts.update_invitation(invitation, invitation_params) do
+            case Invitations.update_invitation(invitation, invitation_params) do
               {:ok, updated_invitation} ->
                 render_api_response(conn, updated_invitation,
                   resource_type: "invitation",
@@ -228,11 +231,11 @@ defmodule AuthifyWeb.API.InvitationsController do
         organization = conn.assigns.current_organization
 
         try do
-          invitation = Accounts.get_invitation!(id)
+          invitation = Invitations.get_invitation!(id)
 
           # Ensure invitation belongs to current organization
           if invitation.organization_id == organization.id do
-            case Accounts.delete_invitation(invitation) do
+            case Invitations.delete_invitation(invitation) do
               {:ok, deleted_invitation} ->
                 AuditHelper.log_invitation_revoked(conn, deleted_invitation,
                   extra_metadata: %{"source" => "api"}

@@ -3,7 +3,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
   import Authify.AccountsFixtures
 
-  alias Authify.Accounts
+  alias Authify.Groups
 
   setup %{conn: conn} do
     organization = organization_fixture()
@@ -23,9 +23,9 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
     test "returns list of groups with pagination", %{conn: conn, organization: organization} do
       # Create test groups
       {:ok, group1} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
-      {:ok, group2} = Accounts.create_group(%{name: "Sales", organization_id: organization.id})
+      {:ok, group2} = Groups.create_group(%{name: "Sales", organization_id: organization.id})
 
       conn = get(conn, "/#{organization.slug}/scim/v2/Groups")
 
@@ -52,7 +52,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
     } do
       # Create 5 groups
       Enum.each(1..5, fn i ->
-        Accounts.create_group(%{name: "Group #{i}", organization_id: organization.id})
+        Groups.create_group(%{name: "Group #{i}", organization_id: organization.id})
       end)
 
       # Get first page
@@ -86,9 +86,9 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "filters groups by displayName", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
-      {:ok, _other} = Accounts.create_group(%{name: "Sales", organization_id: organization.id})
+      {:ok, _other} = Groups.create_group(%{name: "Sales", organization_id: organization.id})
 
       conn =
         get(conn, "/#{organization.slug}/scim/v2/Groups?filter=displayName eq \"Engineering\"")
@@ -103,14 +103,14 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "filters groups by externalId", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           name: "Engineering",
           external_id: "ext123",
           organization_id: organization.id
         })
 
       {:ok, _other} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           name: "Sales",
           external_id: "ext456",
           organization_id: organization.id
@@ -157,9 +157,9 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
     end
 
     test "sorts groups by displayName ascending", %{conn: conn, organization: organization} do
-      {:ok, _} = Accounts.create_group(%{name: "Zebra", organization_id: organization.id})
-      {:ok, _} = Accounts.create_group(%{name: "Alpha", organization_id: organization.id})
-      {:ok, _} = Accounts.create_group(%{name: "Beta", organization_id: organization.id})
+      {:ok, _} = Groups.create_group(%{name: "Zebra", organization_id: organization.id})
+      {:ok, _} = Groups.create_group(%{name: "Alpha", organization_id: organization.id})
+      {:ok, _} = Groups.create_group(%{name: "Beta", organization_id: organization.id})
 
       conn =
         get(conn, "/#{organization.slug}/scim/v2/Groups?sortBy=displayName&sortOrder=ascending")
@@ -171,9 +171,9 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
     end
 
     test "sorts groups by displayName descending", %{conn: conn, organization: organization} do
-      {:ok, _} = Accounts.create_group(%{name: "Zebra", organization_id: organization.id})
-      {:ok, _} = Accounts.create_group(%{name: "Alpha", organization_id: organization.id})
-      {:ok, _} = Accounts.create_group(%{name: "Beta", organization_id: organization.id})
+      {:ok, _} = Groups.create_group(%{name: "Zebra", organization_id: organization.id})
+      {:ok, _} = Groups.create_group(%{name: "Alpha", organization_id: organization.id})
+      {:ok, _} = Groups.create_group(%{name: "Beta", organization_id: organization.id})
 
       conn =
         get(conn, "/#{organization.slug}/scim/v2/Groups?sortBy=displayName&sortOrder=descending")
@@ -188,7 +188,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
   describe "GET /scim/v2/Groups/:id" do
     test "returns a single group", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       conn = get(conn, "/#{organization.slug}/scim/v2/Groups/#{group.id}")
 
@@ -203,13 +203,13 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "returns group with members", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       user1 = user_fixture(organization: organization, email: "user1@example.com")
       user2 = user_fixture(organization: organization, email: "user2@example.com")
 
-      {:ok, _} = Accounts.add_user_to_group(user1, group)
-      {:ok, _} = Accounts.add_user_to_group(user2, group)
+      {:ok, _} = Groups.add_user_to_group(user1, group)
+      {:ok, _} = Groups.add_user_to_group(user2, group)
 
       conn = get(conn, "/#{organization.slug}/scim/v2/Groups/#{group.id}")
 
@@ -237,7 +237,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
       organization: organization
     } do
       other_org = organization_fixture()
-      {:ok, group} = Accounts.create_group(%{name: "Other Group", organization_id: other_org.id})
+      {:ok, group} = Groups.create_group(%{name: "Other Group", organization_id: other_org.id})
 
       conn = get(conn, "/#{organization.slug}/scim/v2/Groups/#{group.id}")
 
@@ -246,7 +246,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "requires scim:groups:read scope", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       conn =
         conn
@@ -305,7 +305,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
     end
 
     test "returns error for duplicate displayName", %{conn: conn, organization: organization} do
-      {:ok, _} = Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+      {:ok, _} = Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       group_attrs = %{
         "displayName" => "Engineering"
@@ -322,7 +322,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "returns error for duplicate externalId", %{conn: conn, organization: organization} do
       {:ok, _} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           name: "Engineering",
           external_id: "ext123",
           organization_id: organization.id
@@ -360,7 +360,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
   describe "PUT /scim/v2/Groups/:id" do
     test "updates a group", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           name: "Engineering",
           external_id: "ext123",
           organization_id: organization.id
@@ -382,7 +382,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "prevents modifying immutable externalId", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           name: "Engineering",
           external_id: "ext123",
           organization_id: organization.id
@@ -414,7 +414,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "requires scim:groups:write scope", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       conn =
         conn
@@ -433,7 +433,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
   describe "PATCH /scim/v2/Groups/:id" do
     test "replaces displayName with path", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       patch_ops = %{
         "Operations" => [
@@ -455,7 +455,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "replaces entire resource without path", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       patch_ops = %{
         "Operations" => [
@@ -478,7 +478,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "adds members to group", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       user1 = user_fixture(organization: organization, email: "user1@example.com")
       user2 = user_fixture(organization: organization, email: "user2@example.com")
@@ -509,13 +509,13 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "removes member from group", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       user1 = user_fixture(organization: organization, email: "user1@example.com")
       user2 = user_fixture(organization: organization, email: "user2@example.com")
 
-      {:ok, _} = Accounts.add_user_to_group(user1, group)
-      {:ok, _} = Accounts.add_user_to_group(user2, group)
+      {:ok, _} = Groups.add_user_to_group(user1, group)
+      {:ok, _} = Groups.add_user_to_group(user2, group)
 
       patch_ops = %{
         "Operations" => [
@@ -539,7 +539,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "returns error when adding non-existent user", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       patch_ops = %{
         "Operations" => [
@@ -565,7 +565,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
       organization: organization
     } do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       other_org = organization_fixture()
       other_user = user_fixture(organization: other_org, email: "other@example.com")
@@ -591,7 +591,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "returns error for unsupported operation", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       patch_ops = %{
         "Operations" => [
@@ -612,7 +612,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "requires scim:groups:write scope", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       conn =
         conn
@@ -637,7 +637,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
   describe "DELETE /scim/v2/Groups/:id" do
     test "deletes a group", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       conn = delete(conn, "/#{organization.slug}/scim/v2/Groups/#{group.id}")
 
@@ -645,7 +645,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
       assert conn.resp_body == ""
 
       # Verify group is deleted
-      assert Accounts.get_group(group.id) == nil
+      assert Groups.get_group(group.id) == nil
     end
 
     test "returns 404 for non-existent group", %{conn: conn, organization: organization} do
@@ -659,7 +659,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
       organization: organization
     } do
       other_org = organization_fixture()
-      {:ok, group} = Accounts.create_group(%{name: "Other Group", organization_id: other_org.id})
+      {:ok, group} = Groups.create_group(%{name: "Other Group", organization_id: other_org.id})
 
       conn = delete(conn, "/#{organization.slug}/scim/v2/Groups/#{group.id}")
 
@@ -668,7 +668,7 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
     test "requires scim:groups:write scope", %{conn: conn, organization: organization} do
       {:ok, group} =
-        Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       conn =
         conn
@@ -685,8 +685,8 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
       org1 = organization_fixture()
       org2 = organization_fixture()
 
-      {:ok, _} = Accounts.create_group(%{name: "Org1 Group", organization_id: org1.id})
-      {:ok, _} = Accounts.create_group(%{name: "Org2 Group", organization_id: org2.id})
+      {:ok, _} = Groups.create_group(%{name: "Org1 Group", organization_id: org1.id})
+      {:ok, _} = Groups.create_group(%{name: "Org2 Group", organization_id: org2.id})
 
       conn = assign(conn, :current_organization, org1)
       conn = get(conn, "/#{org1.slug}/scim/v2/Groups")

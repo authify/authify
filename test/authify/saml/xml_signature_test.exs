@@ -1,8 +1,8 @@
 defmodule Authify.SAML.XMLSignatureTest do
   use Authify.DataCase, async: true
 
-  alias Authify.Accounts
   alias Authify.Accounts.Certificate
+  alias Authify.Certificates
   alias Authify.SAML.XMLSignature
 
   import Authify.AccountsFixtures
@@ -65,7 +65,7 @@ defmodule Authify.SAML.XMLSignatureTest do
     test "private keys are automatically decrypted by Ecto type", %{organization: organization} do
       # Generate a test certificate
       {:ok, certificate} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "Test Encryption Certificate"
         })
 
@@ -91,7 +91,7 @@ defmodule Authify.SAML.XMLSignatureTest do
 
     test "validates key pair matching", %{organization: organization} do
       {:ok, certificate} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "Test Key Pair Certificate"
         })
 
@@ -119,7 +119,7 @@ defmodule Authify.SAML.XMLSignatureTest do
       admin_user = admin_user_fixture(organization)
 
       {:ok, certificate} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "Test Access Certificate"
         })
 
@@ -154,7 +154,7 @@ defmodule Authify.SAML.XMLSignatureTest do
       organization = organization_fixture()
 
       {:ok, certificate} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "Test Signing Certificate"
         })
 
@@ -233,7 +233,7 @@ defmodule Authify.SAML.XMLSignatureTest do
       organization = organization_fixture()
 
       {:ok, certificate} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "Test Verification Certificate"
         })
 
@@ -384,7 +384,7 @@ defmodule Authify.SAML.XMLSignatureTest do
 
     test "handles large XML documents efficiently", %{organization: organization} do
       {:ok, _certificate} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "Performance Test Certificate"
         })
 

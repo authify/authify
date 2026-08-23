@@ -62,7 +62,7 @@ defmodule Authify.AuditLog.SignerTest do
   describe "sign/2 and verify/2" do
     setup do
       org = organization_fixture()
-      {:ok, cert} = Authify.Accounts.get_or_generate_audit_signing_certificate(org.id)
+      {:ok, cert} = Authify.Certificates.get_or_generate_audit_signing_certificate(org.id)
       %{org: org, cert: cert}
     end
 

@@ -3,6 +3,9 @@ defmodule Authify.AccountsTest do
 
   alias Authify.Accounts
   alias Authify.Accounts.{Group, GroupMembership, Invitation, Organization, User}
+  alias Authify.Certificates
+  alias Authify.Groups
+  alias Authify.Invitations
   alias Authify.OAuth
   alias Authify.SAML
 
@@ -440,7 +443,7 @@ defmodule Authify.AccountsTest do
       admin_user: admin
     } do
       invitation = invitation_for_organization_fixture(org, admin)
-      invitations = Accounts.list_invitations(org.id)
+      invitations = Invitations.list_invitations(org.id)
 
       assert length(invitations) == 1
       assert hd(invitations).id == invitation.id
@@ -464,9 +467,9 @@ defmodule Authify.AccountsTest do
         "expires_at" => DateTime.add(DateTime.utc_now(), -1, :day) |> DateTime.truncate(:second)
       }
 
-      {:ok, _expired_invitation} = Accounts.create_invitation(expired_attrs)
+      {:ok, _expired_invitation} = Invitations.create_invitation(expired_attrs)
 
-      pending_invitations = Accounts.list_pending_invitations(org.id)
+      pending_invitations = Invitations.list_pending_invitations(org.id)
 
       assert length(pending_invitations) == 1
       assert hd(pending_invitations).id == pending_invitation.id
@@ -478,7 +481,7 @@ defmodule Authify.AccountsTest do
       admin_user: admin
     } do
       invitation = invitation_for_organization_fixture(org, admin)
-      found_invitation = Accounts.get_invitation!(invitation.id)
+      found_invitation = Invitations.get_invitation!(invitation.id)
 
       assert found_invitation.id == invitation.id
       assert found_invitation.email == invitation.email
@@ -491,14 +494,14 @@ defmodule Authify.AccountsTest do
       admin_user: admin
     } do
       invitation = invitation_for_organization_fixture(org, admin)
-      found_invitation = Accounts.get_invitation_by_token(invitation.token)
+      found_invitation = Invitations.get_invitation_by_token(invitation.token)
 
       assert found_invitation.id == invitation.id
       assert found_invitation.token == invitation.token
     end
 
     test "get_invitation_by_token/1 returns nil for invalid token" do
-      assert Accounts.get_invitation_by_token("invalid-token") == nil
+      assert Invitations.get_invitation_by_token("invalid-token") == nil
     end
 
     test "create_invitation/1 with valid data creates an invitation", %{
@@ -511,7 +514,7 @@ defmodule Authify.AccountsTest do
           "invited_by_id" => admin.id
         })
 
-      assert {:ok, %Invitation{} = invitation} = Accounts.create_invitation(attrs)
+      assert {:ok, %Invitation{} = invitation} = Invitations.create_invitation(attrs)
       assert invitation.email == "invite@example.com"
       assert invitation.role == "user"
       assert invitation.organization_id == org.id
@@ -531,7 +534,7 @@ defmodule Authify.AccountsTest do
           "invited_by_id" => admin.id
         })
 
-      assert {:error, %Ecto.Changeset{}} = Accounts.create_invitation(attrs)
+      assert {:error, %Ecto.Changeset{}} = Invitations.create_invitation(attrs)
     end
 
     test "create_invitation/1 enforces unique email per organization", %{
@@ -545,10 +548,10 @@ defmodule Authify.AccountsTest do
         })
 
       # Create first invitation
-      {:ok, _invitation1} = Accounts.create_invitation(attrs)
+      {:ok, _invitation1} = Invitations.create_invitation(attrs)
 
       # Try to create second invitation with same email
-      assert {:error, %Ecto.Changeset{} = changeset} = Accounts.create_invitation(attrs)
+      assert {:error, %Ecto.Changeset{} = changeset} = Invitations.create_invitation(attrs)
       assert "User already invited to this organization" in errors_on(changeset).email
     end
 
@@ -560,7 +563,7 @@ defmodule Authify.AccountsTest do
       attrs = Map.merge(@valid_invitation_attrs, %{"organization_id" => org.id})
 
       assert {:ok, %Invitation{} = invitation} =
-               Accounts.create_invitation_and_send_email(attrs, admin)
+               Invitations.create_invitation_and_send_email(attrs, admin)
 
       assert invitation.invited_by_id == admin.id
       assert invitation.organization_id == org.id
@@ -580,7 +583,7 @@ defmodule Authify.AccountsTest do
         "password_confirmation" => "SecureP@ssw0rd!"
       }
 
-      assert {:ok, %User{} = user} = Accounts.accept_invitation(invitation, user_attrs)
+      assert {:ok, %User{} = user} = Invitations.accept_invitation(invitation, user_attrs)
 
       # Check user was created correctly
       assert User.get_primary_email_value(user) == invitation.email
@@ -590,7 +593,7 @@ defmodule Authify.AccountsTest do
       assert User.role_in_organization(user, invitation.organization_id) == invitation.role
 
       # Check invitation was marked as accepted
-      updated_invitation = Accounts.get_invitation!(invitation.id)
+      updated_invitation = Invitations.get_invitation!(invitation.id)
       assert updated_invitation.accepted_at != nil
     end
 
@@ -608,10 +611,10 @@ defmodule Authify.AccountsTest do
       }
 
       assert {:error, %Ecto.Changeset{}} =
-               Accounts.accept_invitation(invitation, invalid_user_attrs)
+               Invitations.accept_invitation(invitation, invalid_user_attrs)
 
       # Invitation should not be marked as accepted
-      unchanged_invitation = Accounts.get_invitation!(invitation.id)
+      unchanged_invitation = Invitations.get_invitation!(invitation.id)
       assert is_nil(unchanged_invitation.accepted_at)
     end
 
@@ -628,7 +631,7 @@ defmodule Authify.AccountsTest do
         "expires_at" => DateTime.add(DateTime.utc_now(), -1, :day) |> DateTime.truncate(:second)
       }
 
-      {:ok, expired_invitation} = Accounts.create_invitation(expired_attrs)
+      {:ok, expired_invitation} = Invitations.create_invitation(expired_attrs)
 
       user_attrs = %{
         "first_name" => "John",
@@ -638,7 +641,7 @@ defmodule Authify.AccountsTest do
       }
 
       assert {:error, :invitation_invalid} =
-               Accounts.accept_invitation(expired_invitation, user_attrs)
+               Invitations.accept_invitation(expired_invitation, user_attrs)
     end
 
     @tag :capture_log
@@ -656,22 +659,22 @@ defmodule Authify.AccountsTest do
       }
 
       # Accept invitation first time
-      {:ok, _user} = Accounts.accept_invitation(invitation, user_attrs)
+      {:ok, _user} = Invitations.accept_invitation(invitation, user_attrs)
 
       # Reload the invitation to get the updated accepted_at field
-      updated_invitation = Accounts.get_invitation!(invitation.id)
+      updated_invitation = Invitations.get_invitation!(invitation.id)
 
       # Try to accept again
       assert {:error, :invitation_invalid} =
-               Accounts.accept_invitation(updated_invitation, user_attrs)
+               Invitations.accept_invitation(updated_invitation, user_attrs)
     end
 
     @tag :capture_log
     test "delete_invitation/1 deletes the invitation", %{organization: org, admin_user: admin} do
       invitation = invitation_for_organization_fixture(org, admin)
 
-      assert {:ok, %Invitation{}} = Accounts.delete_invitation(invitation)
-      assert_raise Ecto.NoResultsError, fn -> Accounts.get_invitation!(invitation.id) end
+      assert {:ok, %Invitation{}} = Invitations.delete_invitation(invitation)
+      assert_raise Ecto.NoResultsError, fn -> Invitations.get_invitation!(invitation.id) end
     end
 
     @tag :capture_log
@@ -680,7 +683,7 @@ defmodule Authify.AccountsTest do
       admin_user: admin
     } do
       invitation = invitation_for_organization_fixture(org, admin)
-      assert %Ecto.Changeset{} = Accounts.change_invitation(invitation)
+      assert %Ecto.Changeset{} = Invitations.change_invitation(invitation)
     end
 
     @tag :capture_log
@@ -700,16 +703,16 @@ defmodule Authify.AccountsTest do
         "expires_at" => DateTime.add(DateTime.utc_now(), -1, :day) |> DateTime.truncate(:second)
       }
 
-      {:ok, _expired_invitation} = Accounts.create_invitation(expired_attrs)
+      {:ok, _expired_invitation} = Invitations.create_invitation(expired_attrs)
 
-      assert length(Accounts.list_invitations(org.id)) == 2
+      assert length(Invitations.list_invitations(org.id)) == 2
 
       # Cleanup expired invitations
-      {deleted_count, _} = Accounts.cleanup_expired_invitations(org.id)
+      {deleted_count, _} = Invitations.cleanup_expired_invitations(org.id)
       assert deleted_count == 1
 
       # Only pending invitation should remain
-      remaining_invitations = Accounts.list_invitations(org.id)
+      remaining_invitations = Invitations.list_invitations(org.id)
       assert length(remaining_invitations) == 1
       assert DateTime.after?(hd(remaining_invitations).expires_at, DateTime.utc_now())
     end
@@ -1134,7 +1137,7 @@ defmodule Authify.AccountsTest do
     } do
       # Create first SAML signing certificate using the proper generation function
       {:ok, cert1} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "SAML Cert 1",
           "is_active" => true
         })
@@ -1143,7 +1146,7 @@ defmodule Authify.AccountsTest do
 
       # Create second SAML signing certificate using the proper generation function
       {:ok, cert2} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "SAML Cert 2",
           "is_active" => true
         })
@@ -1151,22 +1154,25 @@ defmodule Authify.AccountsTest do
       assert cert2.is_active == true
 
       # Verify first cert is now deactivated
-      updated_cert1 = Accounts.get_certificate!(cert1.id)
+      updated_cert1 = Certificates.get_certificate!(cert1.id)
       assert updated_cert1.is_active == false
 
       # Create different usage type - should not affect SAML signing certs
       {:ok, oauth_cert} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "OAuth Cert"
         })
 
       # Change usage type to oauth_signing and activate
       {:ok, oauth_cert} =
-        Accounts.update_certificate(oauth_cert, %{"usage" => "oauth_signing", "is_active" => true})
+        Certificates.update_certificate(oauth_cert, %{
+          "usage" => "oauth_signing",
+          "is_active" => true
+        })
 
       # Both different usage certs can be active
       assert oauth_cert.is_active == true
-      updated_cert2 = Accounts.get_certificate!(cert2.id)
+      updated_cert2 = Certificates.get_certificate!(cert2.id)
       assert updated_cert2.is_active == true
     end
 
@@ -1175,25 +1181,25 @@ defmodule Authify.AccountsTest do
     } do
       # Create two inactive certificates of same usage using proper generation
       {:ok, cert1} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "SAML Cert 1"
         })
 
       {:ok, cert2} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "SAML Cert 2"
         })
 
       # Activate first certificate
-      {:ok, updated_cert1} = Accounts.update_certificate(cert1, %{"is_active" => true})
+      {:ok, updated_cert1} = Certificates.update_certificate(cert1, %{"is_active" => true})
       assert updated_cert1.is_active == true
 
       # Activate second certificate (should deactivate first)
-      {:ok, updated_cert2} = Accounts.update_certificate(cert2, %{"is_active" => true})
+      {:ok, updated_cert2} = Certificates.update_certificate(cert2, %{"is_active" => true})
       assert updated_cert2.is_active == true
 
       # Verify first cert is now deactivated
-      updated_cert1_again = Accounts.get_certificate!(cert1.id)
+      updated_cert1_again = Certificates.get_certificate!(cert1.id)
       assert updated_cert1_again.is_active == false
     end
 
@@ -1201,27 +1207,27 @@ defmodule Authify.AccountsTest do
       organization: organization
     } do
       # No certificates initially
-      assert Accounts.get_active_saml_signing_certificate(organization) == nil
+      assert Certificates.get_active_saml_signing_certificate(organization) == nil
 
       # Create inactive certificate using proper generation
       {:ok, _inactive_cert} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "Inactive SAML Cert"
         })
 
       # Still no active certificate (generated certificates are inactive by default)
-      assert Accounts.get_active_saml_signing_certificate(organization) == nil
+      assert Certificates.get_active_saml_signing_certificate(organization) == nil
 
       # Create and activate a certificate
       {:ok, active_cert} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "Active SAML Cert"
         })
 
-      {:ok, active_cert} = Accounts.update_certificate(active_cert, %{"is_active" => true})
+      {:ok, active_cert} = Certificates.update_certificate(active_cert, %{"is_active" => true})
 
       # Should return the active certificate
-      result = Accounts.get_active_saml_signing_certificate(organization)
+      result = Certificates.get_active_saml_signing_certificate(organization)
       assert result.id == active_cert.id
       assert result.is_active == true
     end
@@ -1229,7 +1235,7 @@ defmodule Authify.AccountsTest do
     test "get_active_oauth_signing_certificate/1 returns nil when no cert exists", %{
       organization: organization
     } do
-      assert Accounts.get_active_oauth_signing_certificate(organization) == nil
+      assert Certificates.get_active_oauth_signing_certificate(organization) == nil
     end
 
     test "get_active_oauth_signing_certificate/1 returns the active cert when one exists", %{
@@ -1237,17 +1243,17 @@ defmodule Authify.AccountsTest do
     } do
       # Create an inactive OAuth signing cert first (with explicit unique name)
       {:ok, inactive_cert} =
-        Accounts.generate_certificate(organization, %{
+        Certificates.generate_certificate(organization, %{
           "usage" => "oauth_signing",
           "name" => "Inactive OAuth Cert"
         })
 
-      assert Accounts.get_active_oauth_signing_certificate(organization) == nil
+      assert Certificates.get_active_oauth_signing_certificate(organization) == nil
 
       # Activate the cert
-      {:ok, cert} = Accounts.update_certificate(inactive_cert, %{"is_active" => true})
+      {:ok, cert} = Certificates.update_certificate(inactive_cert, %{"is_active" => true})
 
-      result = Accounts.get_active_oauth_signing_certificate(organization)
+      result = Certificates.get_active_oauth_signing_certificate(organization)
       assert result.id == cert.id
       assert result.is_active == true
       assert result.usage == "oauth_signing"
@@ -1256,9 +1262,9 @@ defmodule Authify.AccountsTest do
     test "get_or_generate_oauth_signing_certificate/1 auto-generates when no cert exists", %{
       organization: organization
     } do
-      assert Accounts.get_active_oauth_signing_certificate(organization) == nil
+      assert Certificates.get_active_oauth_signing_certificate(organization) == nil
 
-      assert {:ok, cert} = Accounts.get_or_generate_oauth_signing_certificate(organization)
+      assert {:ok, cert} = Certificates.get_or_generate_oauth_signing_certificate(organization)
       assert cert.usage == "oauth_signing"
       assert cert.is_active == true
       assert is_binary(cert.certificate)
@@ -1269,12 +1275,12 @@ defmodule Authify.AccountsTest do
       organization: organization
     } do
       {:ok, existing} =
-        Accounts.generate_certificate(organization, %{
+        Certificates.generate_certificate(organization, %{
           "usage" => "oauth_signing",
           "is_active" => true
         })
 
-      assert {:ok, cert} = Accounts.get_or_generate_oauth_signing_certificate(organization)
+      assert {:ok, cert} = Certificates.get_or_generate_oauth_signing_certificate(organization)
       assert cert.id == existing.id
     end
   end
@@ -1286,9 +1292,9 @@ defmodule Authify.AccountsTest do
     end
 
     test "delete_certificate/1 sets deleted_at and does not remove the row", %{organization: org} do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
 
-      {:ok, deleted} = Accounts.delete_certificate(cert)
+      {:ok, deleted} = Certificates.delete_certificate(cert)
 
       assert deleted.deleted_at != nil
       # Row still exists in DB
@@ -1296,30 +1302,30 @@ defmodule Authify.AccountsTest do
     end
 
     test "list_certificates/1 excludes soft-deleted certificates", %{organization: org} do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
-      {:ok, _} = Accounts.delete_certificate(cert)
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Certificates.delete_certificate(cert)
 
-      certs = Accounts.list_certificates(org)
+      certs = Certificates.list_certificates(org)
       ids = Enum.map(certs, & &1.id)
       refute cert.id in ids
     end
 
     test "get_certificate!/1 raises for soft-deleted certificate", %{organization: org} do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
-      {:ok, _} = Accounts.delete_certificate(cert)
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Certificates.delete_certificate(cert)
 
       assert_raise Ecto.NoResultsError, fn ->
-        Accounts.get_certificate!(cert.id)
+        Certificates.get_certificate!(cert.id)
       end
     end
 
     test "get_certificate!/2 with include_deleted: true finds soft-deleted cert", %{
       organization: org
     } do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
-      {:ok, _} = Accounts.delete_certificate(cert)
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Certificates.delete_certificate(cert)
 
-      found = Accounts.get_certificate!(cert.id, org, include_deleted: true)
+      found = Certificates.get_certificate!(cert.id, org, include_deleted: true)
       assert found.id == cert.id
       assert found.deleted_at != nil
     end
@@ -1327,11 +1333,11 @@ defmodule Authify.AccountsTest do
     test "get_certificate!/2 without include_deleted raises for soft-deleted cert", %{
       organization: org
     } do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
-      {:ok, _} = Accounts.delete_certificate(cert)
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Certificates.delete_certificate(cert)
 
       assert_raise Ecto.NoResultsError, fn ->
-        Accounts.get_certificate!(cert.id, org)
+        Certificates.get_certificate!(cert.id, org)
       end
     end
   end
@@ -1345,7 +1351,7 @@ defmodule Authify.AccountsTest do
     test "get_or_generate_audit_signing_certificate/1 generates cert if none exists", %{
       organization: org
     } do
-      {:ok, cert} = Accounts.get_or_generate_audit_signing_certificate(org.id)
+      {:ok, cert} = Certificates.get_or_generate_audit_signing_certificate(org.id)
 
       assert cert.usage == "audit_signing"
       assert cert.is_active == true
@@ -1355,14 +1361,14 @@ defmodule Authify.AccountsTest do
     test "get_or_generate_audit_signing_certificate/1 returns existing active cert", %{
       organization: org
     } do
-      {:ok, cert1} = Accounts.get_or_generate_audit_signing_certificate(org.id)
-      {:ok, cert2} = Accounts.get_or_generate_audit_signing_certificate(org.id)
+      {:ok, cert1} = Certificates.get_or_generate_audit_signing_certificate(org.id)
+      {:ok, cert2} = Certificates.get_or_generate_audit_signing_certificate(org.id)
 
       assert cert1.id == cert2.id
     end
 
     test "generate_certificate/2 accepts audit_signing usage", %{organization: org} do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "audit_signing"})
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "audit_signing"})
       assert cert.usage == "audit_signing"
     end
   end
@@ -1454,14 +1460,14 @@ defmodule Authify.AccountsTest do
 
     test "create_group/1 defaults is_active to true", %{organization: org} do
       {:ok, group} =
-        Accounts.create_group(%{"name" => "Default Active", "organization_id" => org.id})
+        Groups.create_group(%{"name" => "Default Active", "organization_id" => org.id})
 
       assert group.is_active == true
     end
 
     test "create_group/1 allows setting is_active to false", %{organization: org} do
       {:ok, group} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           "name" => "Inactive Group",
           "organization_id" => org.id,
           "is_active" => false
@@ -1474,7 +1480,7 @@ defmodule Authify.AccountsTest do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       {:ok, group} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           name: "SCIM Group",
           organization_id: org.id,
           scim_created_at: now,
@@ -1486,9 +1492,9 @@ defmodule Authify.AccountsTest do
     end
 
     test "list_groups/1 returns all groups for the organization", %{organization: org} do
-      {:ok, g1} = Accounts.create_group(%{"name" => "Alpha", "organization_id" => org.id})
-      {:ok, g2} = Accounts.create_group(%{"name" => "Beta", "organization_id" => org.id})
-      ids = Accounts.list_groups(org) |> Enum.map(& &1.id)
+      {:ok, g1} = Groups.create_group(%{"name" => "Alpha", "organization_id" => org.id})
+      {:ok, g2} = Groups.create_group(%{"name" => "Beta", "organization_id" => org.id})
+      ids = Groups.list_groups(org) |> Enum.map(& &1.id)
       assert g1.id in ids
       assert g2.id in ids
     end
@@ -1497,34 +1503,34 @@ defmodule Authify.AccountsTest do
       {:ok, other_org} = Accounts.create_organization(valid_org_attrs())
 
       {:ok, other_group} =
-        Accounts.create_group(%{"name" => "Other", "organization_id" => other_org.id})
+        Groups.create_group(%{"name" => "Other", "organization_id" => other_org.id})
 
-      ids = Accounts.list_groups(org) |> Enum.map(& &1.id)
+      ids = Groups.list_groups(org) |> Enum.map(& &1.id)
       refute other_group.id in ids
     end
 
     test "list_groups_filtered/2 with no opts returns all groups", %{organization: org} do
-      {:ok, g1} = Accounts.create_group(%{"name" => "Gamma", "organization_id" => org.id})
-      ids = Accounts.list_groups_filtered(org) |> Enum.map(& &1.id)
+      {:ok, g1} = Groups.create_group(%{"name" => "Gamma", "organization_id" => org.id})
+      ids = Groups.list_groups_filtered(org) |> Enum.map(& &1.id)
       assert g1.id in ids
     end
 
     test "list_groups_filtered/2 filters by active status true", %{organization: org} do
       {:ok, active} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           "name" => "Active",
           "organization_id" => org.id,
           "is_active" => true
         })
 
       {:ok, inactive} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           "name" => "Inactive",
           "organization_id" => org.id,
           "is_active" => false
         })
 
-      results = Accounts.list_groups_filtered(org, status: true)
+      results = Groups.list_groups_filtered(org, status: true)
       ids = Enum.map(results, & &1.id)
       assert active.id in ids
       refute inactive.id in ids
@@ -1532,20 +1538,20 @@ defmodule Authify.AccountsTest do
 
     test "list_groups_filtered/2 filters by active status false", %{organization: org} do
       {:ok, active} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           "name" => "Active2",
           "organization_id" => org.id,
           "is_active" => true
         })
 
       {:ok, inactive} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           "name" => "Inactive2",
           "organization_id" => org.id,
           "is_active" => false
         })
 
-      results = Accounts.list_groups_filtered(org, status: false)
+      results = Groups.list_groups_filtered(org, status: false)
       ids = Enum.map(results, & &1.id)
       assert inactive.id in ids
       refute active.id in ids
@@ -1553,12 +1559,12 @@ defmodule Authify.AccountsTest do
 
     test "list_groups_filtered/2 searches by name", %{organization: org} do
       {:ok, match} =
-        Accounts.create_group(%{"name" => "UniqueSearchName", "organization_id" => org.id})
+        Groups.create_group(%{"name" => "UniqueSearchName", "organization_id" => org.id})
 
       {:ok, no_match} =
-        Accounts.create_group(%{"name" => "SomethingElse", "organization_id" => org.id})
+        Groups.create_group(%{"name" => "SomethingElse", "organization_id" => org.id})
 
-      results = Accounts.list_groups_filtered(org, search: "UniqueSearchName")
+      results = Groups.list_groups_filtered(org, search: "UniqueSearchName")
       ids = Enum.map(results, & &1.id)
       assert match.id in ids
       refute no_match.id in ids
@@ -1566,40 +1572,40 @@ defmodule Authify.AccountsTest do
 
     test "list_groups_filtered/2 searches by description", %{organization: org} do
       {:ok, match} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           "name" => "GroupWithDesc",
           "organization_id" => org.id,
           "description" => "UniqueDescriptionText"
         })
 
       {:ok, no_match} =
-        Accounts.create_group(%{"name" => "NoDescGroup", "organization_id" => org.id})
+        Groups.create_group(%{"name" => "NoDescGroup", "organization_id" => org.id})
 
-      results = Accounts.list_groups_filtered(org, search: "UniqueDescriptionText")
+      results = Groups.list_groups_filtered(org, search: "UniqueDescriptionText")
       ids = Enum.map(results, & &1.id)
       assert match.id in ids
       refute no_match.id in ids
     end
 
     test "list_groups_filtered/2 sorts by name ascending", %{organization: org} do
-      Accounts.create_group(%{"name" => "Zephyr", "organization_id" => org.id})
-      Accounts.create_group(%{"name" => "Aardvark", "organization_id" => org.id})
-      results = Accounts.list_groups_filtered(org, sort: :name, order: :asc)
+      Groups.create_group(%{"name" => "Zephyr", "organization_id" => org.id})
+      Groups.create_group(%{"name" => "Aardvark", "organization_id" => org.id})
+      results = Groups.list_groups_filtered(org, sort: :name, order: :asc)
       names = Enum.map(results, & &1.name)
       assert names == Enum.sort(names)
     end
 
     test "list_groups_filtered/2 sorts by name descending", %{organization: org} do
-      Accounts.create_group(%{"name" => "Zeta", "organization_id" => org.id})
-      Accounts.create_group(%{"name" => "Alpha", "organization_id" => org.id})
-      results = Accounts.list_groups_filtered(org, sort: :name, order: :desc)
+      Groups.create_group(%{"name" => "Zeta", "organization_id" => org.id})
+      Groups.create_group(%{"name" => "Alpha", "organization_id" => org.id})
+      results = Groups.list_groups_filtered(org, sort: :name, order: :desc)
       names = Enum.map(results, & &1.name)
       assert names == Enum.sort(names, :desc)
     end
 
     test "get_group!/2 returns the group scoped to the organization", %{organization: org} do
-      {:ok, group} = Accounts.create_group(%{"name" => "GetTest", "organization_id" => org.id})
-      found = Accounts.get_group!(group.id, org)
+      {:ok, group} = Groups.create_group(%{"name" => "GetTest", "organization_id" => org.id})
+      found = Groups.get_group!(group.id, org)
       assert found.id == group.id
       assert found.name == "GetTest"
     end
@@ -1610,36 +1616,36 @@ defmodule Authify.AccountsTest do
       {:ok, other_org} = Accounts.create_organization(valid_org_attrs())
 
       {:ok, group} =
-        Accounts.create_group(%{"name" => "OtherOrgGroup", "organization_id" => other_org.id})
+        Groups.create_group(%{"name" => "OtherOrgGroup", "organization_id" => other_org.id})
 
-      assert_raise Ecto.NoResultsError, fn -> Accounts.get_group!(group.id, org) end
+      assert_raise Ecto.NoResultsError, fn -> Groups.get_group!(group.id, org) end
     end
 
     test "get_group/1 returns group by integer id", %{organization: org} do
-      {:ok, group} = Accounts.create_group(%{"name" => "IntIdGroup", "organization_id" => org.id})
-      found = Accounts.get_group(group.id)
+      {:ok, group} = Groups.create_group(%{"name" => "IntIdGroup", "organization_id" => org.id})
+      found = Groups.get_group(group.id)
       assert found.id == group.id
     end
 
     test "get_group/1 returns group by string id", %{organization: org} do
       {:ok, group} =
-        Accounts.create_group(%{"name" => "StringIdGroup", "organization_id" => org.id})
+        Groups.create_group(%{"name" => "StringIdGroup", "organization_id" => org.id})
 
-      found = Accounts.get_group(Integer.to_string(group.id))
+      found = Groups.get_group(Integer.to_string(group.id))
       assert found.id == group.id
     end
 
     test "get_group/1 returns nil for non-existent integer id" do
-      assert Accounts.get_group(999_999_999) == nil
+      assert Groups.get_group(999_999_999) == nil
     end
 
     test "get_group/1 returns nil for non-numeric string id" do
-      assert Accounts.get_group("not-a-number") == nil
+      assert Groups.get_group("not-a-number") == nil
     end
 
     test "create_group/1 with valid attrs creates a group", %{organization: org} do
       assert {:ok, %Group{} = group} =
-               Accounts.create_group(%{
+               Groups.create_group(%{
                  "name" => "New Group",
                  "organization_id" => org.id,
                  "description" => "A test group"
@@ -1652,14 +1658,14 @@ defmodule Authify.AccountsTest do
     end
 
     test "create_group/1 with invalid attrs returns error changeset" do
-      assert {:error, %Ecto.Changeset{}} = Accounts.create_group(%{"name" => ""})
+      assert {:error, %Ecto.Changeset{}} = Groups.create_group(%{"name" => ""})
     end
 
     test "create_group/1 enforces unique name within the same organization", %{organization: org} do
-      {:ok, _} = Accounts.create_group(%{"name" => "DupeName", "organization_id" => org.id})
+      {:ok, _} = Groups.create_group(%{"name" => "DupeName", "organization_id" => org.id})
 
       assert {:error, %Ecto.Changeset{} = changeset} =
-               Accounts.create_group(%{"name" => "DupeName", "organization_id" => org.id})
+               Groups.create_group(%{"name" => "DupeName", "organization_id" => org.id})
 
       assert "Group name already exists in this organization" in errors_on(changeset).name
     end
@@ -1668,24 +1674,24 @@ defmodule Authify.AccountsTest do
       organization: org
     } do
       {:ok, other_org} = Accounts.create_organization(valid_org_attrs())
-      {:ok, _} = Accounts.create_group(%{"name" => "SharedName", "organization_id" => org.id})
+      {:ok, _} = Groups.create_group(%{"name" => "SharedName", "organization_id" => org.id})
 
       assert {:ok, _} =
-               Accounts.create_group(%{"name" => "SharedName", "organization_id" => other_org.id})
+               Groups.create_group(%{"name" => "SharedName", "organization_id" => other_org.id})
     end
 
     test "create_group/1 enforces unique external_id within the same organization", %{
       organization: org
     } do
       {:ok, _} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           "name" => "Group1",
           "organization_id" => org.id,
           "external_id" => "ext-unique-123"
         })
 
       assert {:error, %Ecto.Changeset{} = changeset} =
-               Accounts.create_group(%{
+               Groups.create_group(%{
                  "name" => "Group2",
                  "organization_id" => org.id,
                  "external_id" => "ext-unique-123"
@@ -1695,44 +1701,44 @@ defmodule Authify.AccountsTest do
     end
 
     test "update_group/2 with valid attrs updates the group", %{organization: org} do
-      {:ok, group} = Accounts.create_group(%{"name" => "Before", "organization_id" => org.id})
+      {:ok, group} = Groups.create_group(%{"name" => "Before", "organization_id" => org.id})
 
       assert {:ok, updated} =
-               Accounts.update_group(group, %{"name" => "After", "description" => "Updated"})
+               Groups.update_group(group, %{"name" => "After", "description" => "Updated"})
 
       assert updated.name == "After"
       assert updated.description == "Updated"
     end
 
     test "update_group/2 with invalid attrs returns error changeset", %{organization: org} do
-      {:ok, group} = Accounts.create_group(%{"name" => "Valid", "organization_id" => org.id})
-      assert {:error, %Ecto.Changeset{}} = Accounts.update_group(group, %{"name" => ""})
+      {:ok, group} = Groups.create_group(%{"name" => "Valid", "organization_id" => org.id})
+      assert {:error, %Ecto.Changeset{}} = Groups.update_group(group, %{"name" => ""})
     end
 
     test "update_group/2 prevents changing external_id once set", %{organization: org} do
       {:ok, group} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           "name" => "ExtGroup",
           "organization_id" => org.id,
           "external_id" => "original-ext"
         })
 
       assert {:error, %Ecto.Changeset{} = changeset} =
-               Accounts.update_group(group, %{"external_id" => "changed-ext"})
+               Groups.update_group(group, %{"external_id" => "changed-ext"})
 
       assert "cannot be changed once set" in errors_on(changeset).external_id
     end
 
     test "update_group/2 allows setting the same external_id value again", %{organization: org} do
       {:ok, group} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           "name" => "SameExtGroup",
           "organization_id" => org.id,
           "external_id" => "keep-same"
         })
 
       assert {:ok, updated} =
-               Accounts.update_group(group, %{
+               Groups.update_group(group, %{
                  "external_id" => "keep-same",
                  "name" => "Updated Name"
                })
@@ -1742,16 +1748,16 @@ defmodule Authify.AccountsTest do
     end
 
     test "delete_group/1 deletes the group", %{organization: org} do
-      {:ok, group} = Accounts.create_group(%{"name" => "ToDelete", "organization_id" => org.id})
-      assert {:ok, %Group{}} = Accounts.delete_group(group)
-      assert_raise Ecto.NoResultsError, fn -> Accounts.get_group!(group.id, org) end
+      {:ok, group} = Groups.create_group(%{"name" => "ToDelete", "organization_id" => org.id})
+      assert {:ok, %Group{}} = Groups.delete_group(group)
+      assert_raise Ecto.NoResultsError, fn -> Groups.get_group!(group.id, org) end
     end
 
     test "change_group/2 returns a group changeset", %{organization: org} do
       {:ok, group} =
-        Accounts.create_group(%{"name" => "ForChangeset", "organization_id" => org.id})
+        Groups.create_group(%{"name" => "ForChangeset", "organization_id" => org.id})
 
-      assert %Ecto.Changeset{} = Accounts.change_group(group)
+      assert %Ecto.Changeset{} = Groups.change_group(group)
     end
   end
 
@@ -1761,7 +1767,7 @@ defmodule Authify.AccountsTest do
       {:ok, user} = Accounts.create_user_with_role(valid_user_attrs(), org.id, "user")
 
       {:ok, group} =
-        Accounts.create_group(%{"name" => "MembershipGroup", "organization_id" => org.id})
+        Groups.create_group(%{"name" => "MembershipGroup", "organization_id" => org.id})
 
       %{organization: org, user: user, group: group}
     end
@@ -1789,8 +1795,8 @@ defmodule Authify.AccountsTest do
     end
 
     test "add_user_to_group/2 adds the user to the group", %{user: user, group: group} do
-      assert {:ok, %GroupMembership{}} = Accounts.add_user_to_group(user, group)
-      members = Accounts.list_group_members(group)
+      assert {:ok, %GroupMembership{}} = Groups.add_user_to_group(user, group)
+      members = Groups.list_group_members(group)
       assert Enum.any?(members, &(&1.id == user.id))
     end
 
@@ -1798,16 +1804,16 @@ defmodule Authify.AccountsTest do
       user: user,
       group: group
     } do
-      {:ok, _} = Accounts.add_user_to_group(user, group)
+      {:ok, _} = Groups.add_user_to_group(user, group)
 
-      assert {:error, %Ecto.Changeset{} = changeset} = Accounts.add_user_to_group(user, group)
+      assert {:error, %Ecto.Changeset{} = changeset} = Groups.add_user_to_group(user, group)
       assert "User is already in this group" in errors_on(changeset).user_id
     end
 
     test "remove_user_from_group/2 removes the user from the group", %{user: user, group: group} do
-      {:ok, _} = Accounts.add_user_to_group(user, group)
-      Accounts.remove_user_from_group(user, group)
-      members = Accounts.list_group_members(group)
+      {:ok, _} = Groups.add_user_to_group(user, group)
+      Groups.remove_user_from_group(user, group)
+      members = Groups.list_group_members(group)
       refute Enum.any?(members, &(&1.id == user.id))
     end
 
@@ -1817,16 +1823,16 @@ defmodule Authify.AccountsTest do
     } do
       {:ok, user2} = Accounts.create_user_with_role(valid_user_attrs(), org.id, "user")
       {:ok, user3} = Accounts.create_user_with_role(valid_user_attrs(), org.id, "user")
-      {:ok, _} = Accounts.add_user_to_group(user2, group)
-      {:ok, _} = Accounts.add_user_to_group(user3, group)
+      {:ok, _} = Groups.add_user_to_group(user2, group)
+      {:ok, _} = Groups.add_user_to_group(user3, group)
 
-      ids = Accounts.list_group_members(group) |> Enum.map(& &1.id)
+      ids = Groups.list_group_members(group) |> Enum.map(& &1.id)
       assert user2.id in ids
       assert user3.id in ids
     end
 
     test "list_group_members/1 returns empty list when group has no members", %{group: group} do
-      assert Accounts.list_group_members(group) == []
+      assert Groups.list_group_members(group) == []
     end
 
     test "list_user_groups/1 returns all groups the user belongs to", %{
@@ -1834,25 +1840,25 @@ defmodule Authify.AccountsTest do
       user: user
     } do
       {:ok, group2} =
-        Accounts.create_group(%{"name" => "SecondGroup", "organization_id" => org.id})
+        Groups.create_group(%{"name" => "SecondGroup", "organization_id" => org.id})
 
       {:ok, _other} =
-        Accounts.create_group(%{"name" => "NotJoined", "organization_id" => org.id})
+        Groups.create_group(%{"name" => "NotJoined", "organization_id" => org.id})
 
-      {:ok, _} = Accounts.add_user_to_group(user, group2)
+      {:ok, _} = Groups.add_user_to_group(user, group2)
 
-      group_ids = Accounts.list_user_groups(user) |> Enum.map(& &1.id)
+      group_ids = Groups.list_user_groups(user) |> Enum.map(& &1.id)
       assert group2.id in group_ids
     end
 
     test "list_user_groups/1 returns empty list when user belongs to no groups", %{user: user} do
-      assert Accounts.list_user_groups(user) == []
+      assert Groups.list_user_groups(user) == []
     end
 
     test "delete_group/1 cascades to remove group memberships", %{user: user, group: group} do
-      {:ok, _} = Accounts.add_user_to_group(user, group)
-      {:ok, _} = Accounts.delete_group(group)
-      group_ids = Accounts.list_user_groups(user) |> Enum.map(& &1.id)
+      {:ok, _} = Groups.add_user_to_group(user, group)
+      {:ok, _} = Groups.delete_group(group)
+      group_ids = Groups.list_user_groups(user) |> Enum.map(& &1.id)
       refute group.id in group_ids
     end
   end
@@ -1888,13 +1894,13 @@ defmodule Authify.AccountsTest do
       saml_sp: saml_sp
     } do
       {:ok, group} =
-        Accounts.create_group(%{"name" => "Active Group", "organization_id" => org.id})
+        Groups.create_group(%{"name" => "Active Group", "organization_id" => org.id})
 
-      {:ok, _} = Accounts.add_user_to_group(user, group)
-      {:ok, _} = Accounts.add_application_to_group(group, oauth_app.id, "oauth2")
-      {:ok, _} = Accounts.add_application_to_group(group, saml_sp.id, "saml")
+      {:ok, _} = Groups.add_user_to_group(user, group)
+      {:ok, _} = Groups.add_application_to_group(group, oauth_app.id, "oauth2")
+      {:ok, _} = Groups.add_application_to_group(group, saml_sp.id, "saml")
 
-      result = Accounts.get_user_accessible_applications(user, org)
+      result = Groups.get_user_accessible_applications(user, org)
 
       assert Enum.any?(result.oauth2_applications, &(&1.id == oauth_app.id))
       assert Enum.any?(result.saml_service_providers, &(&1.id == saml_sp.id))
@@ -1907,17 +1913,17 @@ defmodule Authify.AccountsTest do
       saml_sp: saml_sp
     } do
       {:ok, group} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           "name" => "Inactive Group",
           "organization_id" => org.id,
           "is_active" => false
         })
 
-      {:ok, _} = Accounts.add_user_to_group(user, group)
-      {:ok, _} = Accounts.add_application_to_group(group, oauth_app.id, "oauth2")
-      {:ok, _} = Accounts.add_application_to_group(group, saml_sp.id, "saml")
+      {:ok, _} = Groups.add_user_to_group(user, group)
+      {:ok, _} = Groups.add_application_to_group(group, oauth_app.id, "oauth2")
+      {:ok, _} = Groups.add_application_to_group(group, saml_sp.id, "saml")
 
-      result = Accounts.get_user_accessible_applications(user, org)
+      result = Groups.get_user_accessible_applications(user, org)
 
       refute Enum.any?(result.oauth2_applications, &(&1.id == oauth_app.id))
       refute Enum.any?(result.saml_service_providers, &(&1.id == saml_sp.id))
@@ -1926,10 +1932,10 @@ defmodule Authify.AccountsTest do
     test "returns only apps from active groups when user belongs to both active and inactive groups",
          %{organization: org, user: user, oauth_app: oauth_app, saml_sp: saml_sp} do
       {:ok, active_group} =
-        Accounts.create_group(%{"name" => "Active Group", "organization_id" => org.id})
+        Groups.create_group(%{"name" => "Active Group", "organization_id" => org.id})
 
       {:ok, inactive_group} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           "name" => "Inactive Group",
           "organization_id" => org.id,
           "is_active" => false
@@ -1942,15 +1948,15 @@ defmodule Authify.AccountsTest do
           redirect_uris: "https://inactive.example.com/callback"
         })
 
-      {:ok, _} = Accounts.add_user_to_group(user, active_group)
-      {:ok, _} = Accounts.add_user_to_group(user, inactive_group)
-      {:ok, _} = Accounts.add_application_to_group(active_group, oauth_app.id, "oauth2")
-      {:ok, _} = Accounts.add_application_to_group(active_group, saml_sp.id, "saml")
+      {:ok, _} = Groups.add_user_to_group(user, active_group)
+      {:ok, _} = Groups.add_user_to_group(user, inactive_group)
+      {:ok, _} = Groups.add_application_to_group(active_group, oauth_app.id, "oauth2")
+      {:ok, _} = Groups.add_application_to_group(active_group, saml_sp.id, "saml")
 
       {:ok, _} =
-        Accounts.add_application_to_group(inactive_group, oauth_app_inactive.id, "oauth2")
+        Groups.add_application_to_group(inactive_group, oauth_app_inactive.id, "oauth2")
 
-      result = Accounts.get_user_accessible_applications(user, org)
+      result = Groups.get_user_accessible_applications(user, org)
 
       assert Enum.any?(result.oauth2_applications, &(&1.id == oauth_app.id))
       assert Enum.any?(result.saml_service_providers, &(&1.id == saml_sp.id))
@@ -1961,7 +1967,7 @@ defmodule Authify.AccountsTest do
       organization: org,
       user: user
     } do
-      result = Accounts.get_user_accessible_applications(user, org)
+      result = Groups.get_user_accessible_applications(user, org)
 
       assert result.oauth2_applications == []
       assert result.saml_service_providers == []

@@ -5,6 +5,7 @@ defmodule AuthifyWeb.ProfileController do
   alias Authify.Accounts
   alias Authify.Accounts.{PersonalAccessToken, User, UserEmail}
   alias Authify.OAuth
+  alias Authify.PersonalAccessTokens
   alias AuthifyWeb.Helpers.AuditHelper
 
   def show(conn, _params) do
@@ -384,13 +385,13 @@ defmodule AuthifyWeb.ProfileController do
     current_user = conn.assigns.current_user
     organization = conn.assigns.current_organization
 
-    personal_access_tokens = Accounts.list_personal_access_tokens(current_user)
+    personal_access_tokens = PersonalAccessTokens.list_personal_access_tokens(current_user)
 
     render(conn, :personal_access_tokens,
       user: current_user,
       organization: organization,
       personal_access_tokens: personal_access_tokens,
-      form: to_form(Accounts.change_personal_access_token(%PersonalAccessToken{}))
+      form: to_form(PersonalAccessTokens.change_personal_access_token(%PersonalAccessToken{}))
     )
   end
 
@@ -398,7 +399,7 @@ defmodule AuthifyWeb.ProfileController do
     current_user = conn.assigns.current_user
     organization = conn.assigns.current_organization
 
-    case Accounts.create_personal_access_token(current_user, organization, pat_params) do
+    case PersonalAccessTokens.create_personal_access_token(current_user, organization, pat_params) do
       {:ok, pat} ->
         pat = Authify.Repo.preload(pat, :scopes)
 
@@ -425,7 +426,7 @@ defmodule AuthifyWeb.ProfileController do
           extra_metadata: %{"source" => "web"}
         )
 
-        personal_access_tokens = Accounts.list_personal_access_tokens(current_user)
+        personal_access_tokens = PersonalAccessTokens.list_personal_access_tokens(current_user)
 
         render(conn, :personal_access_tokens,
           user: current_user,
@@ -438,9 +439,12 @@ defmodule AuthifyWeb.ProfileController do
 
   def delete_personal_access_token(conn, %{"id" => id}) do
     current_user = conn.assigns.current_user
-    pat = Accounts.get_personal_access_token!(id, current_user) |> Authify.Repo.preload(:scopes)
 
-    case Accounts.delete_personal_access_token(pat) do
+    pat =
+      PersonalAccessTokens.get_personal_access_token!(id, current_user)
+      |> Authify.Repo.preload(:scopes)
+
+    case PersonalAccessTokens.delete_personal_access_token(pat) do
       {:ok, deleted_pat} ->
         AuditHelper.log_personal_access_token_event(
           conn,

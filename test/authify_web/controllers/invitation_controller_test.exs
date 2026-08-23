@@ -6,6 +6,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
   alias Authify.Accounts
   alias Authify.AuditLog
   alias Authify.Guardian
+  alias Authify.Invitations
 
   describe "index" do
     setup :create_user_and_login
@@ -161,7 +162,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Invitation cancelled successfully"
 
       assert_raise Ecto.NoResultsError, fn ->
-        Accounts.get_invitation!(invitation.id)
+        Invitations.get_invitation!(invitation.id)
       end
 
       events =
@@ -195,7 +196,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Invitation not found"
 
       # Invitation should still exist
-      assert Accounts.get_invitation!(other_invitation.id)
+      assert Invitations.get_invitation!(other_invitation.id)
     end
   end
 
@@ -236,7 +237,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
         "expires_at" => DateTime.add(DateTime.utc_now(), -1, :day) |> DateTime.truncate(:second)
       }
 
-      {:ok, expired_invitation} = Accounts.create_invitation(expired_attrs)
+      {:ok, expired_invitation} = Invitations.create_invitation(expired_attrs)
 
       conn = get(conn, ~p"/invite/#{expired_invitation.token}")
 
@@ -260,7 +261,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
         "password_confirmation" => "SecureP@ssw0rd!"
       }
 
-      {:ok, _user} = Accounts.accept_invitation(invitation, user_attrs)
+      {:ok, _user} = Invitations.accept_invitation(invitation, user_attrs)
 
       conn = get(conn, ~p"/invite/#{invitation.token}")
 
@@ -303,7 +304,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert user_org.role == invitation.role
 
       # Check invitation was marked as accepted
-      updated_invitation = Accounts.get_invitation!(invitation.id)
+      updated_invitation = Invitations.get_invitation!(invitation.id)
       assert updated_invitation.accepted_at != nil
 
       events =
@@ -337,7 +338,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
 
       assert html_response(conn, 200) =~ "Accept Invitation"
       # Invitation should not be marked as accepted
-      unchanged_invitation = Accounts.get_invitation!(invitation.id)
+      unchanged_invitation = Invitations.get_invitation!(invitation.id)
       assert is_nil(unchanged_invitation.accepted_at)
     end
 
@@ -367,7 +368,7 @@ defmodule AuthifyWeb.InvitationControllerTest do
         "expires_at" => DateTime.add(DateTime.utc_now(), -1, :day) |> DateTime.truncate(:second)
       }
 
-      {:ok, expired_invitation} = Accounts.create_invitation(expired_attrs)
+      {:ok, expired_invitation} = Invitations.create_invitation(expired_attrs)
 
       user_params = %{
         "first_name" => "John",

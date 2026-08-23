@@ -4,8 +4,8 @@ defmodule AuthifyWeb.CertificatesControllerTest do
 
   import Authify.AccountsFixtures
 
-  alias Authify.Accounts
   alias Authify.AuditLog
+  alias Authify.Certificates
 
   setup %{conn: conn} do
     organization = organization_fixture()
@@ -37,7 +37,7 @@ defmodule AuthifyWeb.CertificatesControllerTest do
       assert redirected_to(conn) =~ "/#{organization.slug}/certificates/"
 
       created_certificate =
-        Accounts.list_certificates(organization)
+        Certificates.list_certificates(organization)
         |> Enum.find(&(&1.name == "Manual Upload Cert"))
 
       assert created_certificate
@@ -86,7 +86,7 @@ defmodule AuthifyWeb.CertificatesControllerTest do
       {certificate_pem, private_key_pem} = sample_pems(organization)
 
       {:ok, certificate} =
-        Accounts.create_certificate(organization, %{
+        Certificates.create_certificate(organization, %{
           "name" => "Inactive Cert",
           "usage" => "saml_signing",
           "certificate" => certificate_pem,
@@ -118,7 +118,7 @@ defmodule AuthifyWeb.CertificatesControllerTest do
       {certificate_pem, private_key_pem} = sample_pems(organization)
 
       {:ok, certificate} =
-        Accounts.create_certificate(organization, %{
+        Certificates.create_certificate(organization, %{
           "name" => "Active Cert",
           "usage" => "saml_signing",
           "certificate" => certificate_pem,
@@ -150,7 +150,7 @@ defmodule AuthifyWeb.CertificatesControllerTest do
       {certificate_pem, private_key_pem} = sample_pems(organization)
 
       {:ok, certificate} =
-        Accounts.create_certificate(organization, %{
+        Certificates.create_certificate(organization, %{
           "name" => "Disposable Cert",
           "usage" => "saml_signing",
           "certificate" => certificate_pem,
@@ -178,7 +178,7 @@ defmodule AuthifyWeb.CertificatesControllerTest do
 
   defp sample_pems(organization) do
     {:ok, certificate} =
-      Accounts.generate_certificate(organization, %{
+      Certificates.generate_certificate(organization, %{
         "name" => "Sample PEM",
         "usage" => "saml_signing",
         "is_active" => false
@@ -186,7 +186,7 @@ defmodule AuthifyWeb.CertificatesControllerTest do
 
     pem_tuple = {certificate.certificate, certificate.private_key}
 
-    Accounts.delete_certificate(certificate)
+    Certificates.delete_certificate(certificate)
 
     pem_tuple
   end

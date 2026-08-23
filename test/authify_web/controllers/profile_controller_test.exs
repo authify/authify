@@ -8,6 +8,7 @@ defmodule AuthifyWeb.ProfileControllerTest do
   alias Authify.Accounts.User
   alias Authify.Accounts.UserEmail
   alias Authify.AuditLog
+  alias Authify.PersonalAccessTokens
 
   setup :register_and_log_in_user
 
@@ -304,7 +305,7 @@ defmodule AuthifyWeb.ProfileControllerTest do
       assert response =~ "profile:read, profile:write"
 
       # Verify token was created in database
-      tokens = Accounts.list_personal_access_tokens(user)
+      tokens = PersonalAccessTokens.list_personal_access_tokens(user)
       assert length(tokens) == 1
 
       token = hd(tokens)
@@ -362,7 +363,7 @@ defmodule AuthifyWeb.ProfileControllerTest do
       organization = user.organization
 
       {:ok, token} =
-        Accounts.create_personal_access_token(user, organization, %{
+        PersonalAccessTokens.create_personal_access_token(user, organization, %{
           "name" => "Token to Delete",
           "scopes" => "profile:read"
         })
@@ -380,7 +381,7 @@ defmodule AuthifyWeb.ProfileControllerTest do
       assert response =~ "No personal access tokens"
 
       # Verify token was deleted from database
-      tokens = Accounts.list_personal_access_tokens(user)
+      tokens = PersonalAccessTokens.list_personal_access_tokens(user)
       assert Enum.empty?(tokens)
 
       events =
@@ -402,7 +403,7 @@ defmodule AuthifyWeb.ProfileControllerTest do
       organization = other_user.organization
 
       {:ok, other_token} =
-        Accounts.create_personal_access_token(other_user, organization, %{
+        PersonalAccessTokens.create_personal_access_token(other_user, organization, %{
           "name" => "Other User Token",
           "scopes" => "profile:read"
         })
@@ -440,7 +441,7 @@ defmodule AuthifyWeb.ProfileControllerTest do
       assert response =~ "invitations:read, invitations:write, users:read"
 
       # Verify token was created in database with correct scopes
-      tokens = Accounts.list_personal_access_tokens(user)
+      tokens = PersonalAccessTokens.list_personal_access_tokens(user)
       token = Enum.find(tokens, &(&1.name == "Invitations API Token"))
 
       assert token.name == "Invitations API Token"

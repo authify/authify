@@ -14,7 +14,7 @@ defmodule Authify.EmailTest do
         "organization_id" => organization.id,
         "invited_by_id" => inviter.id
       })
-      |> Authify.Accounts.create_invitation()
+      |> Authify.Invitations.create_invitation()
 
     Authify.Repo.preload(invitation, [:organization, invited_by: [:emails]])
   end

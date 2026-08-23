@@ -2,6 +2,8 @@ defmodule AuthifyWeb.UserDashboardControllerTest do
   use AuthifyWeb.ConnCase, async: true
 
   alias Authify.Accounts
+
+  alias Authify.Groups
   alias Authify.OAuth
   alias Authify.SAML
 
@@ -65,7 +67,7 @@ defmodule AuthifyWeb.UserDashboardControllerTest do
     } do
       # Create a group
       {:ok, group} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           "name" => "Test Apps",
           "description" => "Test group",
           "organization_id" => org.id
@@ -91,11 +93,11 @@ defmodule AuthifyWeb.UserDashboardControllerTest do
         })
 
       # Add applications to group
-      {:ok, _} = Accounts.add_application_to_group(group, oauth_app.id, "oauth2")
-      {:ok, _} = Accounts.add_application_to_group(group, saml_sp.id, "saml")
+      {:ok, _} = Groups.add_application_to_group(group, oauth_app.id, "oauth2")
+      {:ok, _} = Groups.add_application_to_group(group, saml_sp.id, "saml")
 
       # Add user to group
-      {:ok, _} = Accounts.add_user_to_group(user, group)
+      {:ok, _} = Groups.add_user_to_group(user, group)
 
       conn = get(conn, ~p"/#{org.slug}/user/dashboard")
 
