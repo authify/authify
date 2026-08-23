@@ -3,7 +3,6 @@ defmodule Authify.SCIM.ProvisioningTest do
 
   import Authify.AccountsFixtures
 
-  alias Authify.Accounts
   alias Authify.Accounts.User
   alias Authify.Groups
   alias Authify.SCIM.Provisioning

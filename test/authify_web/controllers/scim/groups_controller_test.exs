@@ -3,8 +3,6 @@ defmodule AuthifyWeb.SCIM.GroupsControllerTest do
 
   import Authify.AccountsFixtures
 
-  alias Authify.Accounts
-
   alias Authify.Groups
 
   setup %{conn: conn} do
