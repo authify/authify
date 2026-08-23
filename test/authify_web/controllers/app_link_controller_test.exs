@@ -2,6 +2,8 @@ defmodule AuthifyWeb.AppLinkControllerTest do
   use AuthifyWeb.ConnCase, async: true
 
   alias Authify.Accounts
+
+  alias Authify.Groups
   alias Authify.OAuth
   alias Authify.SAML
 
@@ -32,7 +34,7 @@ defmodule AuthifyWeb.AppLinkControllerTest do
 
     # Create a group
     {:ok, group} =
-      Accounts.create_group(%{
+      Groups.create_group(%{
         "name" => "Test Apps",
         "description" => "Test group",
         "organization_id" => organization.id
@@ -57,8 +59,8 @@ defmodule AuthifyWeb.AppLinkControllerTest do
       })
 
     # Add applications to group
-    {:ok, _} = Accounts.add_application_to_group(group, oauth_app.id, "oauth2")
-    {:ok, _} = Accounts.add_application_to_group(group, saml_sp.id, "saml")
+    {:ok, _} = Groups.add_application_to_group(group, oauth_app.id, "oauth2")
+    {:ok, _} = Groups.add_application_to_group(group, saml_sp.id, "saml")
 
     # Authenticate user and preload associations
     user = Accounts.get_user_with_organizations!(user.id)
@@ -95,7 +97,7 @@ defmodule AuthifyWeb.AppLinkControllerTest do
         })
 
       # Add user to group
-      {:ok, _} = Accounts.add_user_to_group(user, group)
+      {:ok, _} = Groups.add_user_to_group(user, group)
 
       conn = get(conn, ~p"/#{org.slug}/user/apps/oauth2/#{updated_app.id}")
 
@@ -111,7 +113,7 @@ defmodule AuthifyWeb.AppLinkControllerTest do
       organization: org
     } do
       # Add user to group
-      {:ok, _} = Accounts.add_user_to_group(user, group)
+      {:ok, _} = Groups.add_user_to_group(user, group)
 
       conn = get(conn, ~p"/#{org.slug}/user/apps/oauth2/#{oauth_app.id}")
 
@@ -134,7 +136,7 @@ defmodule AuthifyWeb.AppLinkControllerTest do
         })
 
       # Add user to group
-      {:ok, _} = Accounts.add_user_to_group(user, group)
+      {:ok, _} = Groups.add_user_to_group(user, group)
 
       conn = get(conn, ~p"/#{org.slug}/user/apps/oauth2/#{updated_app.id}")
 
@@ -175,7 +177,7 @@ defmodule AuthifyWeb.AppLinkControllerTest do
       organization: org
     } do
       # Add user to group
-      {:ok, _} = Accounts.add_user_to_group(user, group)
+      {:ok, _} = Groups.add_user_to_group(user, group)
 
       conn = get(conn, ~p"/#{org.slug}/user/apps/saml/#{saml_sp.id}")
 

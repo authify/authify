@@ -481,7 +481,7 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
     test "supports PATCH operations for groups", %{conn: conn, organization: organization} do
       # Create a group first
       {:ok, group} =
-        Authify.Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Authify.Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       bulk_request = %{
         "schemas" => ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
@@ -511,14 +511,14 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
       assert Enum.at(response["Operations"], 0)["status"] == "200"
 
       # Verify the update
-      updated_group = Authify.Accounts.get_group(group.id)
+      updated_group = Authify.Groups.get_group(group.id)
       assert updated_group.name == "Engineering Team"
     end
 
     test "supports PATCH with add members operation", %{conn: conn, organization: organization} do
       # Create a group and users
       {:ok, group} =
-        Authify.Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Authify.Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       user1 = user_fixture(organization: organization, email: "user1@example.com")
       user2 = user_fixture(organization: organization, email: "user2@example.com")
@@ -554,7 +554,7 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
       assert Enum.at(response["Operations"], 0)["status"] == "200"
 
       # Verify the members were added
-      updated_group = Authify.Accounts.get_group(group.id) |> Authify.Repo.preload(:users)
+      updated_group = Authify.Groups.get_group(group.id) |> Authify.Repo.preload(:users)
       user_ids = Enum.map(updated_group.users, & &1.id)
       assert user1.id in user_ids
       assert user2.id in user_ids
@@ -563,10 +563,10 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
     test "supports PATCH with remove member operation", %{conn: conn, organization: organization} do
       # Create a group with a user
       {:ok, group} =
-        Authify.Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Authify.Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       user = user_fixture(organization: organization, email: "user@example.com")
-      {:ok, _} = Authify.Accounts.add_user_to_group(user, group)
+      {:ok, _} = Authify.Groups.add_user_to_group(user, group)
 
       bulk_request = %{
         "schemas" => ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
@@ -595,7 +595,7 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
       assert Enum.at(response["Operations"], 0)["status"] == "200"
 
       # Verify the member was removed
-      updated_group = Authify.Accounts.get_group(group.id) |> Authify.Repo.preload(:users)
+      updated_group = Authify.Groups.get_group(group.id) |> Authify.Repo.preload(:users)
       user_ids = Enum.map(updated_group.users, & &1.id)
       assert user.id not in user_ids
     end
@@ -605,7 +605,7 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
       existing_user = user_fixture(organization: organization, first_name: "Alice")
 
       {:ok, existing_group} =
-        Authify.Accounts.create_group(%{name: "Engineering", organization_id: organization.id})
+        Authify.Groups.create_group(%{name: "Engineering", organization_id: organization.id})
 
       bulk_request = %{
         "schemas" => ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],

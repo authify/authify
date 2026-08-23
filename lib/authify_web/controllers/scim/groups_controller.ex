@@ -7,7 +7,7 @@ defmodule AuthifyWeb.SCIM.GroupsController do
 
   use AuthifyWeb.SCIM.BaseController
 
-  alias Authify.Accounts
+  alias Authify.Groups
   alias Authify.SCIM.{Provisioning, ResourceFormatter}
   alias AuthifyWeb.Helpers.AuditHelper
   alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
@@ -75,7 +75,7 @@ defmodule AuthifyWeb.SCIM.GroupsController do
 
     case ensure_scim_scope(conn, "scim:groups:read") do
       {:ok, _conn} ->
-        case Accounts.get_group(id) do
+        case Groups.get_group(id) do
           nil ->
             render_scim_error(conn, 404, :no_target, "Group not found")
 
@@ -200,7 +200,7 @@ defmodule AuthifyWeb.SCIM.GroupsController do
 
     case ensure_scim_scope(conn, "scim:groups:write") do
       {:ok, _conn} ->
-        case Accounts.get_group(id) do
+        case Groups.get_group(id) do
           nil ->
             render_scim_error(conn, 404, :no_target, "Group not found")
 
@@ -223,7 +223,7 @@ defmodule AuthifyWeb.SCIM.GroupsController do
 
     case ensure_scim_scope(conn, "scim:groups:write") do
       {:ok, _conn} ->
-        case Accounts.get_group(id) do
+        case Groups.get_group(id) do
           nil ->
             render_scim_error(conn, 404, :no_target, "Group not found")
 
@@ -340,14 +340,14 @@ defmodule AuthifyWeb.SCIM.GroupsController do
 
     case ensure_scim_scope(conn, "scim:groups:write") do
       {:ok, _conn} ->
-        case Accounts.get_group(id) do
+        case Groups.get_group(id) do
           nil ->
             render_scim_error(conn, 404, :no_target, "Group not found")
 
           group ->
             case Helpers.validate_resource_organization(group, organization) do
               :ok ->
-                case Accounts.delete_group(group) do
+                case Groups.delete_group(group) do
                   {:ok, deleted_group} ->
                     AuditHelper.log_event_async(
                       conn,

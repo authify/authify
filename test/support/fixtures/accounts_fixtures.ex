@@ -6,6 +6,8 @@ defmodule Authify.AccountsFixtures do
 
   alias Authify.Accounts
 
+  alias Authify.Groups
+
   @doc """
   Generate a unique organization name.
   """
@@ -245,9 +247,9 @@ defmodule Authify.AccountsFixtures do
         "name" => unique_group_name(),
         "organization_id" => organization.id
       })
-      |> Accounts.create_group()
+      |> Groups.create_group()
 
     # Return group with organization preloaded
-    Accounts.get_group!(group.id, organization)
+    Groups.get_group!(group.id, organization)
   end
 end

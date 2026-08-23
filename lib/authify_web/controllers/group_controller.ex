@@ -3,6 +3,7 @@ defmodule AuthifyWeb.GroupController do
 
   alias Authify.Accounts
   alias Authify.Accounts.Group
+  alias Authify.Groups
   alias Authify.OAuth
   alias Authify.SAML
 
@@ -29,7 +30,7 @@ defmodule AuthifyWeb.GroupController do
       search: search
     ]
 
-    groups = Accounts.list_groups_filtered(organization, filter_opts)
+    groups = Groups.list_groups_filtered(organization, filter_opts)
 
     render(conn, :index,
       groups: groups,
@@ -49,7 +50,7 @@ defmodule AuthifyWeb.GroupController do
 
   def new(conn, _params) do
     organization = conn.assigns.current_organization
-    changeset = Accounts.change_group(%Group{}, %{})
+    changeset = Groups.change_group(%Group{}, %{})
     render(conn, :new, changeset: changeset, organization: organization)
   end
 
@@ -58,7 +59,7 @@ defmodule AuthifyWeb.GroupController do
 
     group_params = Map.put(group_params, "organization_id", organization.id)
 
-    case Accounts.create_group(group_params) do
+    case Groups.create_group(group_params) do
       {:ok, group} ->
         conn
         |> put_flash(:info, "Group created successfully.")
@@ -72,7 +73,7 @@ defmodule AuthifyWeb.GroupController do
   def edit(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
     group = get_group!(id, organization)
-    changeset = Accounts.change_group(group, %{})
+    changeset = Groups.change_group(group, %{})
 
     render(conn, :edit,
       group: group,
@@ -85,7 +86,7 @@ defmodule AuthifyWeb.GroupController do
     organization = conn.assigns.current_organization
     group = get_group!(id, organization)
 
-    case Accounts.update_group(group, group_params) do
+    case Groups.update_group(group, group_params) do
       {:ok, group} ->
         conn
         |> put_flash(:info, "Group updated successfully.")
@@ -103,7 +104,7 @@ defmodule AuthifyWeb.GroupController do
   def delete(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
     group = get_group!(id, organization)
-    {:ok, _group} = Accounts.delete_group(group)
+    {:ok, _group} = Groups.delete_group(group)
 
     conn
     |> put_flash(:info, "Group deleted successfully.")
@@ -134,7 +135,7 @@ defmodule AuthifyWeb.GroupController do
     group = get_group!(id, organization)
     user = Accounts.get_user!(user_id)
 
-    case Accounts.add_user_to_group(user, group) do
+    case Groups.add_user_to_group(user, group) do
       {:ok, _membership} ->
         conn
         |> put_flash(:info, "User added to group successfully.")
@@ -152,7 +153,7 @@ defmodule AuthifyWeb.GroupController do
     group = get_group!(id, organization)
     user = Accounts.get_user!(user_id)
 
-    {count, _} = Accounts.remove_user_from_group(user, group)
+    {count, _} = Groups.remove_user_from_group(user, group)
 
     if count > 0 do
       conn
@@ -173,7 +174,7 @@ defmodule AuthifyWeb.GroupController do
     organization = conn.assigns.current_organization
     group = get_group!(id, organization)
 
-    case Accounts.add_application_to_group(group, app_id, app_type) do
+    case Groups.add_application_to_group(group, app_id, app_type) do
       {:ok, _member} ->
         conn
         |> put_flash(:info, "Application added to group successfully.")
@@ -190,7 +191,7 @@ defmodule AuthifyWeb.GroupController do
     organization = conn.assigns.current_organization
     group = get_group!(id, organization)
 
-    case Accounts.remove_application_from_group(group, member_id) do
+    case Groups.remove_application_from_group(group, member_id) do
       {count, _} when count > 0 ->
         conn
         |> put_flash(:info, "Application removed from group successfully.")
@@ -206,7 +207,7 @@ defmodule AuthifyWeb.GroupController do
   # Private helper functions
 
   defp get_group!(id, organization) do
-    Accounts.get_group!(id, organization)
+    Groups.get_group!(id, organization)
   end
 
   defp get_group_with_details!(id, organization) do

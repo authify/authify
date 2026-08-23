@@ -1,8 +1,8 @@
 defmodule AuthifyWeb.UserDashboardController do
   use AuthifyWeb, :controller
 
-  alias Authify.Accounts
   alias Authify.Accounts.User
+  alias Authify.Groups
   alias Authify.OAuth
 
   def index(conn, _params) do
@@ -10,7 +10,7 @@ defmodule AuthifyWeb.UserDashboardController do
     organization = conn.assigns.current_organization
 
     # Get applications accessible to this user
-    accessible_apps = Accounts.get_user_accessible_applications(user, organization)
+    accessible_apps = Groups.get_user_accessible_applications(user, organization)
 
     # Get user's grants for showing authorization status
     user_grants = OAuth.list_user_grants(user)

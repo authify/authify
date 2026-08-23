@@ -9,6 +9,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
   use AuthifyWeb.SCIM.BaseController
 
   alias Authify.Accounts
+  alias Authify.Groups
   alias Authify.SCIM.{Provisioning, ResourceFormatter}
   alias AuthifyWeb.Helpers.AuditHelper
   alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
@@ -284,7 +285,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
   end
 
   defp execute_operation("PUT", :group, id, data, bulk_id, organization, _conn) when id != nil do
-    case Accounts.get_group(id) do
+    case Groups.get_group(id) do
       nil ->
         {:error, 404,
          build_error_response(%{"method" => "PUT", "bulkId" => bulk_id}, 404, "Group not found")}
@@ -364,7 +365,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
 
   defp execute_operation("DELETE", :group, id, _data, bulk_id, organization, _conn)
        when id != nil do
-    case Accounts.get_group(id) do
+    case Groups.get_group(id) do
       nil ->
         {:error, 404,
          build_error_response(
@@ -376,7 +377,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
       group ->
         case Helpers.validate_resource_organization(group, organization) do
           :ok ->
-            case Accounts.delete_group(group) do
+            case Groups.delete_group(group) do
               {:ok, _group} ->
                 response = %{
                   method: "DELETE",
@@ -446,7 +447,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
 
   defp execute_operation("PATCH", :group, id, data, bulk_id, organization, _conn)
        when id != nil do
-    case Accounts.get_group(id) do
+    case Groups.get_group(id) do
       nil ->
         {:error, 404,
          build_error_response(%{"method" => "PATCH", "bulkId" => bulk_id}, 404, "Group not found")}

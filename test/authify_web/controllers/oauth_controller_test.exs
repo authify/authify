@@ -6,6 +6,7 @@ defmodule AuthifyWeb.OAuthControllerTest do
 
   alias Authify.Accounts
   alias Authify.Accounts.User
+  alias Authify.Groups
 
   describe "authorize" do
     setup do
@@ -565,22 +566,22 @@ defmodule AuthifyWeb.OAuthControllerTest do
     } do
       # Create groups
       {:ok, group1} =
-        Authify.Accounts.create_group(%{
+        Authify.Groups.create_group(%{
           "name" => "Developers",
           "description" => "Development team",
           "organization_id" => organization.id
         })
 
       {:ok, group2} =
-        Authify.Accounts.create_group(%{
+        Authify.Groups.create_group(%{
           "name" => "Admins",
           "description" => "Admin team",
           "organization_id" => organization.id
         })
 
       # Add user to groups
-      {:ok, _} = Authify.Accounts.add_user_to_group(user, group1)
-      {:ok, _} = Authify.Accounts.add_user_to_group(user, group2)
+      {:ok, _} = Authify.Groups.add_user_to_group(user, group1)
+      {:ok, _} = Authify.Groups.add_user_to_group(user, group2)
 
       # Create application and access token with groups scope
       application = application_fixture(organization: organization)
@@ -616,13 +617,13 @@ defmodule AuthifyWeb.OAuthControllerTest do
     } do
       # Create a group and add user to it
       {:ok, group} =
-        Authify.Accounts.create_group(%{
+        Authify.Groups.create_group(%{
           "name" => "Test Group",
           "description" => "Test",
           "organization_id" => organization.id
         })
 
-      {:ok, _} = Authify.Accounts.add_user_to_group(user, group)
+      {:ok, _} = Authify.Groups.add_user_to_group(user, group)
 
       # Create application and access token WITHOUT groups scope
       application = application_fixture(organization: organization)

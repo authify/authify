@@ -1,7 +1,7 @@
 defmodule AuthifyWeb.AppLinkController do
   use AuthifyWeb, :controller
 
-  alias Authify.Accounts
+  alias Authify.Groups
   alias Authify.OAuth
   alias Authify.SAML
 
@@ -65,7 +65,7 @@ defmodule AuthifyWeb.AppLinkController do
   end
 
   defp user_has_access_to_app?(user, organization, app_id, app_type) do
-    accessible_apps = Accounts.get_user_accessible_applications(user, organization)
+    accessible_apps = Groups.get_user_accessible_applications(user, organization)
 
     case app_type do
       "oauth2" ->

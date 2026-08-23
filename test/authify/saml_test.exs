@@ -590,19 +590,19 @@ defmodule Authify.SAMLTest do
 
       # Create groups and assign to user
       {:ok, group1} =
-        Authify.Accounts.create_group(%{
+        Authify.Groups.create_group(%{
           name: "Developers",
           organization_id: organization.id
         })
 
       {:ok, group2} =
-        Authify.Accounts.create_group(%{
+        Authify.Groups.create_group(%{
           name: "Admins",
           organization_id: organization.id
         })
 
-      Authify.Accounts.add_user_to_group(user, group1)
-      Authify.Accounts.add_user_to_group(user, group2)
+      Authify.Groups.add_user_to_group(user, group1)
+      Authify.Groups.add_user_to_group(user, group2)
 
       sp =
         service_provider_fixture(%{

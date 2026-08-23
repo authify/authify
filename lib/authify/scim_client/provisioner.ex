@@ -8,6 +8,7 @@ defmodule Authify.SCIMClient.Provisioner do
 
   alias Authify.Accounts
   alias Authify.Accounts.{Group, Organization, User}
+  alias Authify.Groups
   alias Authify.SCIMClient.{AttributeMapper, Client, DefaultMappings, HTTPClient}
 
   @max_retries 5
@@ -72,7 +73,7 @@ defmodule Authify.SCIMClient.Provisioner do
     groups_synced =
       if client.sync_groups do
         organization = Authify.Repo.get!(Organization, client.organization_id)
-        groups = Accounts.list_groups(organization)
+        groups = Groups.list_groups(organization)
         Logger.info("Syncing #{length(groups)} groups to SCIM client #{client.id}")
 
         Enum.each(groups, fn group ->

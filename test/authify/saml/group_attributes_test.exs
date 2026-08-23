@@ -2,6 +2,8 @@ defmodule Authify.SAML.GroupAttributesTest do
   use Authify.DataCase, async: true
 
   alias Authify.Accounts
+
+  alias Authify.Groups
   alias Authify.SAML
 
   describe "SAML group attributes" do
@@ -32,22 +34,22 @@ defmodule Authify.SAML.GroupAttributesTest do
 
       # Create groups
       {:ok, group1} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           name: "Engineering",
           description: "Engineering team",
           organization_id: org.id
         })
 
       {:ok, group2} =
-        Accounts.create_group(%{
+        Groups.create_group(%{
           name: "Admins",
           description: "Administrators",
           organization_id: org.id
         })
 
       # Add user to groups
-      Accounts.add_user_to_group(user, group1)
-      Accounts.add_user_to_group(user, group2)
+      Groups.add_user_to_group(user, group1)
+      Groups.add_user_to_group(user, group2)
 
       # Create service provider with attribute mapping
       {:ok, sp} =
