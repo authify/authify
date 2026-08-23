@@ -5,6 +5,7 @@ defmodule AuthifyWeb.UsersController do
 
   alias Authify.Accounts
   alias Authify.Accounts.User
+  alias Authify.Invitations
   alias Authify.LocaleHelpers
   alias AuthifyWeb.Audit.Users, as: UsersAudit
 
@@ -81,7 +82,7 @@ defmodule AuthifyWeb.UsersController do
       # Global organization - can view any user
       target_user = Accounts.get_user_globally!(id)
       # For global view, get invitations sent BY this user
-      invitations = Accounts.list_invitations_by_inviter(target_user.id)
+      invitations = Invitations.list_invitations_by_inviter(target_user.id)
 
       render_user_show(conn, target_user, invitations, user, organization, true)
     else
@@ -90,7 +91,7 @@ defmodule AuthifyWeb.UsersController do
       # Verify user belongs to the current organization
       if Accounts.User.member_of?(target_user, organization.id) do
         # Get invitations sent BY this user
-        invitations = Accounts.list_invitations_by_inviter(target_user.id)
+        invitations = Invitations.list_invitations_by_inviter(target_user.id)
         render_user_show(conn, target_user, invitations, user, organization, false)
       else
         conn

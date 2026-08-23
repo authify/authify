@@ -3,6 +3,7 @@ defmodule AuthifyWeb.AnalyticsController do
 
   alias Authify.Accounts
 
+  alias Authify.Invitations
   # All actions require being in the global organization
   def action(conn, _) do
     if conn.assigns.current_organization.slug != "authify-global" do
@@ -98,10 +99,10 @@ defmodule AuthifyWeb.AnalyticsController do
 
   defp get_invitation_analytics do
     %{
-      total_invitations: Accounts.count_invitations(),
-      pending_invitations: Accounts.count_pending_invitations(),
-      accepted_invitations: Accounts.count_accepted_invitations(),
-      expired_invitations: Accounts.count_expired_invitations()
+      total_invitations: Invitations.count_invitations(),
+      pending_invitations: Invitations.count_pending_invitations(),
+      accepted_invitations: Invitations.count_accepted_invitations(),
+      expired_invitations: Invitations.count_expired_invitations()
     }
   end
 
@@ -137,8 +138,8 @@ defmodule AuthifyWeb.AnalyticsController do
       new_users_24h: Accounts.count_users_since(last_24h),
       new_users_7d: Accounts.count_users_since(last_7d),
       new_users_30d: Accounts.count_users_since(last_30d),
-      invitations_sent_7d: Accounts.count_invitations_since(last_7d),
-      invitations_accepted_7d: Accounts.count_invitations_accepted_since(last_7d)
+      invitations_sent_7d: Invitations.count_invitations_since(last_7d),
+      invitations_accepted_7d: Invitations.count_invitations_accepted_since(last_7d)
     }
   end
 

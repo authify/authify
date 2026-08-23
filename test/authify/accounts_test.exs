@@ -5,6 +5,7 @@ defmodule Authify.AccountsTest do
   alias Authify.Accounts.{Group, GroupMembership, Invitation, Organization, User}
   alias Authify.Certificates
   alias Authify.Groups
+  alias Authify.Invitations
   alias Authify.OAuth
   alias Authify.SAML
 
@@ -442,7 +443,7 @@ defmodule Authify.AccountsTest do
       admin_user: admin
     } do
       invitation = invitation_for_organization_fixture(org, admin)
-      invitations = Accounts.list_invitations(org.id)
+      invitations = Invitations.list_invitations(org.id)
 
       assert length(invitations) == 1
       assert hd(invitations).id == invitation.id
@@ -466,9 +467,9 @@ defmodule Authify.AccountsTest do
         "expires_at" => DateTime.add(DateTime.utc_now(), -1, :day) |> DateTime.truncate(:second)
       }
 
-      {:ok, _expired_invitation} = Accounts.create_invitation(expired_attrs)
+      {:ok, _expired_invitation} = Invitations.create_invitation(expired_attrs)
 
-      pending_invitations = Accounts.list_pending_invitations(org.id)
+      pending_invitations = Invitations.list_pending_invitations(org.id)
 
       assert length(pending_invitations) == 1
       assert hd(pending_invitations).id == pending_invitation.id
@@ -480,7 +481,7 @@ defmodule Authify.AccountsTest do
       admin_user: admin
     } do
       invitation = invitation_for_organization_fixture(org, admin)
-      found_invitation = Accounts.get_invitation!(invitation.id)
+      found_invitation = Invitations.get_invitation!(invitation.id)
 
       assert found_invitation.id == invitation.id
       assert found_invitation.email == invitation.email
@@ -493,14 +494,14 @@ defmodule Authify.AccountsTest do
       admin_user: admin
     } do
       invitation = invitation_for_organization_fixture(org, admin)
-      found_invitation = Accounts.get_invitation_by_token(invitation.token)
+      found_invitation = Invitations.get_invitation_by_token(invitation.token)
 
       assert found_invitation.id == invitation.id
       assert found_invitation.token == invitation.token
     end
 
     test "get_invitation_by_token/1 returns nil for invalid token" do
-      assert Accounts.get_invitation_by_token("invalid-token") == nil
+      assert Invitations.get_invitation_by_token("invalid-token") == nil
     end
 
     test "create_invitation/1 with valid data creates an invitation", %{
@@ -513,7 +514,7 @@ defmodule Authify.AccountsTest do
           "invited_by_id" => admin.id
         })
 
-      assert {:ok, %Invitation{} = invitation} = Accounts.create_invitation(attrs)
+      assert {:ok, %Invitation{} = invitation} = Invitations.create_invitation(attrs)
       assert invitation.email == "invite@example.com"
       assert invitation.role == "user"
       assert invitation.organization_id == org.id
@@ -533,7 +534,7 @@ defmodule Authify.AccountsTest do
           "invited_by_id" => admin.id
         })
 
-      assert {:error, %Ecto.Changeset{}} = Accounts.create_invitation(attrs)
+      assert {:error, %Ecto.Changeset{}} = Invitations.create_invitation(attrs)
     end
 
     test "create_invitation/1 enforces unique email per organization", %{
@@ -547,10 +548,10 @@ defmodule Authify.AccountsTest do
         })
 
       # Create first invitation
-      {:ok, _invitation1} = Accounts.create_invitation(attrs)
+      {:ok, _invitation1} = Invitations.create_invitation(attrs)
 
       # Try to create second invitation with same email
-      assert {:error, %Ecto.Changeset{} = changeset} = Accounts.create_invitation(attrs)
+      assert {:error, %Ecto.Changeset{} = changeset} = Invitations.create_invitation(attrs)
       assert "User already invited to this organization" in errors_on(changeset).email
     end
 
@@ -562,7 +563,7 @@ defmodule Authify.AccountsTest do
       attrs = Map.merge(@valid_invitation_attrs, %{"organization_id" => org.id})
 
       assert {:ok, %Invitation{} = invitation} =
-               Accounts.create_invitation_and_send_email(attrs, admin)
+               Invitations.create_invitation_and_send_email(attrs, admin)
 
       assert invitation.invited_by_id == admin.id
       assert invitation.organization_id == org.id
@@ -582,7 +583,7 @@ defmodule Authify.AccountsTest do
         "password_confirmation" => "SecureP@ssw0rd!"
       }
 
-      assert {:ok, %User{} = user} = Accounts.accept_invitation(invitation, user_attrs)
+      assert {:ok, %User{} = user} = Invitations.accept_invitation(invitation, user_attrs)
 
       # Check user was created correctly
       assert User.get_primary_email_value(user) == invitation.email
@@ -592,7 +593,7 @@ defmodule Authify.AccountsTest do
       assert User.role_in_organization(user, invitation.organization_id) == invitation.role
 
       # Check invitation was marked as accepted
-      updated_invitation = Accounts.get_invitation!(invitation.id)
+      updated_invitation = Invitations.get_invitation!(invitation.id)
       assert updated_invitation.accepted_at != nil
     end
 
@@ -610,10 +611,10 @@ defmodule Authify.AccountsTest do
       }
 
       assert {:error, %Ecto.Changeset{}} =
-               Accounts.accept_invitation(invitation, invalid_user_attrs)
+               Invitations.accept_invitation(invitation, invalid_user_attrs)
 
       # Invitation should not be marked as accepted
-      unchanged_invitation = Accounts.get_invitation!(invitation.id)
+      unchanged_invitation = Invitations.get_invitation!(invitation.id)
       assert is_nil(unchanged_invitation.accepted_at)
     end
 
@@ -630,7 +631,7 @@ defmodule Authify.AccountsTest do
         "expires_at" => DateTime.add(DateTime.utc_now(), -1, :day) |> DateTime.truncate(:second)
       }
 
-      {:ok, expired_invitation} = Accounts.create_invitation(expired_attrs)
+      {:ok, expired_invitation} = Invitations.create_invitation(expired_attrs)
 
       user_attrs = %{
         "first_name" => "John",
@@ -640,7 +641,7 @@ defmodule Authify.AccountsTest do
       }
 
       assert {:error, :invitation_invalid} =
-               Accounts.accept_invitation(expired_invitation, user_attrs)
+               Invitations.accept_invitation(expired_invitation, user_attrs)
     end
 
     @tag :capture_log
@@ -658,22 +659,22 @@ defmodule Authify.AccountsTest do
       }
 
       # Accept invitation first time
-      {:ok, _user} = Accounts.accept_invitation(invitation, user_attrs)
+      {:ok, _user} = Invitations.accept_invitation(invitation, user_attrs)
 
       # Reload the invitation to get the updated accepted_at field
-      updated_invitation = Accounts.get_invitation!(invitation.id)
+      updated_invitation = Invitations.get_invitation!(invitation.id)
 
       # Try to accept again
       assert {:error, :invitation_invalid} =
-               Accounts.accept_invitation(updated_invitation, user_attrs)
+               Invitations.accept_invitation(updated_invitation, user_attrs)
     end
 
     @tag :capture_log
     test "delete_invitation/1 deletes the invitation", %{organization: org, admin_user: admin} do
       invitation = invitation_for_organization_fixture(org, admin)
 
-      assert {:ok, %Invitation{}} = Accounts.delete_invitation(invitation)
-      assert_raise Ecto.NoResultsError, fn -> Accounts.get_invitation!(invitation.id) end
+      assert {:ok, %Invitation{}} = Invitations.delete_invitation(invitation)
+      assert_raise Ecto.NoResultsError, fn -> Invitations.get_invitation!(invitation.id) end
     end
 
     @tag :capture_log
@@ -682,7 +683,7 @@ defmodule Authify.AccountsTest do
       admin_user: admin
     } do
       invitation = invitation_for_organization_fixture(org, admin)
-      assert %Ecto.Changeset{} = Accounts.change_invitation(invitation)
+      assert %Ecto.Changeset{} = Invitations.change_invitation(invitation)
     end
 
     @tag :capture_log
@@ -702,16 +703,16 @@ defmodule Authify.AccountsTest do
         "expires_at" => DateTime.add(DateTime.utc_now(), -1, :day) |> DateTime.truncate(:second)
       }
 
-      {:ok, _expired_invitation} = Accounts.create_invitation(expired_attrs)
+      {:ok, _expired_invitation} = Invitations.create_invitation(expired_attrs)
 
-      assert length(Accounts.list_invitations(org.id)) == 2
+      assert length(Invitations.list_invitations(org.id)) == 2
 
       # Cleanup expired invitations
-      {deleted_count, _} = Accounts.cleanup_expired_invitations(org.id)
+      {deleted_count, _} = Invitations.cleanup_expired_invitations(org.id)
       assert deleted_count == 1
 
       # Only pending invitation should remain
-      remaining_invitations = Accounts.list_invitations(org.id)
+      remaining_invitations = Invitations.list_invitations(org.id)
       assert length(remaining_invitations) == 1
       assert DateTime.after?(hd(remaining_invitations).expires_at, DateTime.utc_now())
     end

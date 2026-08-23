@@ -3,12 +3,13 @@ defmodule AuthifyWeb.InvitationController do
 
   alias Authify.Accounts
   alias Authify.Accounts.{Invitation, User}
+  alias Authify.Invitations
   alias AuthifyWeb.Helpers.AuditHelper
 
   def index(conn, _params) do
     user = conn.assigns.current_user
     organization = conn.assigns.current_organization
-    invitations = Accounts.list_invitations(organization.id)
+    invitations = Invitations.list_invitations(organization.id)
 
     render(conn, :index,
       user: user,
@@ -21,7 +22,7 @@ defmodule AuthifyWeb.InvitationController do
   def new(conn, _params) do
     user = conn.assigns.current_user
     organization = conn.assigns.current_organization
-    changeset = Accounts.change_invitation(%Invitation{})
+    changeset = Invitations.change_invitation(%Invitation{})
 
     render(conn, :new,
       user: user,
@@ -37,7 +38,7 @@ defmodule AuthifyWeb.InvitationController do
 
     invitation_params_with_org = Map.put(invitation_params, "organization_id", organization.id)
 
-    case Accounts.create_invitation_and_send_email(invitation_params_with_org, current_user) do
+    case Invitations.create_invitation_and_send_email(invitation_params_with_org, current_user) do
       {:ok, invitation} ->
         AuditHelper.log_invitation_sent(conn, invitation, extra_metadata: %{"source" => "web"})
 
@@ -67,7 +68,7 @@ defmodule AuthifyWeb.InvitationController do
     organization = conn.assigns.current_organization
 
     invitation =
-      Accounts.get_invitation!(id) |> Authify.Repo.preload([:invited_by, :organization])
+      Invitations.get_invitation!(id) |> Authify.Repo.preload([:invited_by, :organization])
 
     # Ensure invitation belongs to current organization
     if invitation.organization_id == organization.id do
@@ -88,12 +89,12 @@ defmodule AuthifyWeb.InvitationController do
     organization = conn.assigns.current_organization
 
     invitation =
-      Accounts.get_invitation!(id)
+      Invitations.get_invitation!(id)
       |> Authify.Repo.preload([:organization, :invited_by])
 
     # Ensure invitation belongs to current organization
     if invitation.organization_id == organization.id do
-      {:ok, _invitation} = Accounts.delete_invitation(invitation)
+      {:ok, _invitation} = Invitations.delete_invitation(invitation)
 
       AuditHelper.log_invitation_revoked(conn, invitation, extra_metadata: %{"source" => "web"})
 
@@ -108,7 +109,7 @@ defmodule AuthifyWeb.InvitationController do
   end
 
   def accept(conn, %{"token" => token}) do
-    case Accounts.get_invitation_by_token(token) do
+    case Invitations.get_invitation_by_token(token) do
       nil ->
         conn
         |> put_flash(:error, "Invalid or expired invitation.")
@@ -139,14 +140,14 @@ defmodule AuthifyWeb.InvitationController do
   end
 
   def accept_invitation(conn, %{"token" => token, "user" => user_params}) do
-    case Accounts.get_invitation_by_token(token) do
+    case Invitations.get_invitation_by_token(token) do
       nil ->
         conn
         |> put_flash(:error, "Invalid or expired invitation.")
         |> redirect(to: ~p"/")
 
       invitation ->
-        case Accounts.accept_invitation(invitation, user_params) do
+        case Invitations.accept_invitation(invitation, user_params) do
           {:ok, user} ->
             user = Authify.Repo.preload(user, :organization)
 

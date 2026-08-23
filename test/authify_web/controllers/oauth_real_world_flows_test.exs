@@ -60,7 +60,7 @@ defmodule AuthifyWeb.OAuthRealWorldFlowsTest do
 
       # Step 3: Admin invites a regular user
       {:ok, invitation} =
-        Authify.Accounts.create_invitation(%{
+        Authify.Invitations.create_invitation(%{
           "email" => "employee@acme.example.com",
           "role" => "user",
           "organization_id" => organization.id,
@@ -71,7 +71,7 @@ defmodule AuthifyWeb.OAuthRealWorldFlowsTest do
 
       # Step 4: User accepts invitation and creates account
       {:ok, user} =
-        Authify.Accounts.accept_invitation(invitation, %{
+        Authify.Invitations.accept_invitation(invitation, %{
           "first_name" => "John",
           "last_name" => "Employee",
           "password" => "SecureP@ssw0rd!",

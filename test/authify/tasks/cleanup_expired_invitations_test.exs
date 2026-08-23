@@ -16,7 +16,7 @@ defmodule Authify.Tasks.CleanupExpiredInvitationsTest do
       old_expired_at = DateTime.utc_now() |> DateTime.add(-72, :hour)
 
       {:ok, old_invitation} =
-        Authify.Accounts.create_invitation(%{
+        Authify.Invitations.create_invitation(%{
           "email" => "old@example.com",
           "role" => "user",
           "organization_id" => org.id,
@@ -28,7 +28,7 @@ defmodule Authify.Tasks.CleanupExpiredInvitationsTest do
       recent_expired_at = DateTime.utc_now() |> DateTime.add(-24, :hour)
 
       {:ok, recent_invitation} =
-        Authify.Accounts.create_invitation(%{
+        Authify.Invitations.create_invitation(%{
           "email" => "recent@example.com",
           "role" => "user",
           "organization_id" => org.id,
@@ -41,7 +41,7 @@ defmodule Authify.Tasks.CleanupExpiredInvitationsTest do
 
       # Create an accepted invitation that's expired (should NOT be deleted)
       {:ok, accepted_invitation} =
-        Authify.Accounts.create_invitation(%{
+        Authify.Invitations.create_invitation(%{
           "email" => "accepted@example.com",
           "role" => "user",
           "organization_id" => org.id,

@@ -294,6 +294,29 @@ defmodule Authify.Accounts do
     end)
   end
 
+  defp create_admin_user_for_organization(organization, user_attrs) do
+    # Generate unique username based on preferred username
+    preferred_username = Map.get(user_attrs, "username", "admin")
+    unique_username = User.generate_unique_username(preferred_username, organization.id, Repo)
+
+    normalized_user_attrs =
+      normalize_user_email_attrs(user_attrs, Map.get(user_attrs, "email"),
+        default_type: "work",
+        default_primary: true
+      )
+
+    user_attrs_with_org =
+      normalized_user_attrs
+      |> Map.put("organization_id", organization.id)
+      |> Map.put("role", "admin")
+      |> Map.put("username", unique_username)
+
+    case create_user(user_attrs_with_org) do
+      {:ok, user} -> {:ok, {organization, user}}
+      {:error, changeset} -> {:error, changeset}
+    end
+  end
+
   @doc """
   Updates a user.
 
@@ -1012,213 +1035,6 @@ defmodule Authify.Accounts do
     User.global_admin?(user)
   end
 
-  ## Invitations
-
-  @doc """
-  Creates an invitation.
-  """
-  def create_invitation(attrs \\ %{}) do
-    %Invitation{}
-    |> Invitation.changeset(attrs)
-    |> Repo.insert()
-  end
-
-  @doc """
-  Gets an invitation by token.
-  """
-  def get_invitation_by_token(token) do
-    Invitation
-    |> where([i], i.token == ^token)
-    |> preload([:invited_by, :organization])
-    |> Repo.one()
-  end
-
-  @doc """
-  Accepts an invitation and creates a user account.
-  """
-  def accept_invitation(invitation, user_attrs) do
-    if Invitation.pending?(invitation) do
-      Repo.transaction(fn ->
-        # Mark invitation as accepted
-        accepted_at = DateTime.utc_now()
-
-        invitation_changeset =
-          Invitation.accept_changeset(invitation, %{accepted_at: accepted_at})
-
-        with {:ok, _accepted_invitation} <- Repo.update(invitation_changeset),
-             # Generate unique username based on preferred username
-             preferred_username = Map.get(user_attrs, "username", "user"),
-             unique_username =
-               User.generate_unique_username(preferred_username, invitation.organization_id, Repo),
-             user_attrs_with_org =
-               user_attrs
-               |> Map.put("organization_id", invitation.organization_id)
-               |> Map.put("role", invitation.role)
-               |> Map.put("username", unique_username)
-               |> normalize_user_email_attrs(invitation.email,
-                 default_type: "work",
-                 default_primary: true,
-                 verified_at: accepted_at
-               ),
-             {:ok, user} <- create_user(user_attrs_with_org) do
-          user
-        else
-          {:error, changeset} -> Repo.rollback(changeset)
-        end
-      end)
-    else
-      {:error, :invitation_invalid}
-    end
-  end
-
-  defp create_admin_user_for_organization(organization, user_attrs) do
-    # Generate unique username based on preferred username
-    preferred_username = Map.get(user_attrs, "username", "admin")
-    unique_username = User.generate_unique_username(preferred_username, organization.id, Repo)
-
-    normalized_user_attrs =
-      normalize_user_email_attrs(user_attrs, Map.get(user_attrs, "email"),
-        default_type: "work",
-        default_primary: true
-      )
-
-    user_attrs_with_org =
-      normalized_user_attrs
-      |> Map.put("organization_id", organization.id)
-      |> Map.put("role", "admin")
-      |> Map.put("username", unique_username)
-
-    case create_user(user_attrs_with_org) do
-      {:ok, user} -> {:ok, {organization, user}}
-      {:error, changeset} -> {:error, changeset}
-    end
-  end
-
-  @doc """
-  Returns an `%Ecto.Changeset{}` for tracking invitation changes.
-  """
-  def change_invitation(%Invitation{} = invitation, attrs \\ %{}) do
-    Invitation.changeset(invitation, attrs)
-  end
-
-  @doc """
-  Lists invitations for an organization.
-  """
-  def list_invitations(organization_id) do
-    from(i in Invitation,
-      where: i.organization_id == ^organization_id,
-      preload: [:invited_by, :organization],
-      order_by: [desc: i.inserted_at]
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns the list of invitations sent by a specific user.
-  """
-  def list_invitations_by_inviter(inviter_id) do
-    from(i in Invitation,
-      where: i.invited_by_id == ^inviter_id,
-      preload: [:invited_by, :organization],
-      order_by: [desc: i.inserted_at]
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets a single invitation.
-  """
-  def get_invitation!(id), do: Repo.get!(Invitation, id)
-
-  @doc """
-  Deletes an invitation.
-  """
-  def delete_invitation(invitation) do
-    Repo.delete(invitation)
-  end
-
-  @doc """
-  Lists pending invitations for an organization.
-  """
-  def list_pending_invitations(organization_id) do
-    current_time = DateTime.utc_now()
-
-    from(i in Invitation,
-      where:
-        i.organization_id == ^organization_id and is_nil(i.accepted_at) and
-          i.expires_at > ^current_time,
-      preload: [:invited_by, :organization],
-      order_by: [desc: i.inserted_at]
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Creates an invitation and emits event to trigger email workflow.
-
-  Emits an `invite_created` event that triggers the invitation workflow,
-  which includes sending the invitation email asynchronously via the task system.
-
-  Returns {:ok, invitation} on success or {:error, changeset} on validation failure.
-  """
-  def create_invitation_and_send_email(attrs, inviter) do
-    attrs_with_inviter = Map.put(attrs, "invited_by_id", inviter.id)
-
-    case create_invitation(attrs_with_inviter) do
-      {:ok, invitation} ->
-        # Preload associations for organization_id
-        invitation = Repo.preload(invitation, [:organization, :invited_by])
-
-        # Emit event to trigger invitation workflow (email sending)
-        case Authify.Tasks.EventHandler.handle_event(:invite_created, %{
-               invitation_id: invitation.id,
-               organization_id: invitation.organization_id
-             }) do
-          {:ok, _task} ->
-            require Logger
-            Logger.info("Invitation workflow triggered for #{invitation.email}")
-
-          {:error, reason} ->
-            require Logger
-            Logger.error("Failed to trigger invitation workflow: #{inspect(reason)}")
-        end
-
-        {:ok, invitation}
-
-      {:error, changeset} ->
-        {:error, changeset}
-    end
-  end
-
-  @doc """
-  Builds the full URL for accepting an invitation.
-
-  The invitation must have the organization association preloaded.
-  """
-  def build_invitation_accept_url(invitation) do
-    organization = invitation.organization
-
-    # Get the effective email link domain for this organization
-    # (uses configured email_link_domain or falls back to default domain)
-    domain = Authify.Organizations.get_email_link_domain(organization)
-
-    # Build the accept URL (GET route that shows the acceptance form)
-    "#{build_base_url(domain)}/invite/#{invitation.token}"
-  end
-
-  @doc """
-  Cleans up expired invitations.
-  """
-  def cleanup_expired_invitations do
-    cutoff_date = DateTime.add(DateTime.utc_now(), -30, :day)
-
-    from(i in Invitation,
-      where: i.expires_at < ^cutoff_date
-    )
-    |> Repo.delete_all()
-    |> elem(0)
-  end
-
   ## Personal Access Tokens
 
   @doc """
@@ -1743,46 +1559,11 @@ defmodule Authify.Accounts do
   end
 
   @doc """
-  Gets invitation stats.
-  """
-  def get_invitation_stats do
-    total = from(i in Invitation) |> Repo.aggregate(:count, :id)
-    pending = from(i in Invitation, where: is_nil(i.accepted_at)) |> Repo.aggregate(:count, :id)
-
-    accepted =
-      from(i in Invitation, where: not is_nil(i.accepted_at)) |> Repo.aggregate(:count, :id)
-
-    acceptance_rate = if total > 0, do: accepted / total * 100, else: 0.0
-
-    %{
-      total_invitations: total,
-      pending_invitations: pending,
-      accepted_invitations: accepted,
-      total: total,
-      pending: pending,
-      accepted: accepted,
-      acceptance_rate: acceptance_rate
-    }
-  end
-
-  @doc """
   Counts organizations.
   """
   def count_organizations do
     from(o in Organization, where: o.active == true)
     |> Repo.aggregate(:count, :id)
-  end
-
-  @doc """
-  Cleanup expired invitations with organization parameter.
-  """
-  def cleanup_expired_invitations(organization_id) do
-    current_time = DateTime.utc_now()
-
-    from(i in Invitation,
-      where: i.organization_id == ^organization_id and i.expires_at < ^current_time
-    )
-    |> Repo.delete_all()
   end
 
   @doc """
@@ -1794,37 +1575,6 @@ defmodule Authify.Accounts do
     )
     |> Repo.delete_all()
     |> elem(0)
-  end
-
-  @doc """
-  Counts total invitations.
-  """
-  def count_invitations do
-    from(i in Invitation) |> Repo.aggregate(:count, :id)
-  end
-
-  @doc """
-  Counts expired invitations.
-  """
-  def count_expired_invitations do
-    cutoff_date = DateTime.utc_now()
-
-    from(i in Invitation, where: i.expires_at < ^cutoff_date)
-    |> Repo.aggregate(:count, :id)
-  end
-
-  @doc """
-  Counts expired invitations that are ready for cleanup (expired more than 48 hours ago).
-  This matches the cleanup task's grace period logic.
-  """
-  def count_cleanable_invitations do
-    cutoff = DateTime.utc_now() |> DateTime.add(-48, :hour)
-
-    from(i in Invitation,
-      where: is_nil(i.accepted_at),
-      where: i.expires_at < ^cutoff
-    )
-    |> Repo.aggregate(:count, :id)
   end
 
   @doc """
@@ -1901,16 +1651,6 @@ defmodule Authify.Accounts do
   end
 
   @doc """
-  Counts invitations created since a given date.
-  """
-  def count_invitations_since(date) do
-    from(i in Invitation,
-      where: i.inserted_at >= ^date
-    )
-    |> Repo.aggregate(:count, :id)
-  end
-
-  @doc """
   Counts organizations created since a given date.
   """
   def count_organizations_since(date) do
@@ -1943,22 +1683,6 @@ defmodule Authify.Accounts do
   end
 
   @doc """
-  Counts pending invitations.
-  """
-  def count_pending_invitations do
-    from(i in Invitation, where: is_nil(i.accepted_at))
-    |> Repo.aggregate(:count, :id)
-  end
-
-  @doc """
-  Counts accepted invitations.
-  """
-  def count_accepted_invitations do
-    from(i in Invitation, where: not is_nil(i.accepted_at))
-    |> Repo.aggregate(:count, :id)
-  end
-
-  @doc """
   Counts organizations created before a given date.
   """
   def count_organizations_created_before(date) do
@@ -1974,16 +1698,6 @@ defmodule Authify.Accounts do
   def count_users_created_before(date) do
     from(u in User,
       where: u.active == true and u.inserted_at < ^date
-    )
-    |> Repo.aggregate(:count, :id)
-  end
-
-  @doc """
-  Counts invitations accepted since a given date.
-  """
-  def count_invitations_accepted_since(date) do
-    from(i in Invitation,
-      where: not is_nil(i.accepted_at) and i.accepted_at >= ^date
     )
     |> Repo.aggregate(:count, :id)
   end
