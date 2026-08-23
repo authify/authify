@@ -4,8 +4,8 @@ defmodule Authify.MixProject do
   def project do
     [
       app: :authify,
-      version: "0.18.0",
-      elixir: "~> 1.19",
+      version: "0.19.0",
+      elixir: "~> 1.20",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),

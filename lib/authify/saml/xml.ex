@@ -36,7 +36,6 @@ defmodule Authify.SAML.XML do
   end
 
   def parse_authn_request(nil), do: {:error, "SAML request cannot be empty"}
-  def parse_authn_request(""), do: {:error, "SAML request cannot be empty"}
 
   @doc """
   Parse a SAML LogoutRequest from XML or Base64-encoded XML.
@@ -63,7 +62,6 @@ defmodule Authify.SAML.XML do
   end
 
   def parse_logout_request(nil), do: {:error, "SAML logout request cannot be empty"}
-  def parse_logout_request(""), do: {:error, "SAML logout request cannot be empty"}
 
   @doc """
   Generate a SAML Response with Assertion, optionally signed.

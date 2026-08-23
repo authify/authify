@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-08-23
+
+### Changed
+
+- Upgraded to Elixir 1.20.3 and Erlang/OTP 29.0.5
+- CI now tests on both Elixir 1.20.3 and the `main` branch (dev/edge)
+
+### Fixed
+
+- Resolved warnings introduced by Elixir 1.20's stricter typechecker
+- Fixed MFA lockout so it can actually be disabled (`|| true` always evaluated truthy)
+
 ## [0.18.0] - 2026-08-23
 
 ### Changed
@@ -722,7 +734,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/authify/authify/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/authify/authify/compare/v0.12.3...v0.18.0
 [0.12.3]: https://github.com/authify/authify/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/authify/authify/compare/v0.12.1...v0.12.2

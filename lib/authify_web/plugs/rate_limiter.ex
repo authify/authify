@@ -23,7 +23,6 @@ defmodule AuthifyWeb.Plugs.RateLimiter do
   """
 
   import Plug.Conn
-  require Logger
 
   @behaviour Plug
 
@@ -144,11 +143,6 @@ defmodule AuthifyWeb.Plugs.RateLimiter do
           |> put_resp_header("retry-after", to_string(retry_after))
           |> send_rate_limit_response()
           |> halt()
-
-        {:error, reason} ->
-          # Log the error but don't block the request
-          Logger.error("Rate limiting error for #{bucket_key}: #{inspect(reason)}")
-          conn
       end
     else
       # Rate limiting disabled, allow all requests

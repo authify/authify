@@ -8,8 +8,8 @@ on:
 
 env:
   MIX_ENV: test
-  ELIXIR_VERSION: '1.19.5'
-  OTP_VERSION: '28.5.0.5'
+  ELIXIR_VERSION: '1.20.3'
+  OTP_VERSION: '29.0.5'
 
 jobs:
   test:
@@ -19,8 +19,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        elixir: ['1.19.5']
-        otp: ['28.5.0.5']
+        elixir: ['1.20.3', 'main']
+        otp: ['29.0.5']
         partition: [1, 2, 3, 4]
 
     services:
@@ -51,7 +51,7 @@ jobs:
 
       - name: Cache dependencies
         id: cache-deps
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             deps

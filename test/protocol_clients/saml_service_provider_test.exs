@@ -56,7 +56,7 @@ defmodule AuthifyTest.SAMLServiceProviderTest do
       sp = SAMLServiceProvider.new(org)
       assert {:ok, {encoded, request_id}} = SAMLServiceProvider.build_authn_request(sp)
       assert is_binary(encoded)
-      assert is_binary(request_id) and String.starts_with?(request_id, "_")
+      assert String.starts_with?(request_id, "_")
       xml = Base.decode64!(encoded)
       assert String.contains?(xml, "<?xml")
       assert String.contains?(xml, "<saml2p:AuthnRequest")

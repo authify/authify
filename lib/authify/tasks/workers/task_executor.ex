@@ -27,7 +27,6 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
   alias Authify.Tasks.Telemetry, as: TaskTelemetry
 
   @active_states Task.active_states()
-  @transitioning_states Task.transitioning_states()
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"task_id" => task_id}}) do
@@ -177,10 +176,6 @@ defmodule Authify.Tasks.Workers.TaskExecutor do
 
       %Task{status: :skipping} ->
         handler.on_skipping(duplicate, task)
-
-      %Task{status: status} when status in @transitioning_states ->
-        # Catch-all for any new transitioning states
-        :wait
     end
   end
 
