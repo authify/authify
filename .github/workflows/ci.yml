@@ -19,12 +19,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - elixir: '1.20.3'
-            otp: '29.0.5'
-          # Elixir main branch = latest dev/edge, built against OTP 29.
-          - elixir: 'main'
-            otp: '29.0.5'
+        elixir: ['1.20.3', 'main']
+        otp: ['29.0.5']
         partition: [1, 2, 3, 4]
 
     services:
