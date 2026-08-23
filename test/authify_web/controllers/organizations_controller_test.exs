@@ -1,7 +1,5 @@
 defmodule AuthifyWeb.OrganizationsControllerTest do
-  # async: false — the delete action issues multiple cascading DB queries
-  # that exhaust the connection pool under concurrent load
-  use AuthifyWeb.ConnCase, async: false
+  use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
 
