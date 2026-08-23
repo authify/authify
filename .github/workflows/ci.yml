@@ -19,8 +19,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        elixir: ['1.19.5']
-        otp: ['28.3']
+        include:
+          - elixir: '1.19.5'
+            otp: '28.3'
+          - elixir: '1.20.3'
+            otp: '29.0.5'
         partition: [1, 2, 3, 4]
 
     services:
