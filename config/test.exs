@@ -15,6 +15,13 @@ config :authify, env: :test
 after_connect_fn =
   {MyXQL, :query!, ["SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED", []]}
 
+# The sandbox pool must be larger than ExUnit's max_cases (defaults to
+# schedulers_online * 2) so that tests doing async preloading (which spawn a
+# Task that needs its own connection) don't exhaust the pool and drop requests.
+# Without this headroom, CI runners with few cores (pool == max_cases) hit
+# "could not checkout the connection" flakes.
+pool_size = System.schedulers_online() * 2 + 10
+
 if System.get_env("CI_MODE") do
   config :authify, Authify.Repo,
     username: "authifytest",
@@ -22,7 +29,7 @@ if System.get_env("CI_MODE") do
     hostname: "127.0.0.1",
     database: "authify_test#{System.get_env("MIX_TEST_PARTITION")}",
     pool: Ecto.Adapters.SQL.Sandbox,
-    pool_size: System.schedulers_online() * 2,
+    pool_size: pool_size,
     after_connect: after_connect_fn
 else
   config :authify, Authify.Repo,
@@ -31,7 +38,7 @@ else
     hostname: "localhost",
     database: "authify_test#{System.get_env("MIX_TEST_PARTITION")}",
     pool: Ecto.Adapters.SQL.Sandbox,
-    pool_size: System.schedulers_online() * 2,
+    pool_size: pool_size,
     after_connect: after_connect_fn
 end
 
