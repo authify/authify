@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-08-23
+
+### Changed
+
+- Split the monolithic `Authify.Accounts` context into focused contexts: `Authify.Groups`, `Authify.Certificates`, `Authify.Invitations`, `Authify.Stats`, and `Authify.PersonalAccessTokens`
+- Extracted SCIM provisioning from Accounts into `Authify.SCIM.Provisioning`
+- Extracted MFA orchestration from the controller into `Authify.MFA.Flow`
+- Extracted shared controller boilerplate between the API and SCIM controllers
+- Improved test performance by running previously-serial test suites asynchronously
+- Parallelized the CI test suite across four partitions
+
+### Fixed
+
+- Fixed intermittent `could not checkout the connection` flake by adding connection pool headroom for async preloading
+- Fixed flaky health cache test by using millisecond resolution for the cache TTL
+
+### Dependencies
+
+- Bumped `phoenix_live_view` to 1.2.9
+- Bumped `phoenix_live_dashboard` to 0.9.0
+- Bumped `guardian` to 2.5.0
+- Bumped `phoenix` to 1.8.11
+- Bumped `swoosh` to 1.27.0
+
 ## [0.12.3] - 2026-02-05
 
 ### Fixed
@@ -698,7 +722,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.12.3...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/authify/authify/compare/v0.12.3...v0.18.0
 [0.12.3]: https://github.com/authify/authify/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/authify/authify/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/authify/authify/compare/v0.12.0...v0.12.1
