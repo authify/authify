@@ -95,6 +95,10 @@ jobs:
     name: Build Docker Image
     runs-on: ubuntu-latest
     needs: test
+    # Only validate the image build on pull requests. Releases build and push
+    # the canonical image via release.yml, so building again on main/develop
+    # pushes (and the release tag) would be redundant work.
+    if: github.event_name == 'pull_request'
 
     steps:
       - name: Checkout code
