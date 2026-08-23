@@ -5,8 +5,6 @@ defmodule Authify.SCIMClient.EventHandler do
   """
   use GenServer
 
-  require Logger
-
   alias Authify.SCIMClient.Provisioner
 
   def start_link(opts) do

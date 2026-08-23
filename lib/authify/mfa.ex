@@ -377,9 +377,10 @@ defmodule Authify.MFA do
   - mfa_lockout_duration_minutes: Lockout duration (default: 5)
   """
   def check_rate_limit(%User{} = user, organization) do
-    # Check if lockout is enabled for this organization
+    # Check if lockout is enabled for this organization.
+    # Defaults to enabled unless explicitly set to false.
     lockout_enabled =
-      Authify.Configurations.get_organization_setting(organization, :mfa_lockout_enabled) || true
+      Authify.Configurations.get_organization_setting(organization, :mfa_lockout_enabled) != false
 
     if lockout_enabled do
       # Get org settings

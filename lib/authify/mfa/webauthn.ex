@@ -428,7 +428,7 @@ defmodule Authify.MFA.WebAuthn do
     if at_flag do
       # Parse attested credential data
       <<aaguid::binary-size(16), cred_id_len::16, rest::binary>> = credential_data
-      <<credential_id::binary-size(cred_id_len), public_key_cbor::binary>> = rest
+      <<credential_id::binary-size(^cred_id_len), public_key_cbor::binary>> = rest
 
       # Decode public key (COSE format)
       case CBOR.decode(public_key_cbor) do
