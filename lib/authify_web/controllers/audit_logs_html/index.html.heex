@@ -6,8 +6,8 @@
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
       <h1 class="h2">Audit Logs</h1>
     </div>
-    
-<!-- Filter Form -->
+
+    <!-- Filter Form -->
     <div class="card mb-4">
       <div class="card-header">
         <h5 class="mb-0">Filters</h5>
@@ -54,8 +54,8 @@
                 </optgroup>
               </select>
             </div>
-            
-<!-- Outcome Filter -->
+
+            <!-- Outcome Filter -->
             <div class="col-md-2">
               <label for="outcome" class="form-label">Outcome</label>
               <select name="outcome" id="outcome" class="form-select">
@@ -67,8 +67,8 @@
                 <% end %>
               </select>
             </div>
-            
-<!-- Actor Name Filter -->
+
+            <!-- Actor Name Filter -->
             <div class="col-md-3">
               <label for="actor_name" class="form-label">Actor Name</label>
               <input
@@ -80,8 +80,8 @@
                 value={@filters.actor_name}
               />
             </div>
-            
-<!-- Date From Filter -->
+
+            <!-- Date From Filter -->
             <div class="col-md-2">
               <label for="date_from" class="form-label">From Date</label>
               <input
@@ -92,8 +92,8 @@
                 value={@filters.date_from}
               />
             </div>
-            
-<!-- Date To Filter -->
+
+            <!-- Date To Filter -->
             <div class="col-md-2">
               <label for="date_to" class="form-label">To Date</label>
               <input
@@ -117,8 +117,8 @@
         </form>
       </div>
     </div>
-    
-<!-- Results Count -->
+
+    <!-- Results Count -->
     <div class="mb-3">
       <p class="text-muted">
         Showing {length(@events)} events
@@ -127,8 +127,8 @@
         <% end %>
       </p>
     </div>
-    
-<!-- Events Table -->
+
+    <!-- Events Table -->
     <%= if Enum.empty?(@events) do %>
       <div class="alert alert-info">
         <i class="bi bi-info-circle me-2"></i>
@@ -180,8 +180,7 @@
                         class="bi bi-shield-check text-success"
                         title="Cryptographically signed"
                         style="font-size: 1.1rem;"
-                      >
-                      </i>
+                      ></i>
                     <% end %>
                   </td>
                   <td>

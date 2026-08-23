@@ -6,8 +6,8 @@
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
       <h1 class="h2">Tasks</h1>
     </div>
-    
-<!-- Filter Form -->
+
+    <!-- Filter Form -->
     <div class="card mb-4">
       <div class="card-header">
         <h5 class="mb-0">Filters</h5>
@@ -31,8 +31,8 @@
                 <% end %>
               </select>
             </div>
-            
-<!-- Type Filter -->
+
+            <!-- Type Filter -->
             <div class="col-md-2">
               <label for="type" class="form-label">Type</label>
               <input
@@ -44,8 +44,8 @@
                 value={@filters.type}
               />
             </div>
-            
-<!-- Action Filter -->
+
+            <!-- Action Filter -->
             <div class="col-md-2">
               <label for="action" class="form-label">Action</label>
               <input
@@ -57,8 +57,8 @@
                 value={@filters.action}
               />
             </div>
-            
-<!-- Organization Filter -->
+
+            <!-- Organization Filter -->
             <div class="col-md-3">
               <label for="organization_id" class="form-label">Organization</label>
               <select name="organization_id" id="organization_id" class="form-select">
@@ -73,8 +73,8 @@
                 <% end %>
               </select>
             </div>
-            
-<!-- Actions -->
+
+            <!-- Actions -->
             <div class="col-md-2 d-flex align-items-end">
               <button type="submit" class="btn btn-primary w-100">Apply</button>
             </div>
@@ -82,8 +82,8 @@
         </form>
       </div>
     </div>
-    
-<!-- Task Table -->
+
+    <!-- Task Table -->
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Tasks</h5>
@@ -158,8 +158,8 @@
           </tbody>
         </table>
       </div>
-      
-<!-- Pagination -->
+
+      <!-- Pagination -->
       <%= if @total > @per_page do %>
         <div class="card-footer">
           <nav aria-label="Task pagination">

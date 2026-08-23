@@ -163,8 +163,8 @@
         <% end %>
       </div>
     <% end %>
-    
-<!-- Edit API Application Modals -->
+
+    <!-- Edit API Application Modals -->
     <%= for app <- @management_applications do %>
       <div
         class="modal fade"
@@ -179,8 +179,7 @@
               <h5 class="modal-title" id={"editAppModalLabel#{app.id}"}>
                 Edit Management API Application
               </h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
-              </button>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form
               method="post"
