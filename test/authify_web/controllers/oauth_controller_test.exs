@@ -4,9 +4,8 @@ defmodule AuthifyWeb.OAuthControllerTest do
   import Authify.AccountsFixtures
   import Authify.OAuthFixtures
 
-  alias Authify.Accounts
   alias Authify.Accounts.User
-  alias Authify.Groups
+  alias Authify.Certificates
 
   describe "authorize" do
     setup do
@@ -985,7 +984,7 @@ defmodule AuthifyWeb.OAuthControllerTest do
     } do
       # Ensure an OAuth signing cert is pre-created so we know its id
       {:ok, cert} =
-        Accounts.get_or_generate_oauth_signing_certificate(organization)
+        Certificates.get_or_generate_oauth_signing_certificate(organization)
 
       {:ok, auth_code} =
         Authify.OAuth.create_authorization_code(

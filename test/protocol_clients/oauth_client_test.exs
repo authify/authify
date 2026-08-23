@@ -93,7 +93,7 @@ defmodule AuthifyTest.OAuthClientTest do
 
     test "rejects an expired token", %{org: org, app: app, client: client} do
       # Sign a token with an exp in the past using the org's actual signing key
-      {:ok, cert} = Authify.Accounts.get_or_generate_oauth_signing_certificate(org)
+      {:ok, cert} = Authify.Certificates.get_or_generate_oauth_signing_certificate(org)
       [entry | _] = :public_key.pem_decode(cert.private_key)
       private_key = :public_key.pem_entry_decode(entry)
 

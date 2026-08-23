@@ -488,7 +488,7 @@ defmodule Authify.SAML.XML do
   end
 
   defp get_signing_certificate(organization) do
-    case Authify.Accounts.get_active_saml_signing_certificate(organization) do
+    case Authify.Certificates.get_active_saml_signing_certificate(organization) do
       %Authify.Accounts.Certificate{} = cert ->
         Authify.Accounts.Certificate.certificate_data(cert)
 
@@ -500,6 +500,6 @@ defmodule Authify.SAML.XML do
 
   defp get_signing_certificate_struct(organization_id) do
     organization = %Authify.Accounts.Organization{id: organization_id}
-    Authify.Accounts.get_active_saml_signing_certificate(organization)
+    Authify.Certificates.get_active_saml_signing_certificate(organization)
   end
 end

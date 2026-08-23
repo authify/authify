@@ -428,7 +428,7 @@ defmodule Authify.AuditLogTest do
       Authify.Configurations.set_organization_setting(org, :sign_audit_logs, true)
 
       {:ok, event} = AuditLog.log_event(:login_success, attrs)
-      {:ok, cert} = Authify.Accounts.get_or_generate_audit_signing_certificate(org.id)
+      {:ok, cert} = Authify.Certificates.get_or_generate_audit_signing_certificate(org.id)
 
       assert :ok == Authify.AuditLog.Signer.verify(event, cert.certificate)
     end

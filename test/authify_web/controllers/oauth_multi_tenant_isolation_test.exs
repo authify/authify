@@ -511,8 +511,8 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
     } do
       # Trigger cert auto-generation for both orgs by hitting the token endpoint,
       # or just call the helper directly to ensure certs exist
-      {:ok, cert_a} = Authify.Accounts.get_or_generate_oauth_signing_certificate(org_a)
-      {:ok, cert_b} = Authify.Accounts.get_or_generate_oauth_signing_certificate(org_b)
+      {:ok, cert_a} = Authify.Certificates.get_or_generate_oauth_signing_certificate(org_a)
+      {:ok, cert_b} = Authify.Certificates.get_or_generate_oauth_signing_certificate(org_b)
 
       # Get JWKS for org A
       conn_a = get(conn, ~p"/#{org_a.slug}/.well-known/jwks")

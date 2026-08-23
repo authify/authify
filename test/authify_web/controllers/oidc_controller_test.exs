@@ -3,7 +3,7 @@ defmodule AuthifyWeb.OIDCControllerTest do
 
   import Authify.AccountsFixtures
 
-  alias Authify.Accounts
+  alias Authify.Certificates
 
   describe "discovery" do
     test "returns organization-scoped OIDC configuration", %{conn: conn} do
@@ -55,7 +55,7 @@ defmodule AuthifyWeb.OIDCControllerTest do
 
       # Generate an active OAuth signing certificate
       {:ok, cert} =
-        Accounts.generate_certificate(organization, %{
+        Certificates.generate_certificate(organization, %{
           "usage" => "oauth_signing",
           "is_active" => true
         })
@@ -80,7 +80,7 @@ defmodule AuthifyWeb.OIDCControllerTest do
 
       # Generate a SAML signing cert — should NOT appear in JWKS
       {:ok, _saml_cert} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "is_active" => true
         })
 
@@ -96,7 +96,7 @@ defmodule AuthifyWeb.OIDCControllerTest do
 
       # Generate an inactive OAuth signing cert
       {:ok, _cert} =
-        Accounts.generate_certificate(organization, %{
+        Certificates.generate_certificate(organization, %{
           "usage" => "oauth_signing",
           "is_active" => false
         })

@@ -3,6 +3,7 @@ defmodule Authify.AccountsTest do
 
   alias Authify.Accounts
   alias Authify.Accounts.{Group, GroupMembership, Invitation, Organization, User}
+  alias Authify.Certificates
   alias Authify.Groups
   alias Authify.OAuth
   alias Authify.SAML
@@ -1135,7 +1136,7 @@ defmodule Authify.AccountsTest do
     } do
       # Create first SAML signing certificate using the proper generation function
       {:ok, cert1} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "SAML Cert 1",
           "is_active" => true
         })
@@ -1144,7 +1145,7 @@ defmodule Authify.AccountsTest do
 
       # Create second SAML signing certificate using the proper generation function
       {:ok, cert2} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "SAML Cert 2",
           "is_active" => true
         })
@@ -1152,22 +1153,25 @@ defmodule Authify.AccountsTest do
       assert cert2.is_active == true
 
       # Verify first cert is now deactivated
-      updated_cert1 = Accounts.get_certificate!(cert1.id)
+      updated_cert1 = Certificates.get_certificate!(cert1.id)
       assert updated_cert1.is_active == false
 
       # Create different usage type - should not affect SAML signing certs
       {:ok, oauth_cert} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "OAuth Cert"
         })
 
       # Change usage type to oauth_signing and activate
       {:ok, oauth_cert} =
-        Accounts.update_certificate(oauth_cert, %{"usage" => "oauth_signing", "is_active" => true})
+        Certificates.update_certificate(oauth_cert, %{
+          "usage" => "oauth_signing",
+          "is_active" => true
+        })
 
       # Both different usage certs can be active
       assert oauth_cert.is_active == true
-      updated_cert2 = Accounts.get_certificate!(cert2.id)
+      updated_cert2 = Certificates.get_certificate!(cert2.id)
       assert updated_cert2.is_active == true
     end
 
@@ -1176,25 +1180,25 @@ defmodule Authify.AccountsTest do
     } do
       # Create two inactive certificates of same usage using proper generation
       {:ok, cert1} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "SAML Cert 1"
         })
 
       {:ok, cert2} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "SAML Cert 2"
         })
 
       # Activate first certificate
-      {:ok, updated_cert1} = Accounts.update_certificate(cert1, %{"is_active" => true})
+      {:ok, updated_cert1} = Certificates.update_certificate(cert1, %{"is_active" => true})
       assert updated_cert1.is_active == true
 
       # Activate second certificate (should deactivate first)
-      {:ok, updated_cert2} = Accounts.update_certificate(cert2, %{"is_active" => true})
+      {:ok, updated_cert2} = Certificates.update_certificate(cert2, %{"is_active" => true})
       assert updated_cert2.is_active == true
 
       # Verify first cert is now deactivated
-      updated_cert1_again = Accounts.get_certificate!(cert1.id)
+      updated_cert1_again = Certificates.get_certificate!(cert1.id)
       assert updated_cert1_again.is_active == false
     end
 
@@ -1202,27 +1206,27 @@ defmodule Authify.AccountsTest do
       organization: organization
     } do
       # No certificates initially
-      assert Accounts.get_active_saml_signing_certificate(organization) == nil
+      assert Certificates.get_active_saml_signing_certificate(organization) == nil
 
       # Create inactive certificate using proper generation
       {:ok, _inactive_cert} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "Inactive SAML Cert"
         })
 
       # Still no active certificate (generated certificates are inactive by default)
-      assert Accounts.get_active_saml_signing_certificate(organization) == nil
+      assert Certificates.get_active_saml_signing_certificate(organization) == nil
 
       # Create and activate a certificate
       {:ok, active_cert} =
-        Accounts.generate_saml_signing_certificate(organization, %{
+        Certificates.generate_saml_signing_certificate(organization, %{
           "name" => "Active SAML Cert"
         })
 
-      {:ok, active_cert} = Accounts.update_certificate(active_cert, %{"is_active" => true})
+      {:ok, active_cert} = Certificates.update_certificate(active_cert, %{"is_active" => true})
 
       # Should return the active certificate
-      result = Accounts.get_active_saml_signing_certificate(organization)
+      result = Certificates.get_active_saml_signing_certificate(organization)
       assert result.id == active_cert.id
       assert result.is_active == true
     end
@@ -1230,7 +1234,7 @@ defmodule Authify.AccountsTest do
     test "get_active_oauth_signing_certificate/1 returns nil when no cert exists", %{
       organization: organization
     } do
-      assert Accounts.get_active_oauth_signing_certificate(organization) == nil
+      assert Certificates.get_active_oauth_signing_certificate(organization) == nil
     end
 
     test "get_active_oauth_signing_certificate/1 returns the active cert when one exists", %{
@@ -1238,17 +1242,17 @@ defmodule Authify.AccountsTest do
     } do
       # Create an inactive OAuth signing cert first (with explicit unique name)
       {:ok, inactive_cert} =
-        Accounts.generate_certificate(organization, %{
+        Certificates.generate_certificate(organization, %{
           "usage" => "oauth_signing",
           "name" => "Inactive OAuth Cert"
         })
 
-      assert Accounts.get_active_oauth_signing_certificate(organization) == nil
+      assert Certificates.get_active_oauth_signing_certificate(organization) == nil
 
       # Activate the cert
-      {:ok, cert} = Accounts.update_certificate(inactive_cert, %{"is_active" => true})
+      {:ok, cert} = Certificates.update_certificate(inactive_cert, %{"is_active" => true})
 
-      result = Accounts.get_active_oauth_signing_certificate(organization)
+      result = Certificates.get_active_oauth_signing_certificate(organization)
       assert result.id == cert.id
       assert result.is_active == true
       assert result.usage == "oauth_signing"
@@ -1257,9 +1261,9 @@ defmodule Authify.AccountsTest do
     test "get_or_generate_oauth_signing_certificate/1 auto-generates when no cert exists", %{
       organization: organization
     } do
-      assert Accounts.get_active_oauth_signing_certificate(organization) == nil
+      assert Certificates.get_active_oauth_signing_certificate(organization) == nil
 
-      assert {:ok, cert} = Accounts.get_or_generate_oauth_signing_certificate(organization)
+      assert {:ok, cert} = Certificates.get_or_generate_oauth_signing_certificate(organization)
       assert cert.usage == "oauth_signing"
       assert cert.is_active == true
       assert is_binary(cert.certificate)
@@ -1270,12 +1274,12 @@ defmodule Authify.AccountsTest do
       organization: organization
     } do
       {:ok, existing} =
-        Accounts.generate_certificate(organization, %{
+        Certificates.generate_certificate(organization, %{
           "usage" => "oauth_signing",
           "is_active" => true
         })
 
-      assert {:ok, cert} = Accounts.get_or_generate_oauth_signing_certificate(organization)
+      assert {:ok, cert} = Certificates.get_or_generate_oauth_signing_certificate(organization)
       assert cert.id == existing.id
     end
   end
@@ -1287,9 +1291,9 @@ defmodule Authify.AccountsTest do
     end
 
     test "delete_certificate/1 sets deleted_at and does not remove the row", %{organization: org} do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
 
-      {:ok, deleted} = Accounts.delete_certificate(cert)
+      {:ok, deleted} = Certificates.delete_certificate(cert)
 
       assert deleted.deleted_at != nil
       # Row still exists in DB
@@ -1297,30 +1301,30 @@ defmodule Authify.AccountsTest do
     end
 
     test "list_certificates/1 excludes soft-deleted certificates", %{organization: org} do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
-      {:ok, _} = Accounts.delete_certificate(cert)
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Certificates.delete_certificate(cert)
 
-      certs = Accounts.list_certificates(org)
+      certs = Certificates.list_certificates(org)
       ids = Enum.map(certs, & &1.id)
       refute cert.id in ids
     end
 
     test "get_certificate!/1 raises for soft-deleted certificate", %{organization: org} do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
-      {:ok, _} = Accounts.delete_certificate(cert)
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Certificates.delete_certificate(cert)
 
       assert_raise Ecto.NoResultsError, fn ->
-        Accounts.get_certificate!(cert.id)
+        Certificates.get_certificate!(cert.id)
       end
     end
 
     test "get_certificate!/2 with include_deleted: true finds soft-deleted cert", %{
       organization: org
     } do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
-      {:ok, _} = Accounts.delete_certificate(cert)
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Certificates.delete_certificate(cert)
 
-      found = Accounts.get_certificate!(cert.id, org, include_deleted: true)
+      found = Certificates.get_certificate!(cert.id, org, include_deleted: true)
       assert found.id == cert.id
       assert found.deleted_at != nil
     end
@@ -1328,11 +1332,11 @@ defmodule Authify.AccountsTest do
     test "get_certificate!/2 without include_deleted raises for soft-deleted cert", %{
       organization: org
     } do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "saml_signing"})
-      {:ok, _} = Accounts.delete_certificate(cert)
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "saml_signing"})
+      {:ok, _} = Certificates.delete_certificate(cert)
 
       assert_raise Ecto.NoResultsError, fn ->
-        Accounts.get_certificate!(cert.id, org)
+        Certificates.get_certificate!(cert.id, org)
       end
     end
   end
@@ -1346,7 +1350,7 @@ defmodule Authify.AccountsTest do
     test "get_or_generate_audit_signing_certificate/1 generates cert if none exists", %{
       organization: org
     } do
-      {:ok, cert} = Accounts.get_or_generate_audit_signing_certificate(org.id)
+      {:ok, cert} = Certificates.get_or_generate_audit_signing_certificate(org.id)
 
       assert cert.usage == "audit_signing"
       assert cert.is_active == true
@@ -1356,14 +1360,14 @@ defmodule Authify.AccountsTest do
     test "get_or_generate_audit_signing_certificate/1 returns existing active cert", %{
       organization: org
     } do
-      {:ok, cert1} = Accounts.get_or_generate_audit_signing_certificate(org.id)
-      {:ok, cert2} = Accounts.get_or_generate_audit_signing_certificate(org.id)
+      {:ok, cert1} = Certificates.get_or_generate_audit_signing_certificate(org.id)
+      {:ok, cert2} = Certificates.get_or_generate_audit_signing_certificate(org.id)
 
       assert cert1.id == cert2.id
     end
 
     test "generate_certificate/2 accepts audit_signing usage", %{organization: org} do
-      {:ok, cert} = Accounts.generate_certificate(org, %{"usage" => "audit_signing"})
+      {:ok, cert} = Certificates.generate_certificate(org, %{"usage" => "audit_signing"})
       assert cert.usage == "audit_signing"
     end
   end

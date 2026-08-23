@@ -5,6 +5,7 @@ defmodule AuthifyWeb.OAuthController do
 
   alias Authify.Accounts
   alias Authify.Accounts.User
+  alias Authify.Certificates
   alias Authify.Configurations
   alias Authify.OAuth
   alias AuthifyWeb.Audit.OAuth, as: AuditOAuth
@@ -709,7 +710,8 @@ defmodule AuthifyWeb.OAuthController do
   end
 
   defp generate_id_token(access_token, organization, nonce) do
-    with {:ok, certificate} <- Accounts.get_or_generate_oauth_signing_certificate(organization),
+    with {:ok, certificate} <-
+           Certificates.get_or_generate_oauth_signing_certificate(organization),
          {:ok, private_key} <- load_private_key(certificate) do
       sign_id_token(access_token, organization, certificate, private_key, nonce)
     end
