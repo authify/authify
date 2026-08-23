@@ -1,9 +1,8 @@
 defmodule AuthifyWeb.AnalyticsController do
   use AuthifyWeb, :controller
 
-  alias Authify.Accounts
-
   alias Authify.Invitations
+  alias Authify.Stats
   # All actions require being in the global organization
   def action(conn, _) do
     if conn.assigns.current_organization.slug != "authify-global" do
@@ -40,10 +39,10 @@ defmodule AuthifyWeb.AnalyticsController do
   # Private helper functions for analytics data
 
   defp get_system_overview do
-    total_organizations = Accounts.count_organizations()
-    active_organizations = Accounts.count_active_organizations()
-    total_users = Accounts.count_users()
-    global_admins = Accounts.count_global_admins()
+    total_organizations = Stats.count_organizations()
+    active_organizations = Stats.count_active_organizations()
+    total_users = Stats.count_users()
+    global_admins = Stats.count_global_admins()
 
     %{
       total_organizations: total_organizations,
@@ -56,7 +55,7 @@ defmodule AuthifyWeb.AnalyticsController do
   end
 
   defp get_organization_analytics do
-    organizations = Accounts.list_organizations_with_stats()
+    organizations = Stats.list_organizations_with_stats()
 
     # Calculate organization metrics
     user_counts = Enum.map(organizations, &(&1.user_count || 0))
@@ -85,14 +84,14 @@ defmodule AuthifyWeb.AnalyticsController do
     recent_cutoff = DateTime.add(DateTime.utc_now(), -30, :day)
 
     %{
-      new_users_last_30_days: Accounts.count_users_since(recent_cutoff),
+      new_users_last_30_days: Stats.count_users_since(recent_cutoff),
       users_by_role: %{
-        admin: Accounts.count_users_by_role_globally("admin"),
-        user: Accounts.count_users_by_role_globally("user")
+        admin: Stats.count_users_by_role_globally("admin"),
+        user: Stats.count_users_by_role_globally("user")
       },
       users_by_status: %{
-        active: Accounts.count_active_users(),
-        inactive: Accounts.count_inactive_users()
+        active: Stats.count_active_users(),
+        inactive: Stats.count_inactive_users()
       }
     }
   end
@@ -114,8 +113,8 @@ defmodule AuthifyWeb.AnalyticsController do
       Enum.map(months, fn date ->
         %{
           month: Calendar.strftime(date, "%B %Y"),
-          organizations: Accounts.count_organizations_created_before(date),
-          users: Accounts.count_users_created_before(date)
+          organizations: Stats.count_organizations_created_before(date),
+          users: Stats.count_users_created_before(date)
         }
       end)
 
@@ -132,12 +131,12 @@ defmodule AuthifyWeb.AnalyticsController do
     last_30d = DateTime.add(DateTime.utc_now(), -30, :day)
 
     %{
-      new_organizations_24h: Accounts.count_organizations_since(last_24h),
-      new_organizations_7d: Accounts.count_organizations_since(last_7d),
-      new_organizations_30d: Accounts.count_organizations_since(last_30d),
-      new_users_24h: Accounts.count_users_since(last_24h),
-      new_users_7d: Accounts.count_users_since(last_7d),
-      new_users_30d: Accounts.count_users_since(last_30d),
+      new_organizations_24h: Stats.count_organizations_since(last_24h),
+      new_organizations_7d: Stats.count_organizations_since(last_7d),
+      new_organizations_30d: Stats.count_organizations_since(last_30d),
+      new_users_24h: Stats.count_users_since(last_24h),
+      new_users_7d: Stats.count_users_since(last_7d),
+      new_users_30d: Stats.count_users_since(last_30d),
       invitations_sent_7d: Invitations.count_invitations_since(last_7d),
       invitations_accepted_7d: Invitations.count_invitations_accepted_since(last_7d)
     }

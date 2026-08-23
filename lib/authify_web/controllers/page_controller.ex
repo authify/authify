@@ -3,6 +3,8 @@ defmodule AuthifyWeb.PageController do
 
   alias Authify.Accounts
 
+  alias Authify.Stats
+
   def home(conn, _params) do
     case conn.assigns[:current_user] do
       nil ->
@@ -54,6 +56,6 @@ defmodule AuthifyWeb.PageController do
   end
 
   defp users_exist? do
-    Accounts.count_users() > 0
+    Stats.count_users() > 0
   end
 end

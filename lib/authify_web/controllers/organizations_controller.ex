@@ -2,8 +2,8 @@ defmodule AuthifyWeb.OrganizationsController do
   use AuthifyWeb, :controller
 
   alias Authify.Accounts
-
   alias Authify.Invitations
+  alias Authify.Stats
   alias AuthifyWeb.Audit.Organizations
 
   # Safely convert string to atom, only for known valid values
@@ -44,7 +44,7 @@ defmodule AuthifyWeb.OrganizationsController do
       status: status_filter
     ]
 
-    organizations = Accounts.list_organizations_with_stats_filtered(filter_opts)
+    organizations = Stats.list_organizations_with_stats_filtered(filter_opts)
 
     render(conn, :index,
       user: user,

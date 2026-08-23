@@ -3,6 +3,7 @@ defmodule AuthifyWeb.API.UsersController do
 
   alias Authify.Accounts
   alias Authify.Accounts.User
+  alias Authify.Stats
   alias AuthifyWeb.Helpers.AuditHelper
 
   @doc """
@@ -20,7 +21,7 @@ defmodule AuthifyWeb.API.UsersController do
           AuthifyWeb.Controllers.Shared.ResourceHelpers.parse_api_pagination(params)
 
         users = Accounts.list_users(organization.id, page: page, per_page: per_page)
-        total_count = Accounts.count_users(organization.id)
+        total_count = Stats.count_users(organization.id)
 
         render_collection_response(conn, users,
           resource_type: "user",

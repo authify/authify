@@ -6,6 +6,7 @@ defmodule AuthifyWeb.SetupController do
   alias Authify.Accounts
   alias Authify.Configurations
   alias Authify.Organizations
+  alias Authify.Stats
 
   @doc """
   Shows the initial setup form for creating the first global admin user.
@@ -13,7 +14,7 @@ defmodule AuthifyWeb.SetupController do
   """
   def new(conn, _params) do
     # Security check: only allow if no users exist
-    if Accounts.count_users() > 0 do
+    if Stats.count_users() > 0 do
       conn
       |> put_flash(:error, "System has already been set up.")
       |> redirect(to: ~p"/login")
@@ -39,7 +40,7 @@ defmodule AuthifyWeb.SetupController do
     authify_domain = Map.get(params, "authify_domain", "")
 
     # Security check: only allow if no users exist
-    if Accounts.count_users() > 0 do
+    if Stats.count_users() > 0 do
       conn
       |> put_flash(:error, "System has already been set up.")
       |> redirect(to: ~p"/login")
