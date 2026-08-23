@@ -1,8 +1,6 @@
 defmodule AuthifyWeb.API.InvitationsController do
   use AuthifyWeb.API.BaseController
 
-  alias Authify.Accounts
-
   alias Authify.Invitations
   alias AuthifyWeb.Helpers.AuditHelper
 
@@ -173,7 +171,7 @@ defmodule AuthifyWeb.API.InvitationsController do
 
           # Ensure invitation belongs to current organization
           if invitation.organization_id == organization.id do
-            case Accounts.update_invitation(invitation, invitation_params) do
+            case Invitations.update_invitation(invitation, invitation_params) do
               {:ok, updated_invitation} ->
                 render_api_response(conn, updated_invitation,
                   resource_type: "invitation",

@@ -102,6 +102,15 @@ defmodule Authify.Invitations do
   def get_invitation!(id), do: Repo.get!(Invitation, id)
 
   @doc """
+  Updates an invitation.
+  """
+  def update_invitation(invitation, attrs) do
+    invitation
+    |> Invitation.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
   Deletes an invitation.
   """
   def delete_invitation(invitation) do

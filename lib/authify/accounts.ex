@@ -6,7 +6,6 @@ defmodule Authify.Accounts do
   import Ecto.Query, warn: false
 
   alias Authify.Accounts.{
-    Invitation,
     Organization,
     User,
     UserEmail
@@ -1321,15 +1320,6 @@ defmodule Authify.Accounts do
   """
   def change_user_password(user, attrs) do
     User.password_changeset(user, attrs)
-  end
-
-  @doc """
-  Update invitation.
-  """
-  def update_invitation(invitation, attrs) do
-    invitation
-    |> Invitation.changeset(attrs)
-    |> Repo.update()
   end
 
   @doc """
