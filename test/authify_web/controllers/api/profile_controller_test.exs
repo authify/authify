@@ -4,10 +4,11 @@ defmodule AuthifyWeb.API.ProfileControllerTest do
   import Authify.AccountsFixtures
 
   alias Authify.Accounts
+  alias Authify.PersonalAccessTokens
 
   defp setup_pat_conn(conn, user, organization, scopes \\ "profile:read profile:write") do
     {:ok, token} =
-      Accounts.create_personal_access_token(user, organization, %{
+      PersonalAccessTokens.create_personal_access_token(user, organization, %{
         "name" => "Test API Token",
         "scopes" => scopes
       })

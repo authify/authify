@@ -3,6 +3,7 @@ defmodule Authify.ProfileScopeRestrictionTest do
 
   alias Authify.Accounts
   alias Authify.OAuth
+  alias Authify.PersonalAccessTokens
   import Authify.AccountsFixtures
 
   describe "profile scope restrictions" do
@@ -74,7 +75,9 @@ defmodule Authify.ProfileScopeRestrictionTest do
         "scopes" => "profile:read profile:write"
       }
 
-      assert {:ok, pat} = Accounts.create_personal_access_token(user, organization, pat_attrs)
+      assert {:ok, pat} =
+               PersonalAccessTokens.create_personal_access_token(user, organization, pat_attrs)
+
       assert "profile:read" in Accounts.PersonalAccessToken.scopes_list(pat)
       assert "profile:write" in Accounts.PersonalAccessToken.scopes_list(pat)
     end

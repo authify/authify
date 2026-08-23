@@ -201,7 +201,7 @@ defmodule AuthifyWeb.Auth.APIAuth do
   end
 
   defp authenticate_personal_access_token(token) do
-    Authify.Accounts.authenticate_personal_access_token(token)
+    Authify.PersonalAccessTokens.authenticate_personal_access_token(token)
   end
 
   defp validate_oauth_access_token(token) do
