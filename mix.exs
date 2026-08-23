@@ -69,6 +69,10 @@ defmodule Authify.MixProject do
       {:phoenix_live_view, "~> 1.1"},
       {:req, "~> 0.7"},
       {:scalar_plug, "~> 0.2.0"},
+      # scalar_plug pins floki ~> 0.36.2, which produces noisy struct-update
+      # warnings on newer Elixir. We only use floki transitively and scalar_plug
+      # only calls Floki.raw_html/1 (a stable API), so override to the latest.
+      {:floki, "~> 0.38.4", override: true},
       {:swoosh, "~> 1.16"},
       {:sweet_xml, "~> 0.7"},
       {:telemetry_metrics, "~> 1.0"},
