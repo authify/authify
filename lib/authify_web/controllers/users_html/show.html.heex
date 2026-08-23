@@ -350,8 +350,8 @@
                 <% end %>
               </div>
             <% end %>
-            
-<!-- Role Management -->
+
+            <!-- Role Management -->
             <h6 class="text-muted">Role Management</h6>
             <div class="d-grid gap-2 mb-3">
               <%= if @target_user.organization_id == @organization.id do %>
@@ -399,8 +399,8 @@
                 <% end %>
               <% end %>
             </div>
-            
-<!-- Security Actions -->
+
+            <!-- Security Actions -->
             <h6 class="text-muted">Security</h6>
             <div class="d-grid gap-2">
               <%= if @target_user.id != @user.id do %>
@@ -534,8 +534,8 @@
             </div>
           </div>
         <% end %>
-        
-<!-- Recent Invitations sent by this user -->
+
+        <!-- Recent Invitations sent by this user -->
         <%= if not @is_global_view or @target_user.organization_id == @organization.id do %>
           <%= if length(@invitations) > 0 do %>
             <div class="card mt-3">

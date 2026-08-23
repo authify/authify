@@ -32,8 +32,8 @@
             <p class="text-muted small mb-3">
               Users in this group can access all applications assigned to the group.
             </p>
-            
-<!-- Add User Form -->
+
+            <!-- Add User Form -->
             <form
               method="post"
               action={~p"/#{@organization.slug}/groups/#{@group.id}/users"}
@@ -58,8 +58,8 @@
                 </button>
               </div>
             </form>
-            
-<!-- Current Users List -->
+
+            <!-- Current Users List -->
             <%= if Enum.empty?(@group.users) do %>
               <div class="text-center py-4">
                 <i class="bi bi-person-x display-6 text-muted"></i>
@@ -106,8 +106,8 @@
           </div>
         </div>
       </div>
-      
-<!-- Applications Section -->
+
+      <!-- Applications Section -->
       <div class="col-md-6">
         <div class="card">
           <div class="card-header">
@@ -119,8 +119,8 @@
             <p class="text-muted small mb-3">
               Applications in this group are accessible to all group members.
             </p>
-            
-<!-- Add Application Form -->
+
+            <!-- Add Application Form -->
             <form
               method="post"
               action={~p"/#{@organization.slug}/groups/#{@group.id}/applications"}
@@ -174,8 +174,8 @@
                 </div>
               </div>
             </form>
-            
-<!-- Current Applications List -->
+
+            <!-- Current Applications List -->
             <%= if Enum.empty?(@group.group_applications) do %>
               <div class="text-center py-4">
                 <i class="bi bi-app-indicator display-6 text-muted"></i>

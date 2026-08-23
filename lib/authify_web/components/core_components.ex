@@ -71,8 +71,7 @@ defmodule AuthifyWeb.CoreComponents do
         data-bs-dismiss="alert"
         aria-label="Close"
         phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
-      >
-      </button>
+      ></button>
     </div>
     """
   end
@@ -588,8 +587,8 @@ defmodule AuthifyWeb.CoreComponents do
           <!-- Preserve current sort parameters -->
           <input type="hidden" name="sort" value={@current_sort} />
           <input type="hidden" name="order" value={@current_order} />
-          
-    <!-- Search -->
+
+          <!-- Search -->
           <div class="col-md-6">
             <label class="form-label small text-muted">Search</label>
             <input
@@ -601,14 +600,14 @@ defmodule AuthifyWeb.CoreComponents do
               onkeypress="if(event.key === 'Enter') { this.form.submit(); }"
             />
           </div>
-          
-    <!-- Additional Filters -->
+
+          <!-- Additional Filters -->
           <div :for={filter <- @filter} class="col-md-auto">
             <label class="form-label small text-muted">{filter.label}</label>
             {render_slot(filter)}
           </div>
-          
-    <!-- Actions -->
+
+          <!-- Actions -->
           <div class="col-md-auto d-flex align-items-end">
             <div class="btn-group">
               <button type="submit" class="btn btn-sm btn-primary">

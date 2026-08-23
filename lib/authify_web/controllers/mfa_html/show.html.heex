@@ -64,8 +64,8 @@
             <% end %>
           </div>
         </div>
-        
-<!-- TOTP Status Card -->
+
+        <!-- TOTP Status Card -->
         <div class="card mt-3">
           <div class="card-header d-flex align-items-center">
             <h5 class="card-title mb-0">
@@ -118,8 +118,8 @@
             <% end %>
           </div>
         </div>
-        
-<!-- WebAuthn Status Card -->
+
+        <!-- WebAuthn Status Card -->
         <div class="card mt-3">
           <div class="card-header d-flex align-items-center">
             <h5 class="card-title mb-0">
@@ -238,8 +238,8 @@
               <% end %>
             </div>
           </div>
-          
-<!-- Trusted Devices Card -->
+
+          <!-- Trusted Devices Card -->
           <div class="card mt-3">
             <div class="card-header d-flex align-items-center">
               <h5 class="card-title mb-0">
@@ -357,8 +357,8 @@
         <% end %>
       </div>
     </div>
-    
-<!-- Disable TOTP Modal -->
+
+    <!-- Disable TOTP Modal -->
     <%= if Authify.Accounts.User.totp_enabled?(@user) do %>
       <div
         class="modal fade"
@@ -378,8 +378,7 @@
                 class="btn-close"
                 data-bs-dismiss="modal"
                 aria-label="Close"
-              >
-              </button>
+              ></button>
             </div>
             <.form
               for={%{}}
