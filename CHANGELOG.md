@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.2] - 2026-08-24
+
+### Fixed
+
+- Fixed production deploy crash: `Mix.env/0` is not available in releases, replaced with `Application.get_env(:authify, :env)` in the tenant_base_domain seed migration
+
 ## [0.19.1] - 2026-08-24
 
 ### Fixed
@@ -747,7 +753,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.19.1...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.19.2...HEAD
+[0.19.2]: https://github.com/authify/authify/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/authify/authify/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/authify/authify/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/authify/authify/compare/v0.12.3...v0.18.0
