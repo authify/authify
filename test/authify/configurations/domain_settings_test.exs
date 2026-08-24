@@ -6,12 +6,6 @@ defmodule Authify.Configurations.DomainSettingsTest do
 
   import Authify.AccountsFixtures
 
-  setup do
-    # Set required tenant_base_domain for all tests
-    Configurations.set_global_setting(:tenant_base_domain, "authify.test")
-    :ok
-  end
-
   describe "tenant_base_domain global setting" do
     test "can be set and retrieved" do
       assert {:ok, _} =

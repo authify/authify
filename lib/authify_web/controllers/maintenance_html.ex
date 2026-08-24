@@ -18,9 +18,4 @@ defmodule AuthifyWeb.MaintenanceHTML do
   end
 
   def format_memory_percentage(_, _), do: "N/A"
-
-  def status_badge_class("completed"), do: "bg-success"
-  def status_badge_class("running"), do: "bg-primary"
-  def status_badge_class("failed"), do: "bg-danger"
-  def status_badge_class(_), do: "bg-secondary"
 end
