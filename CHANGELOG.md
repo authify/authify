@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-08-24
+
+### Fixed
+
+- Fixed MySQL deadlock (1213) in configuration value upsert — `upsert_configuration_value/3` now uses an atomic `ON DUPLICATE KEY UPDATE` instead of a check-then-insert TOCTOU race
+- Fixed MFA lockout so it can actually be disabled (`|| true` always evaluated truthy)
+
+### Changed
+
+- Replaced hardcoded placeholder maintenance page data with real BEAM VM stats (memory, schedulers, run queue, process count), real MySQL database/table sizes, and real Oban pending job count
+- Removed placeholder backup, orphaned sessions, temp files, and maintenance logs from the maintenance page
+- Seeded `tenant_base_domain` via a test-only migration to eliminate concurrent-write deadlocks in async tests
+
 ## [0.19.0] - 2026-08-23
 
 ### Changed
@@ -734,7 +747,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.19.1...HEAD
+[0.19.1]: https://github.com/authify/authify/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/authify/authify/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/authify/authify/compare/v0.12.3...v0.18.0
 [0.12.3]: https://github.com/authify/authify/compare/v0.12.2...v0.12.3
