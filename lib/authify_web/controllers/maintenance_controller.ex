@@ -104,8 +104,11 @@ defmodule AuthifyWeb.MaintenanceController do
 
   defp get_system_health do
     %{
-      uptime_seconds: :erlang.statistics(:wall_clock) |> elem(0) |> div(1000),
+      uptime_seconds: get_vm_uptime_seconds(),
       memory_usage: get_memory_usage(),
+      schedulers_online: System.schedulers_online(),
+      run_queue_length: get_run_queue_length(),
+      process_count: :erlang.system_info(:process_count),
       active_connections: get_active_connections(),
       last_backup: get_last_backup_time(),
       pending_jobs: get_pending_jobs_count()
@@ -154,31 +157,44 @@ defmodule AuthifyWeb.MaintenanceController do
   # These would typically interface with system monitoring tools
 
   defp get_database_size do
-    # Placeholder - would query actual database size
-    256.7
+    # Query the actual MySQL database size in MB.
+    case query_database_size() do
+      {:ok, bytes} -> round(bytes / 1024 / 1024 * 10) / 10
+      _ -> 0.0
+    end
   end
 
   defp get_table_sizes do
-    %{
-      "users" => 45.2,
-      "organizations" => 12.8,
-      "invitations" => 8.5,
-      "other" => 190.2
-    }
+    # Query actual per-table sizes from MySQL's information_schema.
+    case query_table_sizes() do
+      {:ok, rows} -> rows
+      _ -> %{}
+    end
   end
 
   defp get_memory_usage do
-    # Placeholder - would query actual memory usage
+    memory = :erlang.memory()
+
+    # Total = all BEAM memory (not system-wide). We report BEAM VM memory here.
+    total_bytes = memory[:total]
+    used_bytes = total_bytes - memory[:system]
+    available_bytes = memory[:processes_used] + memory[:system]
+
     %{
-      total_mb: 1024,
-      used_mb: 768,
-      available_mb: 256
+      total_bytes: total_bytes,
+      used_bytes: used_bytes,
+      available_bytes: available_bytes,
+      total_mb: div(total_bytes, 1024 * 1024),
+      used_mb: div(used_bytes, 1024 * 1024),
+      available_mb: div(available_bytes, 1024 * 1024)
     }
   end
 
   defp get_active_connections do
-    # Placeholder - would query actual database connections
-    12
+    # Report the configured database connection pool size, which is the number
+    # of concurrent DB connections the application is provisioned to use.
+    Application.get_env(:authify, Authify.Repo, [])
+    |> Keyword.get(:pool_size, 1)
   end
 
   defp get_last_backup_time do
@@ -187,8 +203,69 @@ defmodule AuthifyWeb.MaintenanceController do
   end
 
   defp get_pending_jobs_count do
-    # Placeholder - would check job queue
-    3
+    # Count Oban jobs in non-terminal states (queued for execution).
+    import Ecto.Query
+
+    from(j in Oban.Job,
+      where: j.state in ["available", "scheduled", "retryable", "executing", "waiting"]
+    )
+    |> Authify.Repo.aggregate(:count, :id)
+  end
+
+  # VM metrics
+
+  defp get_vm_uptime_seconds do
+    :erlang.statistics(:wall_clock) |> elem(0) |> div(1000)
+  end
+
+  defp get_run_queue_length do
+    :erlang.statistics(:total_run_queue_lengths_all)
+  end
+
+  defp query_database_size do
+    query = """
+    SELECT SUM(data_length + index_length) AS bytes
+    FROM information_schema.tables
+    WHERE table_schema = DATABASE()
+    """
+
+    case Authify.Repo.query(query) do
+      {:ok, %{rows: [[nil]]}} ->
+        {:ok, 0}
+
+      {:ok, %{rows: [[bytes]]}} when is_integer(bytes) ->
+        {:ok, bytes}
+
+      {:ok, %{rows: [[bytes]]}} when is_binary(bytes) ->
+        {:ok, String.to_integer(bytes)}
+
+      _ ->
+        :error
+    end
+  end
+
+  defp query_table_sizes do
+    query = """
+    SELECT table_name, (data_length + index_length) AS bytes
+    FROM information_schema.tables
+    WHERE table_schema = DATABASE()
+    ORDER BY bytes DESC
+    LIMIT 10
+    """
+
+    case Authify.Repo.query(query) do
+      {:ok, %{rows: rows}} ->
+        sizes =
+          Enum.reduce(rows, %{}, fn [table, bytes], acc ->
+            bytes = if is_binary(bytes), do: String.to_integer(bytes), else: bytes
+            Map.put(acc, table, round(bytes / 1024 / 1024 * 10) / 10)
+          end)
+
+        {:ok, sizes}
+
+      _ ->
+        :error
+    end
   end
 
   defp get_orphaned_sessions_count do

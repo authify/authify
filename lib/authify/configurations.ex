@@ -289,24 +289,23 @@ defmodule Authify.Configurations do
   defp upsert_configuration_value(config, setting_name, value) do
     setting_name_str = to_string(setting_name)
 
-    existing =
-      config.configuration_values
-      |> Enum.find(&(&1.setting_name == setting_name_str))
-
+    # Atomically insert or update the value using the unique index on
+    # (configuration_id, setting_name). Previously this did a check-then-insert
+    # (TOCTOU), which deadlocked when concurrent processes both found no row and
+    # then inserted the same key. A single ON DUPLICATE KEY UPDATE eliminates
+    # the race in both tests and production.
     result =
-      if existing do
-        existing
-        |> ConfigurationValue.changeset(%{value: value})
-        |> Repo.update()
-      else
-        %ConfigurationValue{}
-        |> ConfigurationValue.changeset(%{
-          configuration_id: config.id,
-          setting_name: setting_name_str,
-          value: value
-        })
-        |> Repo.insert()
-      end
+      %ConfigurationValue{}
+      |> ConfigurationValue.changeset(%{
+        configuration_id: config.id,
+        setting_name: setting_name_str,
+        value: value
+      })
+      |> Repo.insert(
+        # MySQL: ON DUPLICATE KEY UPDATE value = VALUES(value). MySQL triggers
+        # this on any unique-key conflict, so no conflict_target is given.
+        on_conflict: [set: [value: value]]
+      )
 
     # Invalidate cache on successful update
     case result do

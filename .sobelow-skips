@@ -9,3 +9,5 @@ Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:472,6D1EA51
 Config.CSP: Missing Content-Security-Policy,lib/authify_web/router.ex:17,6E55B0E
 Config.CSP: Missing Content-Security-Policy,lib/authify_web/router.ex:80,7C3BA2
 Config.CSRF: Missing CSRF Protections,lib/authify_web/router.ex:14,88CB4F
+SQL.Query: SQL injection,lib/authify_web/controllers/maintenance_controller.ex:232,2BA0D0E
+SQL.Query: SQL injection,lib/authify_web/controllers/maintenance_controller.ex:256,6C40D4C

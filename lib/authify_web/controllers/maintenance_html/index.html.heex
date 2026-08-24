@@ -53,7 +53,7 @@
                         <div class="fw-bold fs-5">
                           {@maintenance.system_health.memory_usage.used_mb} MB
                         </div>
-                        <div class="small">Memory Used</div>
+                        <div class="small">BEAM Memory Used</div>
                         <div class="small">
                           ({format_memory_percentage(
                             @maintenance.system_health.memory_usage.used_mb,
@@ -368,6 +368,16 @@
                   )}
                   <span class="badge bg-success ms-2">Up to date</span>
                 </p>
+
+                <h6 class="text-muted">BEAM VM</h6>
+                <dl class="row mb-3 small">
+                  <dt class="col-6">Schedulers</dt>
+                  <dd class="col-6">{@maintenance.system_health.schedulers_online}</dd>
+                  <dt class="col-6">Run Queue Length</dt>
+                  <dd class="col-6">{@maintenance.system_health.run_queue_length}</dd>
+                  <dt class="col-6">Processes</dt>
+                  <dd class="col-6">{@maintenance.system_health.process_count}</dd>
+                </dl>
 
                 <h6 class="text-muted">Memory Details</h6>
                 <div class="progress mb-2" style="height: 20px;">
