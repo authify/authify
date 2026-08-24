@@ -2,9 +2,26 @@ defmodule Authify.Repo.Migrations.SeedTenantBaseDomain do
   use Ecto.Migration
   import Ecto.Query
 
-  @default_domain "authify.test"
+  # Seed a default tenant_base_domain for the test environment only. This
+  # eliminates the deadlock (1213) that occurred when many async tests each
+  # wrote tenant_base_domain in their setup — concurrent INSERTs to the same
+  # unique key gap-locked in MySQL. By pre-seeding the row, tests inherit it
+  # from the migrated DB state and never need to write it.
+  #
+  # In production, this migration is a no-op — the guided setup process
+  # provides the tenant_base_domain, and we don't want to pollute it with
+  # a test-only default.
+  @test_domain "authify.test"
 
   def up do
+    unless Mix.env() == :test do
+      :ok
+    else
+      seed_tenant_base_domain()
+    end
+  end
+
+  defp seed_tenant_base_domain do
     global_org_id =
       repo().one(
         from(o in "organizations",
@@ -25,7 +42,6 @@ defmodule Authify.Repo.Migrations.SeedTenantBaseDomain do
         )
 
       if config_id do
-        # Only insert if the setting doesn't already exist
         existing =
           repo().one(
             from(cv in "configuration_values",
@@ -37,13 +53,15 @@ defmodule Authify.Repo.Migrations.SeedTenantBaseDomain do
           )
 
         unless existing do
+          now = DateTime.truncate(DateTime.utc_now(), :second)
+
           repo().insert_all("configuration_values", [
             %{
               configuration_id: config_id,
               setting_name: "tenant_base_domain",
-              value: @default_domain,
-              inserted_at: DateTime.truncate(DateTime.utc_now(), :second),
-              updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+              value: @test_domain,
+              inserted_at: now,
+              updated_at: now
             }
           ])
         end
