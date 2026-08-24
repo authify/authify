@@ -14,7 +14,9 @@ defmodule Authify.Repo.Migrations.SeedTenantBaseDomain do
   @test_domain "authify.test"
 
   def up do
-    unless Mix.env() == :test do
+    # Mix is not available in releases, so use the app env that each
+    # environment config sets (config/test.exs, config/prod.exs, etc.).
+    unless Application.get_env(:authify, :env) == :test do
       :ok
     else
       seed_tenant_base_domain()
