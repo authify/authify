@@ -26,8 +26,7 @@ defmodule AuthifyWeb.MaintenanceController do
     maintenance_data = %{
       database_stats: get_database_stats(),
       system_health: get_system_health(),
-      cleanup_stats: get_cleanup_stats(),
-      maintenance_logs: get_recent_maintenance_logs()
+      cleanup_stats: get_cleanup_stats()
     }
 
     render(conn, :index,
@@ -110,7 +109,6 @@ defmodule AuthifyWeb.MaintenanceController do
       run_queue_length: get_run_queue_length(),
       process_count: :erlang.system_info(:process_count),
       active_connections: get_active_connections(),
-      last_backup: get_last_backup_time(),
       pending_jobs: get_pending_jobs_count()
     }
   end
@@ -122,35 +120,8 @@ defmodule AuthifyWeb.MaintenanceController do
       expired_invitations: Invitations.count_expired_invitations(),
       cleanable_invitations: Invitations.count_cleanable_invitations(),
       inactive_organizations_90d:
-        Stats.count_inactive_organizations_since(DateTime.add(now, -90, :day)),
-      orphaned_sessions: get_orphaned_sessions_count(),
-      temp_files: get_temp_files_count()
+        Stats.count_inactive_organizations_since(DateTime.add(now, -90, :day))
     }
-  end
-
-  defp get_recent_maintenance_logs do
-    # This would typically come from a maintenance_logs table
-    # For now, return placeholder data
-    [
-      %{
-        action: "Cleanup expired invitations",
-        timestamp: DateTime.add(DateTime.utc_now(), -2, :hour),
-        status: "completed",
-        details: "Removed 15 expired invitations"
-      },
-      %{
-        action: "Database optimization",
-        timestamp: DateTime.add(DateTime.utc_now(), -1, :day),
-        status: "completed",
-        details: "Optimized user and organization indexes"
-      },
-      %{
-        action: "Backup verification",
-        timestamp: DateTime.add(DateTime.utc_now(), -2, :day),
-        status: "completed",
-        details: "All backups verified successfully"
-      }
-    ]
   end
 
   # Placeholder functions for system metrics
@@ -195,11 +166,6 @@ defmodule AuthifyWeb.MaintenanceController do
     # of concurrent DB connections the application is provisioned to use.
     Application.get_env(:authify, Authify.Repo, [])
     |> Keyword.get(:pool_size, 1)
-  end
-
-  defp get_last_backup_time do
-    # Placeholder - would check actual backup system
-    DateTime.add(DateTime.utc_now(), -6, :hour)
   end
 
   defp get_pending_jobs_count do
@@ -266,15 +232,5 @@ defmodule AuthifyWeb.MaintenanceController do
       _ ->
         :error
     end
-  end
-
-  defp get_orphaned_sessions_count do
-    # Placeholder - would check for sessions without valid users
-    7
-  end
-
-  defp get_temp_files_count do
-    # Placeholder - would check temporary file storage
-    23
   end
 end

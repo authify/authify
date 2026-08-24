@@ -190,22 +190,6 @@
                 </div>
               </div>
             </div>
-            <div class="row g-3">
-              <div class="col-6">
-                <div class="text-center">
-                  <div class="h5 text-secondary">
-                    {@maintenance.cleanup_stats.orphaned_sessions}
-                  </div>
-                  <div class="small text-muted">Orphaned Sessions</div>
-                </div>
-              </div>
-              <div class="col-6">
-                <div class="text-center">
-                  <div class="h5 text-info">{@maintenance.cleanup_stats.temp_files}</div>
-                  <div class="small text-muted">Temp Files</div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -298,56 +282,6 @@
       </div>
     </div>
 
-    <!-- Recent Maintenance Logs -->
-    <div class="row">
-      <div class="col-12">
-        <div class="card">
-          <div class="card-header">
-            <h5 class="card-title mb-0">
-              <i class="bi bi-journal-text"></i> Recent Maintenance Activity
-            </h5>
-          </div>
-          <div class="card-body">
-            <%= if length(@maintenance.maintenance_logs) > 0 do %>
-              <div class="table-responsive">
-                <table class="table table-hover">
-                  <thead>
-                    <tr>
-                      <th>Action</th>
-                      <th>Status</th>
-                      <th>Details</th>
-                      <th>Timestamp</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <%= for log <- @maintenance.maintenance_logs do %>
-                      <tr>
-                        <td>{log.action}</td>
-                        <td>
-                          <span class={"badge #{status_badge_class(log.status)}"}>
-                            {String.capitalize(log.status)}
-                          </span>
-                        </td>
-                        <td class="text-muted small">{log.details}</td>
-                        <td class="text-muted small">
-                          {Calendar.strftime(log.timestamp, "%B %d, %Y at %I:%M %p")}
-                        </td>
-                      </tr>
-                    <% end %>
-                  </tbody>
-                </table>
-              </div>
-            <% else %>
-              <div class="text-center text-muted py-4">
-                <i class="bi bi-journal fs-1 mb-2"></i>
-                <p>No recent maintenance activity</p>
-              </div>
-            <% end %>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- System Information -->
     <div class="row mt-4">
       <div class="col-12">
@@ -360,15 +294,6 @@
           <div class="card-body">
             <div class="row">
               <div class="col-md-6">
-                <h6 class="text-muted">Backup Status</h6>
-                <p class="mb-3">
-                  Last backup: {Calendar.strftime(
-                    @maintenance.system_health.last_backup,
-                    "%B %d, %Y at %I:%M %p"
-                  )}
-                  <span class="badge bg-success ms-2">Up to date</span>
-                </p>
-
                 <h6 class="text-muted">BEAM VM</h6>
                 <dl class="row mb-3 small">
                   <dt class="col-6">Schedulers</dt>
@@ -408,7 +333,6 @@
                   <li>Monitor inactive organizations monthly</li>
                   <li>Recalculate statistics after major data changes</li>
                   <li>Keep system memory usage below 80%</li>
-                  <li>Ensure database backups are running daily</li>
                 </ul>
               </div>
             </div>

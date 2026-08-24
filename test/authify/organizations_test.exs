@@ -6,12 +6,6 @@ defmodule Authify.OrganizationsTest do
   alias Authify.Organizations.OrganizationCname
   import Authify.AccountsFixtures
 
-  setup do
-    # Set required tenant_base_domain for all tests
-    Configurations.set_global_setting(:tenant_base_domain, "authify.test")
-    :ok
-  end
-
   describe "list_organization_cnames/1" do
     test "returns all CNAMEs for an organization" do
       org = organization_fixture()
