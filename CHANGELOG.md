@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.3] - 2026-08-26
+
+### Fixed
+
+- Token endpoint now supports `client_secret_basic` authentication (RFC 6749 §2.3.1). Client credentials are read from the `Authorization: Basic` header in addition to the form body, fixing a 500 error for OIDC clients (e.g. Spring Security) that default to Basic auth
+
 ## [0.19.2] - 2026-08-24
 
 ### Fixed
@@ -752,8 +758,9 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
+[Unreleased]: https://github.com/authify/authify/compare/v0.19.3...HEAD
 
-[Unreleased]: https://github.com/authify/authify/compare/v0.19.2...HEAD
+[0.19.3]: https://github.com/authify/authify/compare/v0.19.2...v0.19.3
 [0.19.2]: https://github.com/authify/authify/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/authify/authify/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/authify/authify/compare/v0.18.0...v0.19.0
