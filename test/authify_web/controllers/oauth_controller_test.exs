@@ -247,6 +247,49 @@ defmodule AuthifyWeb.OAuthControllerTest do
       assert response["id_token"]
     end
 
+    test "exchanges valid authorization code for access token using client_secret_basic", %{
+      conn: conn,
+      application: application,
+      auth_code: auth_code,
+      organization: organization
+    } do
+      basic =
+        Base.encode64("#{application.client_id}:#{application.client_secret}")
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Basic " <> basic)
+        |> post(~p"/#{organization.slug}/oauth/token", %{
+          "grant_type" => "authorization_code",
+          "code" => auth_code.code
+        })
+
+      response = json_response(conn, 200)
+
+      assert response["access_token"]
+      assert response["token_type"] == "Bearer"
+      assert response["id_token"]
+    end
+
+    test "returns invalid_client when Basic header credentials are invalid", %{
+      conn: conn,
+      auth_code: auth_code,
+      organization: organization
+    } do
+      basic = Base.encode64("invalid_client:invalid_secret")
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Basic " <> basic)
+        |> post(~p"/#{organization.slug}/oauth/token", %{
+          "grant_type" => "authorization_code",
+          "code" => auth_code.code
+        })
+
+      response = json_response(conn, 401)
+      assert response["error"] == "invalid_client"
+    end
+
     test "returns error for invalid authorization code", %{
       conn: conn,
       application: application,
@@ -369,6 +412,45 @@ defmodule AuthifyWeb.OAuthControllerTest do
       assert response["scope"] == "management_app:read users:read"
       # Should NOT include ID token for client credentials
       refute response["id_token"]
+    end
+
+    test "exchanges client credentials for token using client_secret_basic", %{
+      conn: conn,
+      application: application,
+      organization: organization
+    } do
+      basic = Base.encode64("#{application.client_id}:#{application.client_secret}")
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Basic " <> basic)
+        |> post(~p"/#{organization.slug}/oauth/token", %{
+          "grant_type" => "client_credentials",
+          "scope" => "management_app:read users:read"
+        })
+
+      response = json_response(conn, 200)
+
+      assert response["access_token"]
+      assert response["token_type"] == "Bearer"
+      assert response["scope"] == "management_app:read users:read"
+    end
+
+    test "returns invalid_client when Basic header credentials are invalid", %{
+      conn: conn,
+      organization: organization
+    } do
+      basic = Base.encode64("invalid_client:invalid_secret")
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Basic " <> basic)
+        |> post(~p"/#{organization.slug}/oauth/token", %{
+          "grant_type" => "client_credentials"
+        })
+
+      response = json_response(conn, 401)
+      assert response["error"] == "invalid_client"
     end
 
     test "returns all granted scopes when scope parameter is omitted", %{
@@ -1116,6 +1198,39 @@ defmodule AuthifyWeb.OAuthControllerTest do
         |> Jason.decode!()
 
       assert header_json["alg"] == "RS256"
+    end
+
+    test "refresh token grant exchanges with client_secret_basic", %{
+      conn: conn,
+      application: application,
+      user: user,
+      organization: organization
+    } do
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "profile"]
+        )
+
+      {:ok, result} = Authify.OAuth.exchange_authorization_code(auth_code, application)
+      refresh_token = result.refresh_token
+
+      basic = Base.encode64("#{application.client_id}:#{application.client_secret}")
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Basic " <> basic)
+        |> post(~p"/#{organization.slug}/oauth/token", %{
+          "grant_type" => "refresh_token",
+          "refresh_token" => refresh_token.plaintext_token
+        })
+
+      response = json_response(conn, 200)
+
+      assert response["access_token"]
+      assert response["refresh_token"]
     end
 
     test "userinfo endpoint returns proper OIDC claims", %{

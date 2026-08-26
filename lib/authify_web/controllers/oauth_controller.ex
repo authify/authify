@@ -196,6 +196,8 @@ defmodule AuthifyWeb.OAuthController do
   Supports grant types: authorization_code, refresh_token, client_credentials.
   """
   def token(conn, params) do
+    params = extract_client_credentials(conn, params)
+
     case params["grant_type"] do
       "authorization_code" ->
         handle_authorization_code_grant(conn, params)
@@ -212,6 +214,26 @@ defmodule AuthifyWeb.OAuthController do
           error_description:
             "Supported grant types: authorization_code, refresh_token, client_credentials"
         })
+    end
+  end
+
+  defp extract_client_credentials(conn, params) do
+    case get_req_header(conn, "authorization") do
+      ["Basic " <> encoded | _] ->
+        case Base.decode64(encoded) do
+          {:ok, decoded} ->
+            [client_id, client_secret] = String.split(decoded, ":", parts: 2)
+
+            params
+            |> Map.put_new("client_id", client_id)
+            |> Map.put_new("client_secret", client_secret)
+
+          _ ->
+            params
+        end
+
+      _ ->
+        params
     end
   end
 
