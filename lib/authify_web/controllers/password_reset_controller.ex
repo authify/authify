@@ -52,7 +52,12 @@ defmodule AuthifyWeb.PasswordResetController do
       %Accounts.User{} = user ->
         if Accounts.User.valid_password_reset_token?(user) do
           changeset = Accounts.change_user_password(user)
-          render(conn, :edit, token: token, changeset: changeset)
+
+          render(conn, :edit,
+            token: token,
+            changeset: changeset,
+            password_policy: Authify.PasswordPolicy.resolve(user.organization)
+          )
         else
           conn
           |> put_flash(:error, "Password reset link is invalid or has expired.")
@@ -108,7 +113,11 @@ defmodule AuthifyWeb.PasswordResetController do
           extra_metadata: %{"source" => "web"}
         )
 
-        render(conn, :edit, token: token, changeset: changeset)
+        render(conn, :edit,
+          token: token,
+          changeset: changeset,
+          password_policy: Authify.PasswordPolicy.resolve(user.organization)
+        )
     end
   end
 end

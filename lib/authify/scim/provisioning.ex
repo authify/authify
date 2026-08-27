@@ -241,7 +241,8 @@ defmodule Authify.SCIM.Provisioning do
   def create_user_scim(attrs, organization_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    password = generate_random_password()
+    policy = Authify.PasswordPolicy.resolve(organization_id)
+    password = generate_random_password(policy)
 
     attrs =
       attrs
@@ -253,7 +254,7 @@ defmodule Authify.SCIM.Provisioning do
 
     result =
       %User{}
-      |> User.registration_changeset(attrs)
+      |> User.registration_changeset(attrs, policy)
       |> User.apply_scim_timestamps(attrs)
       |> Repo.insert()
 
@@ -390,16 +391,8 @@ defmodule Authify.SCIM.Provisioning do
     end
   end
 
-  defp generate_random_password do
-    upper = Enum.take_random(?A..?Z, 6) |> List.to_string()
-    lower = Enum.take_random(?a..?z, 6) |> List.to_string()
-    digits = Enum.take_random(?0..?9, 6) |> List.to_string()
-    special = Enum.take_random(~c"!@#$%^&*", 6) |> List.to_string()
-
-    (upper <> lower <> digits <> special)
-    |> String.graphemes()
-    |> Enum.shuffle()
-    |> Enum.join()
+  defp generate_random_password(policy) do
+    Authify.PasswordPolicy.generate(policy)
   end
 
   @doc """

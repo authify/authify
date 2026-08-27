@@ -73,7 +73,8 @@ defmodule AuthifyWeb.ProfileController do
     render(conn, :edit_password,
       user: current_user,
       organization: organization,
-      changeset: changeset
+      changeset: changeset,
+      password_policy: Authify.PasswordPolicy.resolve(organization)
     )
   end
 
@@ -102,7 +103,8 @@ defmodule AuthifyWeb.ProfileController do
           render(conn, :edit_password,
             user: current_user,
             organization: organization,
-            changeset: changeset
+            changeset: changeset,
+            password_policy: Authify.PasswordPolicy.resolve(organization)
           )
       end
     else
@@ -118,7 +120,8 @@ defmodule AuthifyWeb.ProfileController do
       render(conn, :edit_password,
         user: current_user,
         organization: organization,
-        changeset: changeset
+        changeset: changeset,
+        password_policy: Authify.PasswordPolicy.resolve(organization)
       )
     end
   end

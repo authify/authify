@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-08-26
+
+### Added
+
+- Per-organization password complexity policy. Organization admins can now configure the password requirements (minimum/maximum length, required uppercase/lowercase/digit/special character classes, and the common-password blocklist) via the Configuration settings page. The previous strict rules remain the default so existing organizations see no change until they opt in
+- Password validation (registration, admin user creation, self-service change, password reset, invitation acceptance, and SCIM provisioning) now resolves the effective policy for the organization
+- SCIM-generated passwords now satisfy the organization's configured policy
+- Password hint text in the UI (Add User, Accept Invitation, Change Password, Password Reset, Create Organization) reflects the organization's effective policy
+
 ## [0.19.3] - 2026-08-26
 
 ### Fixed
@@ -758,8 +767,9 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.19.3...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.20.0...HEAD
 
+[0.20.0]: https://github.com/authify/authify/compare/v0.19.3...v0.20.0
 [0.19.3]: https://github.com/authify/authify/compare/v0.19.2...v0.19.3
 [0.19.2]: https://github.com/authify/authify/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/authify/authify/compare/v0.19.0...v0.19.1

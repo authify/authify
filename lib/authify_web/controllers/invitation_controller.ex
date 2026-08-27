@@ -122,6 +122,7 @@ defmodule AuthifyWeb.InvitationController do
           render(conn, :accept,
             invitation: invitation,
             changeset: changeset,
+            password_policy: Authify.PasswordPolicy.resolve(invitation.organization),
             page_title: "Accept Invitation"
           )
         else
@@ -163,6 +164,7 @@ defmodule AuthifyWeb.InvitationController do
             render(conn, :accept,
               invitation: invitation,
               changeset: changeset,
+              password_policy: Authify.PasswordPolicy.resolve(invitation.organization),
               page_title: "Accept Invitation"
             )
 

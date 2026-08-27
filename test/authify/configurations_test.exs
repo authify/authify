@@ -123,6 +123,59 @@ defmodule Authify.ConfigurationsTest do
       assert Configurations.get_setting("Organization", org1.id, :allow_saml) == false
       assert Configurations.get_setting("Organization", org2.id, :allow_saml) == true
     end
+
+    test "password policy settings validate and default correctly" do
+      org = organization_fixture()
+      Configurations.get_or_create_configuration("Organization", org.id, "organization")
+
+      schema = Authify.Configurations.Schemas.Organization
+
+      # Defaults
+      assert Configurations.get_setting("Organization", org.id, :password_min_length) == 8
+      assert Configurations.get_setting("Organization", org.id, :password_max_length) == 100
+
+      assert Configurations.get_setting("Organization", org.id, :password_require_uppercase) ==
+               true
+
+      assert Configurations.get_setting(
+               "Organization",
+               org.id,
+               :password_common_blocklist_enabled
+             ) == true
+
+      # Length validation
+      assert {:ok, _} =
+               Configurations.set_setting("Organization", org.id, :password_min_length, 6)
+
+      assert {:error, _} =
+               Configurations.set_setting("Organization", org.id, :password_min_length, 4)
+
+      assert {:error, _} =
+               Configurations.set_setting("Organization", org.id, :password_min_length, 101)
+
+      assert {:ok, _} =
+               Configurations.set_setting("Organization", org.id, :password_max_length, 200)
+
+      assert {:error, _} =
+               Configurations.set_setting("Organization", org.id, :password_max_length, 0)
+
+      # Boolean settings
+      assert {:ok, _} =
+               Configurations.set_setting(
+                 "Organization",
+                 org.id,
+                 :password_require_special,
+                 false
+               )
+
+      assert Configurations.get_setting("Organization", org.id, :password_require_special) ==
+               false
+
+      # Schema validates value
+      assert {:ok, true} = schema.validate_value(:password_require_uppercase, "true")
+      assert {:ok, 6} = schema.validate_value(:password_min_length, "6")
+      assert {:error, _} = schema.validate_value(:password_min_length, "abc")
+    end
   end
 
   describe "configuration value casting" do

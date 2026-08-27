@@ -540,6 +540,158 @@
                   </div>
                 </div>
 
+                <h6 class="border-bottom pb-2 mb-3 mt-4">Password Policy</h6>
+                <p class="text-muted small">
+                  Configure the password complexity requirements users in this
+                  organization must satisfy when registering, resetting, or
+                  changing their password. Defaults match Authify's strict
+                  security baseline.
+                </p>
+
+                <div class="row">
+                  <div class="col-md-6 mb-4">
+                    <label for="password_min_length" class="form-label">
+                      <strong>Minimum Length</strong>
+                    </label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="password_min_length"
+                      name="settings[password_min_length]"
+                      value={@settings[:password_min_length]}
+                      placeholder="8"
+                      min="6"
+                      max="100"
+                    />
+                    <small class="text-muted">
+                      Minimum password length. Range: 6-100 (default: 8).
+                    </small>
+                  </div>
+
+                  <div class="col-md-6 mb-4">
+                    <label for="password_max_length" class="form-label">
+                      <strong>Maximum Length</strong>
+                    </label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="password_max_length"
+                      name="settings[password_max_length]"
+                      value={@settings[:password_max_length]}
+                      placeholder="100"
+                      min="1"
+                      max="200"
+                    />
+                    <small class="text-muted">
+                      Maximum password length. Range: 1-200 (default: 100).
+                    </small>
+                  </div>
+                </div>
+
+                <div class="row">
+                  <div class="col-md-6 mb-4">
+                    <div class="form-check form-switch">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        id="password_require_uppercase"
+                        name="settings[password_require_uppercase]"
+                        value="true"
+                        checked={@settings[:password_require_uppercase] != false}
+                      />
+                      <label class="form-check-label" for="password_require_uppercase">
+                        <strong>Require Uppercase Letter</strong>
+                      </label>
+                    </div>
+                    <small class="text-muted ms-4 d-block">
+                      Passwords must contain at least one uppercase letter (A-Z).
+                    </small>
+                  </div>
+
+                  <div class="col-md-6 mb-4">
+                    <div class="form-check form-switch">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        id="password_require_lowercase"
+                        name="settings[password_require_lowercase]"
+                        value="true"
+                        checked={@settings[:password_require_lowercase] != false}
+                      />
+                      <label class="form-check-label" for="password_require_lowercase">
+                        <strong>Require Lowercase Letter</strong>
+                      </label>
+                    </div>
+                    <small class="text-muted ms-4 d-block">
+                      Passwords must contain at least one lowercase letter (a-z).
+                    </small>
+                  </div>
+                </div>
+
+                <div class="row">
+                  <div class="col-md-6 mb-4">
+                    <div class="form-check form-switch">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        id="password_require_digit"
+                        name="settings[password_require_digit]"
+                        value="true"
+                        checked={@settings[:password_require_digit] != false}
+                      />
+                      <label class="form-check-label" for="password_require_digit">
+                        <strong>Require Number</strong>
+                      </label>
+                    </div>
+                    <small class="text-muted ms-4 d-block">
+                      Passwords must contain at least one number (0-9).
+                    </small>
+                  </div>
+
+                  <div class="col-md-6 mb-4">
+                    <div class="form-check form-switch">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        id="password_require_special"
+                        name="settings[password_require_special]"
+                        value="true"
+                        checked={@settings[:password_require_special] != false}
+                      />
+                      <label class="form-check-label" for="password_require_special">
+                        <strong>Require Special Character</strong>
+                      </label>
+                    </div>
+                    <small class="text-muted ms-4 d-block">
+                      Passwords must contain at least one special character (!@#$%^&amp;*()_+-=[]{}|;:,.&lt;&gt;?).
+                    </small>
+                  </div>
+                </div>
+
+                <div class="mb-4">
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      id="password_common_blocklist_enabled"
+                      name="settings[password_common_blocklist_enabled]"
+                      value="true"
+                      checked={@settings[:password_common_blocklist_enabled] != false}
+                    />
+                    <label class="form-check-label" for="password_common_blocklist_enabled">
+                      <strong>Reject Common Passwords</strong>
+                    </label>
+                  </div>
+                  <small class="text-muted ms-4 d-block">
+                    Reject passwords on the common-password blocklist (e.g., "password", "123456").
+                  </small>
+                </div>
+
                 <h6 class="border-bottom pb-2 mb-3 mt-4">Domain Configuration</h6>
 
                 <div class="mb-4">
@@ -826,6 +978,9 @@
                 <% end %>
                 <li>
                   <strong>Rate Limits</strong> - Configure request rate limits per endpoint type
+                </li>
+                <li>
+                  <strong>Password Policy</strong> - Configure password complexity requirements
                 </li>
                 <li>
                   <strong>Domain Configuration</strong> - Set custom domains and email link domain

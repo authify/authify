@@ -14,228 +14,250 @@ defmodule Authify.Configurations.Schemas.Organization do
   def settings do
     rate_limit_quota_settings() ++
       rate_limit_settings() ++
-      [
-        # Feature toggles
-        %{
-          name: :allow_invitations,
-          description: "Allow organization admins to invite new users",
-          value_type: :boolean,
-          default_value: true,
-          required: false,
-          validation_fn: nil
-        },
-        %{
-          name: :allow_saml,
-          description: "Enable SAML identity provider functionality for this organization",
-          value_type: :boolean,
-          default_value: true,
-          required: false,
-          validation_fn: nil
-        },
-        %{
-          name: :allow_oauth,
-          description: "Enable OAuth2/OIDC identity provider functionality for this organization",
-          value_type: :boolean,
-          default_value: true,
-          required: false,
-          validation_fn: nil
-        },
-        %{
-          name: :oauth_21_strict_mode,
-          description:
-            "Enable strict OAuth 2.1 compliance mode. When enabled, PKCE is required for all " <>
-              "authorization code flow clients (including confidential clients). Defaults to " <>
-              "false for backwards compatibility.",
-          value_type: :boolean,
-          default_value: false,
-          required: false,
-          validation_fn: nil
-        },
-        %{
-          name: :allow_webauthn,
-          description:
-            "Enable WebAuthn/FIDO2 authentication (security keys, passkeys, biometrics) for this organization",
-          value_type: :boolean,
-          default_value: true,
-          required: false,
-          validation_fn: nil
-        },
-        %{
-          name: :sign_audit_logs,
-          description:
-            "Cryptographically sign audit log events with the organization's audit signing " <>
-              "certificate for compliance verification. When enabled, each new audit event is " <>
-              "signed with RSA-SHA256; the signature and a link to the public certificate are " <>
-              "included in API responses.",
-          value_type: :boolean,
-          default_value: false,
-          required: false,
-          validation_fn: nil
-        },
-        %{
-          name: :scim_inbound_provisioning_enabled,
-          description:
-            "Enable SCIM 2.0 Service Provider endpoints - allows external identity providers and HR systems to provision users and groups into this organization",
-          value_type: :boolean,
-          default_value: true,
-          required: false,
-          validation_fn: nil
-        },
-        %{
-          name: :scim_outbound_provisioning_enabled,
-          description:
-            "Enable SCIM 2.0 outbound provisioning - automatically provision users and groups to configured SCIM clients (downstream applications)",
-          value_type: :boolean,
-          default_value: false,
-          required: false,
-          validation_fn: nil
-        },
-        %{
-          name: :scim_client_request_delay_ms,
-          description:
-            "Minimum delay in milliseconds between consecutive SCIM outbound requests to the same provider. Higher values reduce load on downstream systems. Must be between 50ms and 5000ms.",
-          value_type: :integer,
-          default_value: 100,
-          required: false,
-          validation_fn: &validate_scim_request_delay/1
-        },
-        # MFA (Multi-Factor Authentication) settings
-        %{
-          name: :require_mfa,
-          description:
-            "Require all users in this organization to enable multi-factor authentication",
-          value_type: :boolean,
-          default_value: false,
-          required: false,
-          validation_fn: nil
-        },
-        %{
-          name: :mfa_lockout_enabled,
-          description: "Enable account lockout after failed MFA verification attempts",
-          value_type: :boolean,
-          default_value: true,
-          required: false,
-          validation_fn: nil
-        },
-        %{
-          name: :mfa_lockout_attempts,
-          description: "Number of failed MFA attempts before account lockout (1-10)",
-          value_type: :integer,
-          default_value: 5,
-          required: false,
-          validation_fn: &validate_mfa_attempts/1
-        },
-        %{
-          name: :mfa_lockout_duration_minutes,
-          description: "Duration of MFA lockout in minutes (1-60)",
-          value_type: :integer,
-          default_value: 5,
-          required: false,
-          validation_fn: &validate_lockout_duration/1
-        },
-        # Profile/branding fields
-        %{
-          name: :description,
-          description: "Organization description",
-          value_type: :string,
-          default_value: nil,
-          required: false,
-          validation_fn: &validate_description/1
-        },
-        %{
-          name: :website_url,
-          description: "Organization website URL",
-          value_type: :string,
-          default_value: nil,
-          required: false,
-          validation_fn: &validate_url/1
-        },
-        %{
-          name: :contact_email,
-          description: "Organization contact email",
-          value_type: :string,
-          default_value: nil,
-          required: false,
-          validation_fn: &validate_email/1
-        },
-        %{
-          name: :logo_url,
-          description: "Organization logo URL",
-          value_type: :string,
-          default_value: nil,
-          required: false,
-          validation_fn: &validate_url/1
-        },
-        # Domain configuration
-        %{
-          name: :email_link_domain,
-          description:
-            "Domain used in email links (invitations, password reset, etc.). Must be either the organization's subdomain or one of its configured CNAMEs.",
-          value_type: :string,
-          default_value: nil,
-          required: false,
-          validation_fn: nil
-        },
-        # SMTP configuration
-        %{
-          name: :smtp_server,
-          description: "SMTP server hostname (e.g., smtp.gmail.com)",
-          value_type: :string,
-          default_value: nil,
-          required: false,
-          validation_fn: &validate_smtp_server/1
-        },
-        %{
-          name: :smtp_port,
-          description:
-            "SMTP server port (typically 587 for TLS, 465 for SSL, 25 for unencrypted)",
-          value_type: :integer,
-          default_value: 587,
-          required: false,
-          validation_fn: &validate_smtp_port/1
-        },
-        %{
-          name: :smtp_username,
-          description: "SMTP authentication username",
-          value_type: :string,
-          default_value: nil,
-          required: false,
-          validation_fn: nil
-        },
-        %{
-          name: :smtp_password,
-          description: "SMTP authentication password",
-          value_type: :string,
-          default_value: nil,
-          required: false,
-          validation_fn: nil,
-          encrypted: true
-        },
-        %{
-          name: :smtp_from_email,
-          description: "Email address to use in the 'From' field",
-          value_type: :string,
-          default_value: nil,
-          required: false,
-          validation_fn: &validate_email/1
-        },
-        %{
-          name: :smtp_from_name,
-          description: "Name to use in the 'From' field (e.g., 'Acme Corp')",
-          value_type: :string,
-          default_value: nil,
-          required: false,
-          validation_fn: nil
-        },
-        %{
-          name: :smtp_use_ssl,
-          description: "Use SSL/TLS for SMTP connection",
-          value_type: :boolean,
-          default_value: true,
-          required: false,
-          validation_fn: nil
-        }
-      ]
+      password_policy_settings() ++
+      feature_toggle_settings() ++
+      profile_settings() ++
+      domain_settings() ++
+      smtp_settings()
+  end
+
+  # Feature toggles
+  defp feature_toggle_settings do
+    [
+      %{
+        name: :allow_invitations,
+        description: "Allow organization admins to invite new users",
+        value_type: :boolean,
+        default_value: true,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :allow_saml,
+        description: "Enable SAML identity provider functionality for this organization",
+        value_type: :boolean,
+        default_value: true,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :allow_oauth,
+        description: "Enable OAuth2/OIDC identity provider functionality for this organization",
+        value_type: :boolean,
+        default_value: true,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :oauth_21_strict_mode,
+        description:
+          "Enable strict OAuth 2.1 compliance mode. When enabled, PKCE is required for all " <>
+            "authorization code flow clients (including confidential clients). Defaults to " <>
+            "false for backwards compatibility.",
+        value_type: :boolean,
+        default_value: false,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :allow_webauthn,
+        description:
+          "Enable WebAuthn/FIDO2 authentication (security keys, passkeys, biometrics) for this organization",
+        value_type: :boolean,
+        default_value: true,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :sign_audit_logs,
+        description:
+          "Cryptographically sign audit log events with the organization's audit signing " <>
+            "certificate for compliance verification. When enabled, each new audit event is " <>
+            "signed with RSA-SHA256; the signature and a link to the public certificate are " <>
+            "included in API responses.",
+        value_type: :boolean,
+        default_value: false,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :scim_inbound_provisioning_enabled,
+        description:
+          "Enable SCIM 2.0 Service Provider endpoints - allows external identity providers and HR systems to provision users and groups into this organization",
+        value_type: :boolean,
+        default_value: true,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :scim_outbound_provisioning_enabled,
+        description:
+          "Enable SCIM 2.0 outbound provisioning - automatically provision users and groups to configured SCIM clients (downstream applications)",
+        value_type: :boolean,
+        default_value: false,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :scim_client_request_delay_ms,
+        description:
+          "Minimum delay in milliseconds between consecutive SCIM outbound requests to the same provider. Higher values reduce load on downstream systems. Must be between 50ms and 5000ms.",
+        value_type: :integer,
+        default_value: 100,
+        required: false,
+        validation_fn: &validate_scim_request_delay/1
+      },
+      # MFA (Multi-Factor Authentication) settings
+      %{
+        name: :require_mfa,
+        description:
+          "Require all users in this organization to enable multi-factor authentication",
+        value_type: :boolean,
+        default_value: false,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :mfa_lockout_enabled,
+        description: "Enable account lockout after failed MFA verification attempts",
+        value_type: :boolean,
+        default_value: true,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :mfa_lockout_attempts,
+        description: "Number of failed MFA attempts before account lockout (1-10)",
+        value_type: :integer,
+        default_value: 5,
+        required: false,
+        validation_fn: &validate_mfa_attempts/1
+      },
+      %{
+        name: :mfa_lockout_duration_minutes,
+        description: "Duration of MFA lockout in minutes (1-60)",
+        value_type: :integer,
+        default_value: 5,
+        required: false,
+        validation_fn: &validate_lockout_duration/1
+      }
+    ]
+  end
+
+  # Profile/branding fields
+  defp profile_settings do
+    [
+      %{
+        name: :description,
+        description: "Organization description",
+        value_type: :string,
+        default_value: nil,
+        required: false,
+        validation_fn: &validate_description/1
+      },
+      %{
+        name: :website_url,
+        description: "Organization website URL",
+        value_type: :string,
+        default_value: nil,
+        required: false,
+        validation_fn: &validate_url/1
+      },
+      %{
+        name: :contact_email,
+        description: "Organization contact email",
+        value_type: :string,
+        default_value: nil,
+        required: false,
+        validation_fn: &validate_email/1
+      },
+      %{
+        name: :logo_url,
+        description: "Organization logo URL",
+        value_type: :string,
+        default_value: nil,
+        required: false,
+        validation_fn: &validate_url/1
+      }
+    ]
+  end
+
+  # Domain configuration
+  defp domain_settings do
+    [
+      %{
+        name: :email_link_domain,
+        description:
+          "Domain used in email links (invitations, password reset, etc.). Must be either the organization's subdomain or one of its configured CNAMEs.",
+        value_type: :string,
+        default_value: nil,
+        required: false,
+        validation_fn: nil
+      }
+    ]
+  end
+
+  # SMTP configuration
+  defp smtp_settings do
+    [
+      %{
+        name: :smtp_server,
+        description: "SMTP server hostname (e.g., smtp.gmail.com)",
+        value_type: :string,
+        default_value: nil,
+        required: false,
+        validation_fn: &validate_smtp_server/1
+      },
+      %{
+        name: :smtp_port,
+        description: "SMTP server port (typically 587 for TLS, 465 for SSL, 25 for unencrypted)",
+        value_type: :integer,
+        default_value: 587,
+        required: false,
+        validation_fn: &validate_smtp_port/1
+      },
+      %{
+        name: :smtp_username,
+        description: "SMTP authentication username",
+        value_type: :string,
+        default_value: nil,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :smtp_password,
+        description: "SMTP authentication password",
+        value_type: :string,
+        default_value: nil,
+        required: false,
+        validation_fn: nil,
+        encrypted: true
+      },
+      %{
+        name: :smtp_from_email,
+        description: "Email address to use in the 'From' field",
+        value_type: :string,
+        default_value: nil,
+        required: false,
+        validation_fn: &validate_email/1
+      },
+      %{
+        name: :smtp_from_name,
+        description: "Name to use in the 'From' field (e.g., 'Acme Corp')",
+        value_type: :string,
+        default_value: nil,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :smtp_use_ssl,
+        description: "Use SSL/TLS for SMTP connection",
+        value_type: :boolean,
+        default_value: true,
+        required: false,
+        validation_fn: nil
+      }
+    ]
   end
 
   @impl true
@@ -250,6 +272,68 @@ defmodule Authify.Configurations.Schemas.Organization do
     else
       {:error, "unknown setting: #{setting_name}"}
     end
+  end
+
+  # Password policy settings (organization admin configurable)
+  defp password_policy_settings do
+    [
+      %{
+        name: :password_min_length,
+        description: "Minimum password length (6-100)",
+        value_type: :integer,
+        default_value: 8,
+        required: false,
+        validation_fn: &validate_password_min_length/1
+      },
+      %{
+        name: :password_max_length,
+        description: "Maximum password length (password_min_length-200)",
+        value_type: :integer,
+        default_value: 100,
+        required: false,
+        validation_fn: &validate_password_max_length/1
+      },
+      %{
+        name: :password_require_uppercase,
+        description: "Require at least one uppercase letter in passwords",
+        value_type: :boolean,
+        default_value: true,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :password_require_lowercase,
+        description: "Require at least one lowercase letter in passwords",
+        value_type: :boolean,
+        default_value: true,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :password_require_digit,
+        description: "Require at least one number in passwords",
+        value_type: :boolean,
+        default_value: true,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :password_require_special,
+        description: "Require at least one special character in passwords",
+        value_type: :boolean,
+        default_value: true,
+        required: false,
+        validation_fn: nil
+      },
+      %{
+        name: :password_common_blocklist_enabled,
+        description: "Reject passwords on the common-password blocklist",
+        value_type: :boolean,
+        default_value: true,
+        required: false,
+        validation_fn: nil
+      }
+    ]
   end
 
   # Rate limit quota settings (super admin only)
@@ -550,4 +634,30 @@ defmodule Authify.Configurations.Schemas.Organization do
   end
 
   defp validate_scim_request_delay(_), do: {:error, "Must be an integer"}
+
+  defp validate_password_min_length(nil), do: {:ok, nil}
+
+  defp validate_password_min_length(value)
+       when is_integer(value) and value >= 6 and value <= 100 do
+    {:ok, value}
+  end
+
+  defp validate_password_min_length(value) when is_integer(value) do
+    {:error, "Must be between 6 and 100"}
+  end
+
+  defp validate_password_min_length(_), do: {:error, "Must be an integer"}
+
+  defp validate_password_max_length(nil), do: {:ok, nil}
+
+  defp validate_password_max_length(value)
+       when is_integer(value) and value > 0 and value <= 200 do
+    {:ok, value}
+  end
+
+  defp validate_password_max_length(value) when is_integer(value) do
+    {:error, "Must be between 1 and 200"}
+  end
+
+  defp validate_password_max_length(_), do: {:error, "Must be an integer"}
 end

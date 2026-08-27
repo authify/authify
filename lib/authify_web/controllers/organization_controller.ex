@@ -15,6 +15,7 @@ defmodule AuthifyWeb.OrganizationController do
       render(conn, :new,
         organization_changeset: organization_changeset,
         user_changeset: user_changeset,
+        password_policy: Authify.PasswordPolicy.default_policy(),
         page_title: "Create Organization"
       )
     else
@@ -70,6 +71,7 @@ defmodule AuthifyWeb.OrganizationController do
         |> render(:new,
           organization_changeset: org_changeset,
           user_changeset: user_changeset,
+          password_policy: Authify.PasswordPolicy.default_policy(),
           page_title: "Create Organization"
         )
     end
