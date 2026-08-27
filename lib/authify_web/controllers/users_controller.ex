@@ -431,7 +431,8 @@ defmodule AuthifyWeb.UsersController do
 
     render(conn, :new,
       changeset: changeset,
-      organization: organization
+      organization: organization,
+      password_policy: Authify.PasswordPolicy.resolve(organization)
     )
   end
 
@@ -550,7 +551,8 @@ defmodule AuthifyWeb.UsersController do
       {:error, changeset} ->
         render(conn, :new,
           changeset: changeset,
-          organization: organization
+          organization: organization,
+          password_policy: Authify.PasswordPolicy.resolve(organization)
         )
     end
   end

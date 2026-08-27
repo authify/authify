@@ -266,8 +266,10 @@ defmodule Authify.Accounts do
         default_primary: true
       )
 
+    policy = resolve_password_policy_from_attrs(normalized_attrs)
+
     %User{}
-    |> User.registration_changeset(normalized_attrs)
+    |> User.registration_changeset(normalized_attrs, policy)
     |> Repo.insert()
   end
 
@@ -361,7 +363,7 @@ defmodule Authify.Accounts do
   Returns an `%Ecto.Changeset{}` for user registration.
   """
   def change_user_registration(%User{} = user, attrs \\ %{}) do
-    User.registration_changeset(user, attrs)
+    User.registration_changeset(user, attrs, resolve_password_policy_from_attrs(attrs))
   end
 
   @doc """
@@ -1069,7 +1071,7 @@ defmodule Authify.Accounts do
   Change user password changeset.
   """
   def change_user_password(user) do
-    User.password_changeset(user, %{})
+    User.password_changeset(user, %{}, resolve_password_policy_for_user(user))
   end
 
   @doc """
@@ -1077,7 +1079,7 @@ defmodule Authify.Accounts do
   """
   def update_user_password(user, attrs) do
     user
-    |> User.password_changeset(attrs)
+    |> User.password_changeset(attrs, resolve_password_policy_for_user(user))
     |> Repo.update()
   end
 
@@ -1160,7 +1162,12 @@ defmodule Authify.Accounts do
              DateTime.compare(user.password_reset_expires_at, DateTime.utc_now()) == :lt do
           {:error, :token_expired}
         else
-          changeset = User.password_reset_completion_changeset(user, password_params)
+          changeset =
+            User.password_reset_completion_changeset(
+              user,
+              password_params,
+              resolve_password_policy_for_user(user)
+            )
 
           case Repo.update(changeset) do
             {:ok, updated_user} -> {:ok, updated_user}
@@ -1319,7 +1326,7 @@ defmodule Authify.Accounts do
   Change user password with 2 params.
   """
   def change_user_password(user, attrs) do
-    User.password_changeset(user, attrs)
+    User.password_changeset(user, attrs, resolve_password_policy_for_user(user))
   end
 
   @doc """
@@ -1353,4 +1360,25 @@ defmodule Authify.Accounts do
     |> Repo.delete_all()
     |> elem(0)
   end
+
+  # Resolves the effective password policy from user creation attrs, using the
+  # organization_id when present, otherwise the global default.
+  defp resolve_password_policy_from_attrs(attrs) do
+    case Map.get(attrs, "organization_id") || Map.get(attrs, :organization_id) do
+      nil -> Authify.PasswordPolicy.default_policy()
+      organization_id -> Authify.PasswordPolicy.resolve(organization_id)
+    end
+  end
+
+  # Resolves the effective password policy for a user's organization.
+  defp resolve_password_policy_for_user(%User{organization: %Organization{} = org}) do
+    Authify.PasswordPolicy.resolve(org)
+  end
+
+  defp resolve_password_policy_for_user(%User{organization_id: organization_id})
+       when not is_nil(organization_id) do
+    Authify.PasswordPolicy.resolve(organization_id)
+  end
+
+  defp resolve_password_policy_for_user(%User{}), do: Authify.PasswordPolicy.default_policy()
 end

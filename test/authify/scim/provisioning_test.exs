@@ -146,6 +146,36 @@ defmodule Authify.SCIM.ProvisioningTest do
       refute User.valid_password?(user, "")
     end
 
+    test "create_user_scim generates password satisfying relaxed org policy", %{
+      organization: organization
+    } do
+      Authify.Configurations.get_or_create_configuration(
+        "Organization",
+        organization.id,
+        "organization"
+      )
+
+      for setting <- [
+            :password_require_uppercase,
+            :password_require_lowercase,
+            :password_require_digit,
+            :password_require_special
+          ] do
+        {:ok, _} =
+          Authify.Configurations.set_setting("Organization", organization.id, setting, false)
+      end
+
+      # Under a relaxed policy, provisioning a user must still succeed and the
+      # generated password must be accepted by the organization's policy.
+      assert {:ok, user} =
+               Provisioning.create_user_scim(
+                 scim_user_attrs(%{username: "scim-relaxed"}),
+                 organization.id
+               )
+
+      assert user.scim_created_at
+    end
+
     test "update_user_scim updates timestamp", %{organization: organization} do
       {:ok, user} = Provisioning.create_user_scim(scim_user_attrs(%{}), organization.id)
       original_updated_at = user.scim_updated_at

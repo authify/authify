@@ -114,11 +114,15 @@ defmodule Authify.Accounts.User do
 
   @doc false
   def changeset(user, attrs) do
+    changeset(user, attrs, Authify.PasswordPolicy.default_policy())
+  end
+
+  def changeset(user, attrs, policy) do
     user
     |> cast(attrs, @optional_fields ++ @password_fields)
     |> validate_username()
     |> validate_role()
-    |> validate_password()
+    |> validate_password(policy)
     |> validate_theme_preference()
     |> validate_external_id()
     |> validate_url_field(:avatar_url)
@@ -135,8 +139,12 @@ defmodule Authify.Accounts.User do
   Requires at least one email address with primary=true.
   """
   def registration_changeset(user, attrs) do
+    registration_changeset(user, attrs, Authify.PasswordPolicy.default_policy())
+  end
+
+  def registration_changeset(user, attrs, policy) do
     user
-    |> changeset(attrs)
+    |> changeset(attrs, policy)
     |> cast_assoc(:emails, required: true, with: &UserEmail.nested_changeset/2)
     |> validate_has_primary_email()
     |> validate_required([:password])
@@ -158,9 +166,13 @@ defmodule Authify.Accounts.User do
 
   @doc false
   def password_changeset(user, attrs) do
+    password_changeset(user, attrs, Authify.PasswordPolicy.default_policy())
+  end
+
+  def password_changeset(user, attrs, policy) do
     user
     |> cast(attrs, @password_fields)
-    |> validate_password()
+    |> validate_password(policy)
     |> put_password_hash()
   end
 
@@ -326,108 +338,12 @@ defmodule Authify.Accounts.User do
     end
   end
 
-  defp validate_password(%Ecto.Changeset{valid?: false} = changeset), do: changeset
+  defp validate_password(%Ecto.Changeset{valid?: false} = changeset, _policy), do: changeset
 
-  defp validate_password(changeset) do
+  defp validate_password(changeset, policy) do
     changeset
-    |> validate_length(:password,
-      min: 8,
-      max: 100,
-      message: "must be between 8 and 100 characters"
-    )
+    |> Authify.PasswordPolicy.validate_password(policy)
     |> validate_confirmation(:password, message: "does not match password")
-    |> validate_password_complexity()
-  end
-
-  defp validate_password_complexity(changeset) do
-    case get_change(changeset, :password) do
-      nil ->
-        changeset
-
-      password when is_binary(password) ->
-        changeset
-        |> validate_password_has_uppercase(password)
-        |> validate_password_has_lowercase(password)
-        |> validate_password_has_digit(password)
-        |> validate_password_has_special_char(password)
-        |> validate_password_not_common(password)
-
-      _ ->
-        changeset
-    end
-  end
-
-  defp validate_password_has_uppercase(changeset, password) do
-    if Regex.match?(~r/[A-Z]/, password) do
-      changeset
-    else
-      add_error(changeset, :password, "must contain at least one uppercase letter")
-    end
-  end
-
-  defp validate_password_has_lowercase(changeset, password) do
-    if Regex.match?(~r/[a-z]/, password) do
-      changeset
-    else
-      add_error(changeset, :password, "must contain at least one lowercase letter")
-    end
-  end
-
-  defp validate_password_has_digit(changeset, password) do
-    if Regex.match?(~r/[0-9]/, password) do
-      changeset
-    else
-      add_error(changeset, :password, "must contain at least one number")
-    end
-  end
-
-  defp validate_password_has_special_char(changeset, password) do
-    if Regex.match?(~r/[^A-Za-z0-9]/, password) do
-      changeset
-    else
-      add_error(
-        changeset,
-        :password,
-        "must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)"
-      )
-    end
-  end
-
-  defp validate_password_not_common(changeset, password) do
-    # List of common passwords to reject
-    common_passwords = [
-      "password",
-      "123456",
-      "12345678",
-      "qwerty",
-      "abc123",
-      "password123",
-      "admin",
-      "letmein",
-      "welcome",
-      "monkey",
-      "1234567890",
-      "password1",
-      "123456789",
-      "welcome123",
-      "admin123",
-      "root",
-      "toor",
-      "pass",
-      "test",
-      "guest",
-      "user",
-      "demo",
-      "temp",
-      "changeme",
-      "default"
-    ]
-
-    if String.downcase(password) in common_passwords do
-      add_error(changeset, :password, "is too common, please choose a more secure password")
-    else
-      changeset
-    end
   end
 
   defp validate_url_field(changeset, field) do
@@ -708,8 +624,12 @@ defmodule Authify.Accounts.User do
   Returns a changeset for password reset completion.
   """
   def password_reset_completion_changeset(%__MODULE__{} = user, attrs) do
+    password_reset_completion_changeset(user, attrs, Authify.PasswordPolicy.default_policy())
+  end
+
+  def password_reset_completion_changeset(%__MODULE__{} = user, attrs, policy) do
     user
-    |> password_changeset(attrs)
+    |> password_changeset(attrs, policy)
     |> Ecto.Changeset.put_change(:password_reset_token, nil)
     |> Ecto.Changeset.put_change(:password_reset_expires_at, nil)
   end
