@@ -266,21 +266,16 @@
                 <label for="user_email" class="form-label">Email Address</label>
                 <input
                   type="email"
-                  name="user[email]"
                   id="user_email"
                   class="form-control"
-                  placeholder="john@example.com"
-                  value={
-                    Map.get(@changeset.changes, :email) || Map.get(@changeset.data, :email) || ""
-                  }
-                  required
+                  value={@primary_email}
+                  disabled
                 />
                 <div class="form-text">
-                  <small>Changing email address will require verification.</small>
+                  <small>
+                    Email addresses are managed from the user detail page (add, verify, set primary).
+                  </small>
                 </div>
-                <%= for {msg, _} <- (Keyword.get_values(@changeset.errors, :email) || []) do %>
-                  <div class="invalid-feedback d-block">{msg}</div>
-                <% end %>
               </div>
 
               <div class="d-grid gap-2 mt-4">
@@ -304,7 +299,7 @@
             <p class="small mb-2">Editing user information:</p>
             <ul class="small mb-0">
               <li>Update name, username, and contact details</li>
-              <li>Email changes require verification</li>
+              <li>Email changes are managed from the user detail page</li>
               <li>Title, team, and phone verified are admin-only</li>
               <li>Use other actions to change role or password</li>
             </ul>

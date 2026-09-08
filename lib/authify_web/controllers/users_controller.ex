@@ -456,11 +456,13 @@ defmodule AuthifyWeb.UsersController do
         end
       end
 
+    target_user = Authify.Repo.preload(target_user, :emails)
     changeset = Accounts.change_user_form(target_user)
 
     render(conn, :edit,
       changeset: changeset,
       user: target_user,
+      primary_email: User.get_primary_email_value(target_user),
       organization: organization,
       locale_options: LocaleHelpers.locale_options(),
       timezone_options: LocaleHelpers.timezone_options()
@@ -487,6 +489,10 @@ defmodule AuthifyWeb.UsersController do
         end
       end
 
+    # Email management is handled through the dedicated email flows, not the
+    # edit form; dropping the param prevents an accidental email replacement.
+    user_params = Map.delete(user_params, "email")
+
     case Accounts.update_user(target_user, user_params) do
       {:ok, user} ->
         # Log user update
@@ -500,9 +506,12 @@ defmodule AuthifyWeb.UsersController do
         |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/users/#{user.id}")
 
       {:error, changeset} ->
+        target_user = Authify.Repo.preload(target_user, :emails)
+
         render(conn, :edit,
           changeset: changeset,
           user: target_user,
+          primary_email: User.get_primary_email_value(target_user),
           organization: organization,
           locale_options: LocaleHelpers.locale_options(),
           timezone_options: LocaleHelpers.timezone_options()
