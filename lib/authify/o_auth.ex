@@ -287,6 +287,16 @@ defmodule Authify.OAuth do
   end
 
   @doc """
+  Replaces an application's client secret with `new_secret`.
+  """
+  def regenerate_application_secret(%Application{} = application, new_secret)
+      when is_binary(new_secret) do
+    application
+    |> Application.regenerate_secret_changeset(new_secret)
+    |> Repo.update()
+  end
+
+  @doc """
   Deletes an application.
   """
   def delete_application(%Application{} = application) do

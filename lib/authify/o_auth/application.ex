@@ -102,6 +102,14 @@ defmodule Authify.OAuth.Application do
   end
 
   @doc false
+  def regenerate_secret_changeset(%__MODULE__{} = application, new_secret)
+      when is_binary(new_secret) do
+    application
+    |> change(client_secret: new_secret)
+    |> validate_length(:client_secret, min: 1)
+  end
+
+  @doc false
   def form_changeset(application, attrs \\ %{}) do
     application
     |> cast(attrs, [

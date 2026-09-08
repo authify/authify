@@ -108,6 +108,30 @@ defmodule Authify.OAuthTest do
       application = application_fixture(organization: organization)
       assert %Ecto.Changeset{} = OAuth.change_application(application)
     end
+
+    test "regenerate_application_secret/2 persists the new secret" do
+      organization = organization_fixture()
+      application = application_fixture(organization: organization)
+      original_secret = application.client_secret
+
+      new_secret = :crypto.strong_rand_bytes(32) |> Base.hex_encode32(case: :lower)
+
+      assert {:ok, updated_application} =
+               OAuth.regenerate_application_secret(application, new_secret)
+
+      assert updated_application.client_secret == new_secret
+
+      reloaded = OAuth.get_application!(application.id, organization)
+      assert reloaded.client_secret == new_secret
+      refute reloaded.client_secret == original_secret
+    end
+
+    test "regenerate_application_secret/2 with invalid input returns an error changeset" do
+      organization = organization_fixture()
+      application = application_fixture(organization: organization)
+
+      assert {:error, %Ecto.Changeset{}} = OAuth.regenerate_application_secret(application, "")
+    end
   end
 
   describe "user grants" do

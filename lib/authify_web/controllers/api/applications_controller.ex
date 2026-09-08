@@ -297,7 +297,7 @@ defmodule AuthifyWeb.API.ApplicationsController do
         # Generate new client secret
         new_secret = :crypto.strong_rand_bytes(32) |> Base.hex_encode32(case: :lower)
 
-        case OAuth.update_application(application, %{"client_secret" => new_secret}) do
+        case OAuth.regenerate_application_secret(application, new_secret) do
           {:ok, updated_application} ->
             # Log audit event
             AuditHelper.log_event_async(
