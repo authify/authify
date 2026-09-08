@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-09-07
+
+### Fixed
+
+- Regenerated OAuth client secrets are now actually persisted. The `regenerate-secret` API endpoint returned a new secret in its response but never stored it, leaving the old secret active. Clients rotating credentials now receive credentials that work, and the old secret is revoked as expected
+- Admin user edit form no longer requires retyping the user's email address. The email field previously rendered blank (with a `required` attribute) because it read a field that no longer exists, blocking form submission; it now displays the user's primary email read-only, and email changes go through the dedicated email management flows
+
 ## [0.20.0] - 2026-08-26
 
 ### Added
@@ -767,7 +774,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.20.1...HEAD
+[0.20.1]: https://github.com/authify/authify/compare/v0.20.0...v0.20.1
 
 [0.20.0]: https://github.com/authify/authify/compare/v0.19.3...v0.20.0
 [0.19.3]: https://github.com/authify/authify/compare/v0.19.2...v0.19.3
