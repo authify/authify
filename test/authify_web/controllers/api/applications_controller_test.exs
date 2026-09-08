@@ -4,6 +4,8 @@ defmodule AuthifyWeb.API.ApplicationsControllerTest do
   import Authify.AccountsFixtures
   import Authify.OAuthFixtures
 
+  alias Authify.OAuth
+
   setup %{conn: conn} do
     organization = organization_fixture()
     admin_user = user_fixture(organization: organization, role: "admin")
@@ -329,6 +331,27 @@ defmodule AuthifyWeb.API.ApplicationsControllerTest do
       new_secret = attributes["client_secret"]
       assert new_secret != original_secret
       assert String.length(new_secret) > 0
+
+      # ...and it should actually be persisted (#204)
+      reloaded = OAuth.get_application!(application.id, organization)
+      assert reloaded.client_secret == new_secret
+      refute reloaded.client_secret == original_secret
+    end
+
+    test "regenerated secret is usable for token endpoint auth", %{
+      conn: conn,
+      organization: organization
+    } do
+      application = application_fixture(organization: organization)
+
+      conn =
+        post(conn, "/#{organization.slug}/api/applications/#{application.id}/regenerate-secret")
+
+      assert %{"data" => %{"attributes" => %{"client_secret" => new_secret}}} =
+               json_response(conn, 200)
+
+      assert OAuth.get_application_by_client_id(application.client_id, organization)
+             |> Map.fetch!(:client_secret) == new_secret
     end
 
     test "returns 404 for non-existent application", %{conn: conn, organization: organization} do
