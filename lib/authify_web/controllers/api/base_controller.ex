@@ -201,6 +201,17 @@ defmodule AuthifyWeb.API.BaseController do
           json_map
       end
 
+    # Serialize OAuth application scopes (an association, stripped by @derive)
+    # as an array so clients can verify what scopes an application may request
+    json_map =
+      case resource do
+        %{__struct__: struct} when struct == Authify.OAuth.Application ->
+          Map.put(json_map, "scopes", Authify.OAuth.Application.scopes_list(resource))
+
+        _ ->
+          json_map
+      end
+
     # Handle special client_secret_display field for OAuth applications
     json_map =
       if Map.has_key?(resource, :client_secret_display) do

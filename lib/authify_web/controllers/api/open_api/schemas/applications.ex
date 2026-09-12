@@ -36,7 +36,7 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Applications do
             redirect_uris:
               "https://app.example.com/callback\nhttps://staging.example.com/callback",
             homepage_url: "https://app.example.com",
-            scopes: "openid profile email",
+            scopes: ["openid", "profile", "email"],
             is_active: true,
             organization_id: 123,
             inserted_at: "2024-01-01T00:00:00Z",
@@ -74,7 +74,7 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Applications do
           description: nil,
           redirect_uris: "https://newapp.example.com/callback",
           homepage_url: "https://newapp.example.com",
-          scopes: "openid profile email",
+          scopes: ["openid", "profile", "email"],
           is_active: true,
           organization_id: 123,
           inserted_at: "2024-01-20T15:00:00Z",
@@ -105,7 +105,7 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Applications do
           description: "Production OAuth app",
           redirect_uris: "https://app.example.com/callback",
           homepage_url: "https://app.example.com",
-          scopes: "openid profile email",
+          scopes: ["openid", "profile", "email"],
           is_active: true,
           organization_id: 123,
           inserted_at: "2024-01-01T00:00:00Z",
@@ -135,7 +135,11 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Applications do
           description:
             "Optional homepage URL for the application. When set, the 'Open' button redirects here instead of initiating OAuth flow."
         },
-        scopes: %{type: "string", description: "Space-separated list of OAuth scopes"},
+        scopes: %{
+          type: "array",
+          items: %{type: "string"},
+          description: "List of OAuth scopes the application may request (returned as an array)"
+        },
         is_active: %{type: "boolean", description: "Whether the application is active"},
         organization_id: %{type: "integer", description: "Organization ID"},
         inserted_at: %{type: "string", format: "date-time", description: "Creation timestamp"},
@@ -241,9 +245,12 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Applications do
                 "Optional homepage URL (must be valid HTTP/HTTPS URL). Set to OAuth callback for seamless login."
             },
             scopes: %{
-              type: "string",
+              oneOf: [
+                %{type: "string", description: "Space-separated list of scopes"},
+                %{type: "array", items: %{type: "string"}}
+              ],
               default: "openid profile email",
-              description: "Space-separated list of OAuth scopes"
+              description: "OAuth scopes as a space-separated string or array of strings"
             }
           },
           required: ["name", "redirect_uris"]
@@ -272,7 +279,13 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Applications do
               description:
                 "Optional homepage URL (must be valid HTTP/HTTPS URL). Set to OAuth callback for seamless login."
             },
-            scopes: %{type: "string", description: "Space-separated list of OAuth scopes"},
+            scopes: %{
+              oneOf: [
+                %{type: "string", description: "Space-separated list of scopes"},
+                %{type: "array", items: %{type: "string"}}
+              ],
+              description: "OAuth scopes as a space-separated string or array of strings"
+            },
             is_active: %{type: "boolean"}
           }
         }

@@ -4,6 +4,8 @@ defmodule AuthifyWeb.API.ApplicationsController do
   alias Authify.OAuth
   alias AuthifyWeb.Helpers.AuditHelper
 
+  @allowed_body_params ~w(application)
+
   # Helper to check if user has permission for an application type
   defp can_access_application_type?(scopes, application_type, :read) do
     case application_type do
@@ -119,54 +121,67 @@ defmodule AuthifyWeb.API.ApplicationsController do
   Create a new OAuth application in the current organization.
   Requires applications:write for oauth2_app or management_app:write for management_api_app.
   """
-  def create(conn, %{"application" => application_params}) do
-    scopes = conn.assigns[:current_scopes] || []
-    organization = conn.assigns.current_organization
+  def create(conn, _params) do
+    case validate_application_body(conn) do
+      :ok ->
+        application_params = conn.body_params["application"]
+        scopes = conn.assigns[:current_scopes] || []
+        organization = conn.assigns.current_organization
 
-    # Determine the application type from params (default to oauth2_app)
-    app_type = application_params["application_type"] || "oauth2_app"
+        # Determine the application type from params (default to oauth2_app)
+        app_type = application_params["application_type"] || "oauth2_app"
 
-    if can_access_application_type?(scopes, app_type, :write) do
-      attrs = Map.put(application_params, "organization_id", organization.id)
+        if can_access_application_type?(scopes, app_type, :write) do
+          attrs = Map.put(application_params, "organization_id", organization.id)
 
-      case OAuth.create_application(attrs) do
-        {:ok, application} ->
-          # Log audit event
-          AuditHelper.log_event_async(
+          case OAuth.create_application(attrs) do
+            {:ok, application} ->
+              # Log audit event
+              AuditHelper.log_event_async(
+                conn,
+                :oauth_client_created,
+                "oauth_application",
+                application.id,
+                "success",
+                %{
+                  application_type: application.application_type,
+                  grant_types: application.grant_types,
+                  name: application.name
+                }
+              )
+
+              # Include client_secret in creation response only
+              application_with_secret =
+                application
+                |> Map.from_struct()
+                |> Map.put(:client_secret_display, application.client_secret)
+                |> Map.put(:__struct__, Authify.OAuth.Application)
+
+              render_api_response(conn, application_with_secret,
+                resource_type: "application",
+                status: :created
+              )
+
+            {:error, changeset} ->
+              render_validation_errors(conn, changeset)
+          end
+        else
+          render_error_response(
             conn,
-            :oauth_client_created,
-            "oauth_application",
-            application.id,
-            "success",
-            %{
-              application_type: application.application_type,
-              grant_types: application.grant_types,
-              name: application.name
-            }
+            :forbidden,
+            "insufficient_scope",
+            "Requires #{scope_for_type(app_type, :write)} scope"
           )
+        end
 
-          # Include client_secret in creation response only
-          application_with_secret =
-            application
-            |> Map.from_struct()
-            |> Map.put(:client_secret_display, application.client_secret)
-            |> Map.put(:__struct__, Authify.OAuth.Application)
-
-          render_api_response(conn, application_with_secret,
-            resource_type: "application",
-            status: :created
-          )
-
-        {:error, changeset} ->
-          render_validation_errors(conn, changeset)
-      end
-    else
-      render_error_response(
-        conn,
-        :forbidden,
-        "insufficient_scope",
-        "Requires #{scope_for_type(app_type, :write)} scope"
-      )
+      {:error, details} ->
+        render_error_response(
+          conn,
+          :unprocessable_entity,
+          "validation_failed",
+          "The request data failed validation",
+          details
+        )
     end
   end
 
@@ -176,53 +191,66 @@ defmodule AuthifyWeb.API.ApplicationsController do
   Update an OAuth application's configuration.
   Requires applications:write for oauth2_app or management_app:write for management_api_app.
   """
-  def update(conn, %{"id" => id, "application" => application_params}) do
-    scopes = conn.assigns[:current_scopes] || []
-    organization = conn.assigns.current_organization
+  def update(conn, %{"id" => id}) do
+    case validate_application_body(conn) do
+      :ok ->
+        application_params = conn.body_params["application"]
+        scopes = conn.assigns[:current_scopes] || []
+        organization = conn.assigns.current_organization
 
-    try do
-      application = OAuth.get_application!(id, organization)
+        try do
+          application = OAuth.get_application!(id, organization)
 
-      if can_access_application_type?(scopes, application.application_type, :write) do
-        case OAuth.update_application(application, application_params) do
-          {:ok, updated_application} ->
-            # Log audit event
-            AuditHelper.log_event_async(
+          if can_access_application_type?(scopes, application.application_type, :write) do
+            case OAuth.update_application(application, application_params) do
+              {:ok, updated_application} ->
+                # Log audit event
+                AuditHelper.log_event_async(
+                  conn,
+                  :oauth_client_updated,
+                  "oauth_application",
+                  updated_application.id,
+                  "success",
+                  %{
+                    application_type: updated_application.application_type,
+                    name: updated_application.name,
+                    changes: Map.keys(application_params)
+                  }
+                )
+
+                render_api_response(conn, updated_application,
+                  resource_type: "application",
+                  exclude: [:client_secret]
+                )
+
+              {:error, changeset} ->
+                render_validation_errors(conn, changeset)
+            end
+          else
+            render_error_response(
               conn,
-              :oauth_client_updated,
-              "oauth_application",
-              updated_application.id,
-              "success",
-              %{
-                application_type: updated_application.application_type,
-                name: updated_application.name,
-                changes: Map.keys(application_params)
-              }
+              :forbidden,
+              "insufficient_scope",
+              "Requires #{scope_for_type(application.application_type, :write)} scope"
             )
-
-            render_api_response(conn, updated_application,
-              resource_type: "application",
-              exclude: [:client_secret]
+          end
+        rescue
+          Ecto.NoResultsError ->
+            render_error_response(
+              conn,
+              :not_found,
+              "resource_not_found",
+              "Application not found in organization"
             )
-
-          {:error, changeset} ->
-            render_validation_errors(conn, changeset)
         end
-      else
+
+      {:error, details} ->
         render_error_response(
           conn,
-          :forbidden,
-          "insufficient_scope",
-          "Requires #{scope_for_type(application.application_type, :write)} scope"
-        )
-      end
-    rescue
-      Ecto.NoResultsError ->
-        render_error_response(
-          conn,
-          :not_found,
-          "resource_not_found",
-          "Application not found in organization"
+          :unprocessable_entity,
+          "validation_failed",
+          "The request data failed validation",
+          details
         )
     end
   end
@@ -340,6 +368,40 @@ defmodule AuthifyWeb.API.ApplicationsController do
           "resource_not_found",
           "Application not found in organization"
         )
+    end
+  end
+
+  # Validates that the request body only contains the expected "application"
+  # envelope and that it is present. Without this, misplaced body params (e.g. a
+  # top-level "scopes") are silently dropped, and a missing envelope crashes with
+  # a FunctionClauseError.
+  #
+  # Only the body is inspected (not merged query params) since this concerns
+  # request payload shape. Returns error details in the same shape as
+  # `render_validation_errors/2` (a map of field to a list of messages).
+  defp validate_application_body(%Plug.Conn{} = conn) do
+    body_params = conn.body_params
+
+    unexpected =
+      body_params
+      |> Map.keys()
+      |> Enum.reject(&(&1 in @allowed_body_params))
+      |> Enum.sort()
+
+    cond do
+      !is_map(body_params["application"]) ->
+        {:error, %{application: ["is required"]}}
+
+      unexpected != [] ->
+        {:error,
+         %{
+           unexpected_params: [
+             "unexpected top-level parameters: #{Enum.join(unexpected, ", ")}"
+           ]
+         }}
+
+      true ->
+        :ok
     end
   end
 end

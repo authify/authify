@@ -157,6 +157,7 @@ defmodule Authify.OAuth do
       |> limit(^per_page)
       |> offset(^offset)
       |> Repo.all()
+      |> Repo.preload(:scopes)
 
     total =
       Application
