@@ -63,6 +63,22 @@ defmodule AuthifyWeb.API.ApplicationsControllerTest do
       refute Map.has_key?(attributes, "client_secret")
       assert Map.has_key?(attributes, "client_id")
       assert Map.has_key?(attributes, "name")
+
+      # Scopes are an association, so they must be serialized explicitly (#205)
+      assert Enum.sort(attributes["scopes"]) == ["email", "openid", "profile"]
+    end
+
+    test "returns scopes as an array rather than the default fallback (#205)", %{
+      conn: conn,
+      organization: organization
+    } do
+      application_fixture(organization: organization, scopes: "openid profile")
+
+      conn = get(conn, "/#{organization.slug}/api/applications")
+
+      assert %{"data" => [%{"attributes" => attributes}]} = json_response(conn, 200)
+
+      assert Enum.sort(attributes["scopes"]) == ["openid", "profile"]
     end
 
     test "supports pagination parameters", %{conn: conn, organization: organization} do
@@ -100,7 +116,7 @@ defmodule AuthifyWeb.API.ApplicationsControllerTest do
 
   describe "GET /api/applications/:id" do
     test "returns application details", %{conn: conn, organization: organization} do
-      application = application_fixture(organization: organization)
+      application = application_fixture(organization: organization, scopes: "openid email")
 
       conn = get(conn, "/#{organization.slug}/api/applications/#{application.id}")
 
@@ -117,6 +133,10 @@ defmodule AuthifyWeb.API.ApplicationsControllerTest do
       assert attributes["name"] == application.name
       assert attributes["client_id"] == application.client_id
       refute Map.has_key?(attributes, "client_secret")
+
+      # Scopes are an association, so they must be serialized explicitly (#205).
+      # Use non-default scopes so a hardcoded fallback would fail this assertion.
+      assert Enum.sort(attributes["scopes"]) == ["email", "openid"]
     end
 
     test "returns 404 for non-existent application", %{conn: conn, organization: organization} do
@@ -152,7 +172,7 @@ defmodule AuthifyWeb.API.ApplicationsControllerTest do
           "name" => "Test App",
           "description" => "A test application",
           "redirect_uris" => "https://example.com/callback",
-          "scopes" => "openid profile email"
+          "scopes" => "openid email"
         }
       }
 
@@ -170,6 +190,10 @@ defmodule AuthifyWeb.API.ApplicationsControllerTest do
       assert Map.has_key?(attributes, "client_id")
       assert Map.has_key?(attributes, "client_secret")
       assert String.length(attributes["client_secret"]) > 0
+
+      # Scopes are an association, so they must be serialized explicitly (#205).
+      # Use non-default scopes so a hardcoded fallback would fail this assertion.
+      assert Enum.sort(attributes["scopes"]) == ["email", "openid"]
     end
 
     test "returns validation errors for invalid data", %{conn: conn, organization: organization} do
@@ -191,6 +215,56 @@ defmodule AuthifyWeb.API.ApplicationsControllerTest do
 
       assert details["name"]
       assert details["redirect_uris"]
+    end
+
+    test "rejects top-level scopes outside the application envelope (#205)", %{
+      conn: conn,
+      organization: organization
+    } do
+      application_attrs = %{
+        "application" => %{"name" => "Test App", "redirect_uris" => "https://example.com/cb"},
+        "scopes" => "openid profile"
+      }
+
+      conn = post(conn, "/#{organization.slug}/api/applications", application_attrs)
+
+      assert %{
+               "error" => %{
+                 "type" => "validation_failed",
+                 "details" => %{"unexpected_params" => [message]}
+               }
+             } = json_response(conn, 422)
+
+      assert message =~ "scopes"
+      refute OAuth.list_oauth_applications(organization) |> Enum.any?(&(&1.name == "Test App"))
+    end
+
+    test "rejects requests missing the application envelope (#205)", %{
+      conn: conn,
+      organization: organization
+    } do
+      conn = post(conn, "/#{organization.slug}/api/applications", %{"name" => "Test App"})
+
+      assert %{
+               "error" => %{
+                 "type" => "validation_failed",
+                 "details" => %{"application" => ["is required"]}
+               }
+             } = json_response(conn, 422)
+    end
+
+    test "ignores query-string params when validating the body (#205)", %{
+      conn: conn,
+      organization: organization
+    } do
+      application_attrs = %{
+        "application" => %{"name" => "Test App", "redirect_uris" => "https://example.com/cb"}
+      }
+
+      conn = post(conn, "/#{organization.slug}/api/applications?foo=bar", application_attrs)
+
+      assert %{"data" => %{"attributes" => attributes}} = json_response(conn, 201)
+      assert attributes["name"] == "Test App"
     end
 
     test "requires appropriate Management API scopes", %{conn: conn, organization: organization} do
@@ -236,6 +310,70 @@ defmodule AuthifyWeb.API.ApplicationsControllerTest do
 
       assert attributes["name"] == "Updated App"
       assert attributes["description"] == "Updated description"
+    end
+
+    test "updates scopes and returns them in the response (#205)", %{
+      conn: conn,
+      organization: organization
+    } do
+      application = application_fixture(organization: organization)
+
+      update_attrs = %{"application" => %{"scopes" => ["openid", "email"]}}
+
+      conn = put(conn, "/#{organization.slug}/api/applications/#{application.id}", update_attrs)
+
+      assert %{"data" => %{"attributes" => attributes}} = json_response(conn, 200)
+      assert Enum.sort(attributes["scopes"]) == ["email", "openid"]
+
+      reloaded = OAuth.get_application!(application.id, organization)
+      assert Enum.sort(Authify.OAuth.Application.scopes_list(reloaded)) == ["email", "openid"]
+    end
+
+    test "rejects top-level scopes outside the application envelope (#205)", %{
+      conn: conn,
+      organization: organization
+    } do
+      application =
+        application_fixture(organization: organization, scopes: "openid profile email")
+
+      update_attrs = %{"application" => %{"name" => "Updated"}, "scopes" => "openid"}
+
+      conn = put(conn, "/#{organization.slug}/api/applications/#{application.id}", update_attrs)
+
+      assert %{
+               "error" => %{
+                 "type" => "validation_failed",
+                 "details" => %{"unexpected_params" => [message]}
+               }
+             } = json_response(conn, 422)
+
+      assert message =~ "scopes"
+
+      reloaded = OAuth.get_application!(application.id, organization)
+      assert reloaded.name != "Updated"
+
+      assert Enum.sort(Authify.OAuth.Application.scopes_list(reloaded)) == [
+               "email",
+               "openid",
+               "profile"
+             ]
+    end
+
+    test "rejects requests missing the application envelope (#205)", %{
+      conn: conn,
+      organization: organization
+    } do
+      application = application_fixture(organization: organization)
+
+      conn =
+        put(conn, "/#{organization.slug}/api/applications/#{application.id}", %{"name" => "x"})
+
+      assert %{
+               "error" => %{
+                 "type" => "validation_failed",
+                 "details" => %{"application" => ["is required"]}
+               }
+             } = json_response(conn, 422)
     end
 
     test "returns 404 for non-existent application", %{conn: conn, organization: organization} do
@@ -314,7 +452,7 @@ defmodule AuthifyWeb.API.ApplicationsControllerTest do
 
   describe "POST /api/applications/:application_id/regenerate-secret" do
     test "regenerates client secret", %{conn: conn, organization: organization} do
-      application = application_fixture(organization: organization)
+      application = application_fixture(organization: organization, scopes: "openid email")
       original_secret = application.client_secret
 
       conn =
@@ -331,6 +469,10 @@ defmodule AuthifyWeb.API.ApplicationsControllerTest do
       new_secret = attributes["client_secret"]
       assert new_secret != original_secret
       assert String.length(new_secret) > 0
+
+      # Scopes are an association, so they must be serialized explicitly (#205).
+      # Use non-default scopes so a hardcoded fallback would fail this assertion.
+      assert Enum.sort(attributes["scopes"]) == ["email", "openid"]
 
       # ...and it should actually be persisted (#204)
       reloaded = OAuth.get_application!(application.id, organization)

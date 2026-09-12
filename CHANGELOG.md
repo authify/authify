@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Endpoint URL scheme and port are now environment-overridable via `URL_SCHEME` and `URL_PORT`. Defaults remain `https`/`443` for production, but `URL_SCHEME=http URL_PORT=4000` makes containerized CI and local HTTP deployments advertise correct OIDC discovery URLs and ID token `iss` claims
 
+### Fixed
+
+- Management API application responses (list, show, create, update, and regenerate-secret) now include the application's `scopes` as a JSON array, so clients can verify what an application may request
+- Management API application create/update requests now return a `422 validation_failed` error for unexpected top-level parameters (including a misplaced top-level `scopes`) or a missing `application` envelope instead of silently ignoring them or crashing
+
 ## [0.20.1] - 2026-09-07
 
 ### Fixed
