@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-12
+
 ### Added
 
 - Endpoint URL scheme and port are now environment-overridable via `URL_SCHEME` and `URL_PORT`. Defaults remain `https`/`443` for production, but `URL_SCHEME=http URL_PORT=4000` makes containerized CI and local HTTP deployments advertise correct OIDC discovery URLs and ID token `iss` claims
@@ -783,7 +785,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.20.1...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/authify/authify/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/authify/authify/compare/v0.20.0...v0.20.1
 
 [0.20.0]: https://github.com/authify/authify/compare/v0.19.3...v0.20.0
