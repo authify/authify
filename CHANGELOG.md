@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Endpoint URL scheme and port are now environment-overridable via `URL_SCHEME` and `URL_PORT`. Defaults remain `https`/`443` for production, but `URL_SCHEME=http URL_PORT=4000` makes containerized CI and local HTTP deployments advertise correct OIDC discovery URLs and ID token `iss` claims
+
 ## [0.20.1] - 2026-09-07
 
 ### Fixed

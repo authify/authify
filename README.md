@@ -124,6 +124,21 @@ docker run --rm -p 4000:4000 -p 9568:9568 \
   ghcr.io/authify/authify:latest
 ```
 
+By default the externally advertised endpoint URL is `https://PHX_HOST` on port `443`. For plain HTTP deployments (CI or local development), override the advertised scheme and port:
+
+```bash
+docker run --rm -p 4000:4000 -p 9568:9568 \
+  -e DATABASE_URL="ecto://user:pass@host/authify" \
+  -e SECRET_KEY_BASE="$(mix phx.gen.secret)" \
+  -e ENCRYPTION_PASSWORD="$(mix phx.gen.secret)" \
+  -e PHX_HOST=localhost \
+  -e URL_SCHEME=http \
+  -e URL_PORT=4000 \
+  ghcr.io/authify/authify:latest
+```
+
+This affects absolute URLs such as the OIDC discovery endpoints and the ID token `iss` claim.
+
 **For complete deployment options** including Docker Compose, Kubernetes manifests, scaling strategies, and operational best practices, see the **[Operations Guide](https://github.com/authify/authify/wiki/Operations)**.
 
 ## 📚 Documentation

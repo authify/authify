@@ -127,6 +127,21 @@ if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "example.com"
   port = String.to_integer(System.get_env("PORT") || "4000")
 
+  # ## Endpoint URL Configuration
+  #
+  # `PHX_HOST` and `PORT` configure the actual HTTP listener. The values below
+  # determine the externally advertised URL scheme and port, which are used to
+  # build the OIDC discovery document, the ID token `iss` claim, SCIM base URLs,
+  # and other absolute URLs.
+  #
+  # These default to HTTPS on 443 to preserve production behavior. For plain
+  # HTTP deployments (CI or local dev), set:
+  #
+  #     URL_SCHEME=http
+  #     URL_PORT=4000
+  url_scheme = System.get_env("URL_SCHEME") || "https"
+  url_port = String.to_integer(System.get_env("URL_PORT") || "443")
+
   config :authify, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   # ## WebAuthn Configuration
@@ -144,7 +159,7 @@ if config_env() == :prod do
   config :authify, :webauthn_rp_id, webauthn_rp_id
 
   config :authify, AuthifyWeb.Endpoint,
-    url: [host: host, port: 443, scheme: "https"],
+    url: [host: host, port: url_port, scheme: url_scheme],
     http: [
       # Enable IPv6 and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
