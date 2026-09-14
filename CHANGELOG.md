@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-09-14
+
 ### Changed
 
 - Upgraded to Elixir 1.20.4
@@ -791,7 +793,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/authify/authify/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/authify/authify/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/authify/authify/compare/v0.20.0...v0.20.1
 
