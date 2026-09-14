@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Upgraded to Elixir 1.20.4
+- Docker build now installs `lksctp-tools`, providing `libsctp.so.1` and silencing the OTP `Failed open sctp dynamic library` startup warning
+- Refreshed the Debian base image to the latest published `trixie` snapshot (`trixie-20260824-slim`)
+
 ## [0.21.0] - 2026-09-12
 
 ### Added
