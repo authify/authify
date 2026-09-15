@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-09-14
+
+### Security
+
+- `/oauth/authorize` and `/oauth/consent` no longer redirect OAuth errors to an unvalidated, client-supplied `redirect_uri`. Requests whose `client_id` or `redirect_uri` cannot be validated now return `400` directly (HTML for browsers, JSON for API clients), closing an open-redirect/phishing vector and bringing the endpoints in line with RFC 6749 §4.1.2.1. Errors for validated redirect URIs (e.g. `invalid_scope`, `unsupported_response_type`) still redirect as before
+- OAuth error responses are now JSON for any client that explicitly asks for it (via `_format=json` or an `Accept` header containing `application/json`, including `application/json, */*`). Previously `*/*` in the `Accept` header resolved to HTML
+- The OAuth consent and error pages render as standalone documents instead of being wrapped in the application root layout (which produced nested `<html>`/`<body>` elements)
+
 ### Fixed
 
 - Flaky organization-deletion tests on CI. Cascading organization deletes race with concurrent async MySQL sandbox transactions, hold locks past DBConnection's 15s deadline, and fail with `socket closed`. The affected tests now run with `async: false`, matching Ecto's guidance that MySQL does not support concurrent transactional tests
@@ -797,7 +805,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.21.2...HEAD
+[0.21.2]: https://github.com/authify/authify/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/authify/authify/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/authify/authify/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/authify/authify/compare/v0.20.0...v0.20.1

@@ -52,8 +52,11 @@ defmodule AuthifyWeb.OAuthControllerTest do
       }
 
       conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
-      assert html_response(conn, 200) =~ "Authorize Application"
-      assert html_response(conn, 200) =~ application.name
+      body = html_response(conn, 200)
+      assert body =~ "Authorize Application"
+      assert body =~ application.name
+      # Consent is a standalone document; it must not be wrapped in the app root layout.
+      assert length(String.split(body, "<!DOCTYPE")) - 1 == 1
     end
 
     test "returns error for invalid client_id", %{
@@ -70,8 +73,9 @@ defmodule AuthifyWeb.OAuthControllerTest do
       }
 
       conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
-      assert redirected_to(conn) =~ "https://example.com/callback"
-      assert redirected_to(conn) =~ "error=invalid_client"
+      # Must NOT redirect to the unvalidated redirect_uri (open redirect).
+      assert response(conn, 400)
+      assert html_response(conn, 400) =~ "invalid_client"
     end
 
     test "renders nonce as hidden field in consent screen when provided", %{
@@ -94,6 +98,254 @@ defmodule AuthifyWeb.OAuthControllerTest do
       body = html_response(conn, 200)
       assert body =~ ~s(name="nonce")
       assert body =~ ~s(value="test_nonce_xyz")
+    end
+  end
+
+  describe "authorize open redirect protection" do
+    setup do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      application = application_fixture(organization: organization)
+
+      %{organization: organization, user: user, application: application}
+    end
+
+    test "does not redirect to unvalidated redirect_uri for unknown client", %{
+      conn: conn,
+      user: user,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => "unknown-client",
+        "redirect_uri" => "https://attacker.example/steal",
+        "response_type" => "code",
+        "scope" => "openid"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      assert response(conn, 400)
+      refute conn.status in [301, 302, 303, 307, 308]
+      body = html_response(conn, 400)
+      assert body =~ "invalid_client"
+      # Error page is a standalone document; it must not be wrapped twice.
+      assert length(String.split(body, "<!DOCTYPE")) - 1 == 1
+    end
+
+    test "does not redirect to unvalidated redirect_uri for a known client", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://attacker.example/steal",
+        "response_type" => "code",
+        "scope" => "openid"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      assert response(conn, 400)
+      refute conn.status in [301, 302, 303, 307, 308]
+      assert html_response(conn, 400) =~ "invalid_redirect_uri"
+    end
+
+    test "returns JSON (not a redirect) for non-browser requests", %{
+      conn: conn,
+      user: user,
+      organization: organization
+    } do
+      conn =
+        conn
+        |> log_in_user(user)
+        |> put_req_header("accept", "application/json")
+
+      params = %{
+        "client_id" => "unknown-client",
+        "redirect_uri" => "https://attacker.example/steal",
+        "response_type" => "code",
+        "scope" => "openid"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      assert json_response(conn, 400) == %{"error" => "invalid_client"}
+    end
+
+    test "returns JSON for clients that send application/json alongside */*", %{
+      conn: conn,
+      user: user,
+      organization: organization
+    } do
+      conn =
+        conn
+        |> log_in_user(user)
+        |> put_req_header("accept", "application/json, */*")
+
+      params = %{
+        "client_id" => "unknown-client",
+        "redirect_uri" => "https://attacker.example/steal",
+        "response_type" => "code",
+        "scope" => "openid"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      assert json_response(conn, 400) == %{"error" => "invalid_client"}
+    end
+
+    test "returns JSON when _format=json is requested", %{
+      conn: conn,
+      user: user,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => "unknown-client",
+        "redirect_uri" => "https://attacker.example/steal",
+        "response_type" => "code",
+        "scope" => "openid",
+        "_format" => "json"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      assert json_response(conn, 400) == %{"error" => "invalid_client"}
+    end
+
+    test "redirects invalid_scope to the validated redirect_uri", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid not-a-real-scope"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      assert redirected_to(conn) =~ "https://example.com/callback"
+      assert redirected_to(conn) =~ "error=invalid_scope"
+    end
+
+    test "consent does not redirect to unvalidated redirect_uri", %{
+      conn: conn,
+      user: user,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => "unknown-client",
+        "redirect_uri" => "https://attacker.example/steal",
+        "scope" => "openid",
+        "approve" => "true"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      assert response(conn, 400)
+      refute conn.status in [301, 302, 303, 307, 308]
+      assert html_response(conn, 400) =~ "invalid_client"
+    end
+
+    test "consent denial does not redirect to unvalidated redirect_uri", %{
+      conn: conn,
+      user: user,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => "unknown-client",
+        "redirect_uri" => "https://attacker.example/steal",
+        "scope" => "openid",
+        "approve" => "false"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      assert response(conn, 400)
+      refute conn.status in [301, 302, 303, 307, 308]
+      assert html_response(conn, 400) =~ "invalid_client"
+    end
+
+    test "consent does not redirect to a known client's unregistered redirect_uri", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://attacker.example/steal",
+        "scope" => "openid",
+        "approve" => "true"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      assert response(conn, 400)
+      refute conn.status in [301, 302, 303, 307, 308]
+      assert html_response(conn, 400) =~ "invalid_redirect_uri"
+    end
+
+    test "consent returns JSON for non-browser requests with an unknown client", %{
+      conn: conn,
+      user: user,
+      organization: organization
+    } do
+      conn =
+        conn
+        |> log_in_user(user)
+        |> put_req_header("accept", "application/json")
+
+      params = %{
+        "client_id" => "unknown-client",
+        "redirect_uri" => "https://attacker.example/steal",
+        "scope" => "openid",
+        "approve" => "true"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      assert json_response(conn, 400) == %{"error" => "invalid_client"}
+    end
+
+    test "authorize does not redirect when redirect_uri is missing", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "response_type" => "code",
+        "scope" => "openid"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      assert response(conn, 400)
+      refute conn.status in [301, 302, 303, 307, 308]
+      assert html_response(conn, 400) =~ "invalid_redirect_uri"
     end
   end
 
@@ -870,8 +1122,9 @@ defmodule AuthifyWeb.OAuthControllerTest do
           invalid_params
         )
 
-      assert redirected_to(conn) =~ "https://evil.com/steal-codes"
-      assert redirected_to(conn) =~ "error=invalid_redirect_uri"
+      # Must NOT redirect to the unvalidated redirect_uri (open redirect).
+      assert response(conn, 400)
+      assert html_response(conn, 400) =~ "invalid_redirect_uri"
     end
 
     test "validates client_secret for confidential clients", %{
@@ -1347,7 +1600,9 @@ defmodule AuthifyWeb.OAuthControllerTest do
       conn = get(conn, ~p"/#{organization.slug}/oauth/authorize")
       assert response(conn, 400)
 
-      # Invalid response_type
+      # Invalid client_id with a response_type — the client is unknown, so the
+      # error must be returned directly rather than redirecting to the
+      # unvalidated redirect_uri (open redirect).
       params = %{
         "client_id" => "test_client",
         "redirect_uri" => "https://example.com/callback",
@@ -1355,8 +1610,28 @@ defmodule AuthifyWeb.OAuthControllerTest do
       }
 
       conn = get(build_conn(), ~p"/#{organization.slug}/oauth/authorize", params)
+      assert response(conn, 400)
+      assert html_response(conn, 400) =~ "invalid_client"
+    end
+
+    test "redirects unsupported_response_type for a validated client", %{
+      conn: conn,
+      organization: organization
+    } do
+      application = application_fixture(organization: organization)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "token",
+        "scope" => "openid"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      # redirect_uri is validated, so returning the error there is spec-compliant.
       assert redirected_to(conn) =~ "https://example.com/callback"
-      assert redirected_to(conn) =~ "error=invalid_client"
+      assert redirected_to(conn) =~ "error=unsupported_response_type"
     end
 
     test "handles invalid JSON in token requests", %{conn: conn, organization: organization} do
