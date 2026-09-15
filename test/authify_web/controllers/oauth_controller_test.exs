@@ -52,8 +52,11 @@ defmodule AuthifyWeb.OAuthControllerTest do
       }
 
       conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
-      assert html_response(conn, 200) =~ "Authorize Application"
-      assert html_response(conn, 200) =~ application.name
+      body = html_response(conn, 200)
+      assert body =~ "Authorize Application"
+      assert body =~ application.name
+      # Consent is a standalone document; it must not be wrapped in the app root layout.
+      assert length(String.split(body, "<!DOCTYPE")) - 1 == 1
     end
 
     test "returns error for invalid client_id", %{
@@ -125,7 +128,10 @@ defmodule AuthifyWeb.OAuthControllerTest do
 
       assert response(conn, 400)
       refute conn.status in [301, 302, 303, 307, 308]
-      assert html_response(conn, 400) =~ "invalid_client"
+      body = html_response(conn, 400)
+      assert body =~ "invalid_client"
+      # Error page is a standalone document; it must not be wrapped twice.
+      assert length(String.split(body, "<!DOCTYPE")) - 1 == 1
     end
 
     test "does not redirect to unvalidated redirect_uri for a known client", %{

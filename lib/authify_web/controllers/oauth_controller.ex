@@ -357,7 +357,9 @@ defmodule AuthifyWeb.OAuthController do
   defp render_consent_screen(conn, application, redirect_uri, scopes, params) do
     organization = conn.assigns.current_organization
 
-    render(conn, :consent, %{
+    conn
+    |> put_root_layout(false)
+    |> render(:consent, %{
       application: application,
       redirect_uri: redirect_uri,
       scopes: scopes,
@@ -365,8 +367,7 @@ defmodule AuthifyWeb.OAuthController do
       code_challenge: params["code_challenge"],
       code_challenge_method: params["code_challenge_method"],
       nonce: params["nonce"],
-      organization: organization,
-      layout: false
+      organization: organization
     })
   end
 
@@ -482,7 +483,9 @@ defmodule AuthifyWeb.OAuthController do
     if wants_json?(conn) do
       json(conn, %{error: error})
     else
-      render(conn, :error, error: error, layout: false)
+      conn
+      |> put_root_layout(false)
+      |> render(:error, error: error)
     end
   end
 
