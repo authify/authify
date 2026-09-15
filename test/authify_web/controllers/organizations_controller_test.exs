@@ -1,5 +1,10 @@
 defmodule AuthifyWeb.OrganizationsControllerTest do
-  use AuthifyWeb.ConnCase, async: true
+  # async: false — the delete action issues a cascading DELETE across ~14 tables
+  # with ON DELETE CASCADE. Under concurrent MySQL sandbox transactions this
+  # contends on locks and can exceed DBConnection's 15s holder deadline,
+  # surfacing as "socket closed". Ecto's sandbox docs warn that MySQL does not
+  # support concurrent transactional tests for exactly this reason.
+  use AuthifyWeb.ConnCase, async: false
 
   import Authify.AccountsFixtures
 

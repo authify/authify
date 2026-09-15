@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Flaky organization-deletion tests on CI. Cascading organization deletes race with concurrent async MySQL sandbox transactions, hold locks past DBConnection's 15s deadline, and fail with `socket closed`. The affected tests now run with `async: false`, matching Ecto's guidance that MySQL does not support concurrent transactional tests
+
 ## [0.21.1] - 2026-09-14
 
 ### Changed
