@@ -479,13 +479,20 @@ defmodule AuthifyWeb.OAuthController do
   defp render_error(conn, error) do
     conn = put_status(conn, :bad_request)
 
-    case get_format(conn) do
-      "html" ->
-        render(conn, :error, error: error, layout: false)
-
-      _ ->
-        json(conn, %{error: error})
+    if wants_json?(conn) do
+      json(conn, %{error: error})
+    else
+      render(conn, :error, error: error, layout: false)
     end
+  end
+
+  # Treats a request as an API client when it explicitly asks for JSON, either
+  # via `_format=json` or an `Accept` header that includes `application/json`.
+  # This catches clients sending `Accept: application/json, */*`, which Phoenix's
+  # `:accepts` plug otherwise resolves to HTML because of the `*/*`.
+  defp wants_json?(conn) do
+    get_format(conn) == "json" or
+      Enum.any?(get_req_header(conn, "accept"), &String.contains?(&1, "application/json"))
   end
 
   # Renders an OAuth error to a redirect_uri that has been validated against

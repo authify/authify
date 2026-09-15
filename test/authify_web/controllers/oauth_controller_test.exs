@@ -172,6 +172,48 @@ defmodule AuthifyWeb.OAuthControllerTest do
       assert json_response(conn, 400) == %{"error" => "invalid_client"}
     end
 
+    test "returns JSON for clients that send application/json alongside */*", %{
+      conn: conn,
+      user: user,
+      organization: organization
+    } do
+      conn =
+        conn
+        |> log_in_user(user)
+        |> put_req_header("accept", "application/json, */*")
+
+      params = %{
+        "client_id" => "unknown-client",
+        "redirect_uri" => "https://attacker.example/steal",
+        "response_type" => "code",
+        "scope" => "openid"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      assert json_response(conn, 400) == %{"error" => "invalid_client"}
+    end
+
+    test "returns JSON when _format=json is requested", %{
+      conn: conn,
+      user: user,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => "unknown-client",
+        "redirect_uri" => "https://attacker.example/steal",
+        "response_type" => "code",
+        "scope" => "openid",
+        "_format" => "json"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      assert json_response(conn, 400) == %{"error" => "invalid_client"}
+    end
+
     test "redirects invalid_scope to the validated redirect_uri", %{
       conn: conn,
       user: user,
