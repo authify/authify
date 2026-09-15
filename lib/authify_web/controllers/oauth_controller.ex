@@ -19,14 +19,27 @@ defmodule AuthifyWeb.OAuthController do
     organization = conn.assigns.current_organization
 
     with {:ok, application} <- validate_client_id(params["client_id"], organization),
-         {:ok, redirect_uri} <- validate_redirect_uri(application, params["redirect_uri"]),
-         {:ok, scopes} <- validate_scopes(application, params["scope"]),
+         {:ok, redirect_uri} <- validate_redirect_uri(application, params["redirect_uri"]) do
+      authorize_validated_client(conn, organization, application, redirect_uri, params)
+    else
+      # RFC 6749 §4.1.2.1: when the client or redirect_uri cannot be validated,
+      # we must not redirect to the (untrusted) redirect_uri — doing so is an
+      # open redirect. Surface the error directly instead.
+      {:error, error} ->
+        render_error(conn, error)
+    end
+  end
+
+  defp authorize_validated_client(conn, organization, application, redirect_uri, params) do
+    with {:ok, scopes} <- validate_scopes(application, params["scope"]),
          :ok <- validate_response_type(params["response_type"]),
          :ok <- validate_pkce_for_application(application, params, organization) do
       handle_authorization_request(conn, organization, application, redirect_uri, scopes, params)
     else
+      # The redirect_uri is registered to this application, so it is safe to
+      # return the error to it via redirect.
       {:error, error} ->
-        render_error(conn, error, params["redirect_uri"], params["state"])
+        render_redirect_error(conn, error, redirect_uri, params["state"])
     end
   end
 
@@ -69,15 +82,22 @@ defmodule AuthifyWeb.OAuthController do
     user = Authify.Guardian.Plug.current_resource(conn)
     organization = conn.assigns.current_organization
 
-    case process_authorization_approval(conn, user, organization, params) do
-      {:ok, result} ->
-        handle_consent_approval(conn, organization, user, result, params)
+    with {:ok, application} <- validate_client_id(params["client_id"], organization),
+         {:ok, redirect_uri} <- validate_redirect_uri(application, params["redirect_uri"]) do
+      case process_authorization_approval(conn, user, application, redirect_uri, params) do
+        {:ok, result} ->
+          handle_consent_approval(conn, organization, user, result, params)
 
-      {:error, :organization_mismatch} ->
-        render_error(conn, "invalid_request", params["redirect_uri"], params["state"])
+        {:error, :organization_mismatch} ->
+          render_redirect_error(conn, "invalid_request", redirect_uri, params["state"])
 
-      {:error, _error} ->
-        render_error(conn, "server_error", params["redirect_uri"], params["state"])
+        {:error, _error} ->
+          render_redirect_error(conn, "server_error", redirect_uri, params["state"])
+      end
+    else
+      # Never redirect to an unvalidated redirect_uri — see authorize/2.
+      {:error, error} ->
+        render_error(conn, error)
     end
   end
 
@@ -89,13 +109,18 @@ defmodule AuthifyWeb.OAuthController do
       AuditOAuth.log_authorization_denied(conn, organization, user, params)
     end
 
-    handle_consent_denial(conn, organization, params)
+    with {:ok, application} <- validate_client_id(params["client_id"], organization),
+         {:ok, redirect_uri} <- validate_redirect_uri(application, params["redirect_uri"]) do
+      handle_consent_denial(conn, redirect_uri, params)
+    else
+      # Never redirect to an unvalidated redirect_uri — see authorize/2.
+      {:error, error} ->
+        render_error(conn, error)
+    end
   end
 
-  defp process_authorization_approval(_conn, user, organization, params) do
-    with {:ok, application} <- validate_client_id(params["client_id"], organization),
-         {:ok, redirect_uri} <- validate_redirect_uri(application, params["redirect_uri"]),
-         {:ok, scopes} <- validate_scopes(application, params["scope"]),
+  defp process_authorization_approval(_conn, user, application, redirect_uri, params) do
+    with {:ok, scopes} <- validate_scopes(application, params["scope"]),
          pkce_params = extract_pkce_params(params),
          nonce_params = extract_nonce_param(params),
          {:ok, auth_code} <-
@@ -168,17 +193,11 @@ defmodule AuthifyWeb.OAuthController do
     end
   end
 
-  defp handle_consent_denial(conn, organization, params) do
-    if params["redirect_uri"] do
-      redirect_url =
-        build_redirect_url(params["redirect_uri"], %{"error" => "access_denied"}, params["state"])
+  defp handle_consent_denial(conn, redirect_uri, params) do
+    redirect_url =
+      build_redirect_url(redirect_uri, %{"error" => "access_denied"}, params["state"])
 
-      redirect(conn, external: redirect_url)
-    else
-      conn
-      |> put_flash(:error, "Authorization denied.")
-      |> redirect(to: "/#{organization.slug}/dashboard")
-    end
+    redirect(conn, external: redirect_url)
   end
 
   defp build_redirect_url(base_uri, query_params, state) do
@@ -453,18 +472,30 @@ defmodule AuthifyWeb.OAuthController do
   defp maybe_add_param(map, _key, nil), do: map
   defp maybe_add_param(map, key, value), do: Map.put(map, key, value)
 
-  defp render_error(conn, error, redirect_uri, state) do
-    if redirect_uri do
-      query_params = %{"error" => error}
-      query_params = if state, do: Map.put(query_params, "state", state), else: query_params
+  # Renders an OAuth error for a request whose client and redirect_uri could
+  # not be validated. Per RFC 6749 §4.1.2.1 we must NOT redirect to the
+  # unvalidated redirect_uri (open redirect); return the error directly.
+  # Browser requests get an HTML page; API clients get JSON.
+  defp render_error(conn, error) do
+    conn = put_status(conn, :bad_request)
 
-      redirect_url = redirect_uri <> "?" <> URI.encode_query(query_params)
-      redirect(conn, external: redirect_url)
-    else
-      conn
-      |> put_status(:bad_request)
-      |> json(%{error: error})
+    case get_format(conn) do
+      "html" ->
+        render(conn, :error, error: error, layout: false)
+
+      _ ->
+        json(conn, %{error: error})
     end
+  end
+
+  # Renders an OAuth error to a redirect_uri that has been validated against
+  # the registered application. Safe to redirect per RFC 6749 §4.1.2.1.
+  defp render_redirect_error(conn, error, redirect_uri, state) do
+    query_params = %{"error" => error}
+    query_params = if state, do: Map.put(query_params, "state", state), else: query_params
+
+    redirect_url = redirect_uri <> "?" <> URI.encode_query(query_params)
+    redirect(conn, external: redirect_url)
   end
 
   defp handle_authorization_code_grant(conn, params) do

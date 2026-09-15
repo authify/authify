@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `/oauth/authorize` and `/oauth/consent` no longer redirect OAuth errors to an unvalidated, client-supplied `redirect_uri`. Requests whose `client_id` or `redirect_uri` cannot be validated now return `400` directly (HTML for browsers, JSON for API clients), closing an open-redirect/phishing vector and bringing the endpoints in line with RFC 6749 §4.1.2.1. Errors for validated redirect URIs (e.g. `invalid_scope`, `unsupported_response_type`) still redirect as before
+
 ### Fixed
 
 - Flaky organization-deletion tests on CI. Cascading organization deletes race with concurrent async MySQL sandbox transactions, hold locks past DBConnection's 15s deadline, and fail with `socket closed`. The affected tests now run with `async: false`, matching Ecto's guidance that MySQL does not support concurrent transactional tests

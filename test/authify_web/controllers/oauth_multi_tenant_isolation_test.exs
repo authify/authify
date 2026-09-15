@@ -56,9 +56,10 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
 
       conn = get(conn, ~p"/#{org_a.slug}/oauth/authorize", params)
 
-      # Should redirect with error - app not found in this org
-      assert redirected_to(conn) =~ "https://example.com/callback"
-      assert redirected_to(conn) =~ "error=invalid_client"
+      # Must NOT redirect to the unvalidated redirect_uri (open redirect);
+      # the error is surfaced directly instead.
+      assert response(conn, 400)
+      assert html_response(conn, 400) =~ "invalid_client"
     end
 
     test "user from org B cannot authorize app from org A", %{
@@ -78,8 +79,8 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
 
       conn = get(conn, ~p"/#{org_b.slug}/oauth/authorize", params)
 
-      assert redirected_to(conn) =~ "https://example.com/callback"
-      assert redirected_to(conn) =~ "error=invalid_client"
+      assert response(conn, 400)
+      assert html_response(conn, 400) =~ "invalid_client"
     end
 
     test "authorization code from org A cannot be exchanged in org B", %{
@@ -577,9 +578,10 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
 
       conn = post(conn, ~p"/#{org_a.slug}/oauth/consent", params)
 
-      # Should redirect with error
-      assert redirected_to(conn) =~ "https://example.com/callback"
-      assert redirected_to(conn) =~ "error="
+      # Must NOT redirect to the unvalidated redirect_uri (open redirect);
+      # the error is surfaced directly instead.
+      assert response(conn, 400)
+      assert html_response(conn, 400) =~ "invalid_client"
     end
 
     test "cannot bypass org check by posting directly to consent endpoint", %{
@@ -600,7 +602,9 @@ defmodule AuthifyWeb.OAuthMultiTenantIsolationTest do
 
       conn = post(conn, ~p"/#{org_b.slug}/oauth/consent", params)
 
-      # Should fail - user session should be org-scoped or re-authenticated
+      # The client and redirect_uri are valid for this org, but the logged-in
+      # user belongs to another org. The redirect_uri is trusted, so the error
+      # is returned to it per RFC 6749.
       assert redirected_to(conn) =~ "https://example.com/callback"
       assert redirected_to(conn) =~ "error="
     end
