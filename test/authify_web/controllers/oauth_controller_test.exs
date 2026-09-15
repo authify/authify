@@ -282,6 +282,71 @@ defmodule AuthifyWeb.OAuthControllerTest do
       refute conn.status in [301, 302, 303, 307, 308]
       assert html_response(conn, 400) =~ "invalid_client"
     end
+
+    test "consent does not redirect to a known client's unregistered redirect_uri", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://attacker.example/steal",
+        "scope" => "openid",
+        "approve" => "true"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      assert response(conn, 400)
+      refute conn.status in [301, 302, 303, 307, 308]
+      assert html_response(conn, 400) =~ "invalid_redirect_uri"
+    end
+
+    test "consent returns JSON for non-browser requests with an unknown client", %{
+      conn: conn,
+      user: user,
+      organization: organization
+    } do
+      conn =
+        conn
+        |> log_in_user(user)
+        |> put_req_header("accept", "application/json")
+
+      params = %{
+        "client_id" => "unknown-client",
+        "redirect_uri" => "https://attacker.example/steal",
+        "scope" => "openid",
+        "approve" => "true"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      assert json_response(conn, 400) == %{"error" => "invalid_client"}
+    end
+
+    test "authorize does not redirect when redirect_uri is missing", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "response_type" => "code",
+        "scope" => "openid"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      assert response(conn, 400)
+      refute conn.status in [301, 302, 303, 307, 308]
+      assert html_response(conn, 400) =~ "invalid_redirect_uri"
+    end
   end
 
   describe "consent" do
