@@ -35,6 +35,9 @@ defmodule Authify.DataCase do
   #   are global; these tests deliberately test global lockout behavior.
   # - Maintenance controller tests — uses Oban.Testing with manual mode.
   # - LiveView tests (test/authify_web/live/) — Phoenix LiveView process management.
+  # - Organization-deletion tests (test/authify/accounts/organization_deletion_test.exs)
+  #   — cascading deletes hold InnoDB locks past DBConnection's 15s deadline when
+  #   run concurrently; MySQL does not support concurrent sandbox transactions.
   setup tags do
     Authify.DataCase.setup_sandbox(tags)
 

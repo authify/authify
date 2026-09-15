@@ -36,6 +36,10 @@ defmodule AuthifyWeb.ConnCase do
   # - LiveView tests (test/authify_web/live/) — Phoenix LiveView process management.
   # - Rate limiter tests (test/authify_web/plugs/rate_limiter_test.exs) — global Hammer
   #   buckets and Application-level rate_limiting_enabled config.
+  # - Organization controller tests (test/authify_web/controllers/organizations_controller_test.exs)
+  #   — the delete action's cascading DELETE can hold InnoDB locks past
+  #   DBConnection's 15s deadline when run concurrently; MySQL does not support
+  #   concurrent sandbox transactions.
   setup tags do
     Authify.DataCase.setup_sandbox(tags)
 

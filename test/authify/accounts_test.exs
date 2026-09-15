@@ -77,12 +77,6 @@ defmodule Authify.AccountsTest do
       assert updated_org.name == "Updated Organization"
     end
 
-    test "delete_organization/1 deletes the organization" do
-      {:ok, org} = Accounts.create_organization(valid_org_attrs())
-      assert {:ok, %Organization{}} = Accounts.delete_organization(org)
-      assert_raise Ecto.NoResultsError, fn -> Accounts.get_organization!(org.id) end
-    end
-
     test "change_organization/1 returns an organization changeset" do
       {:ok, org} = Accounts.create_organization(valid_org_attrs())
       assert %Ecto.Changeset{} = Accounts.change_organization(org)
