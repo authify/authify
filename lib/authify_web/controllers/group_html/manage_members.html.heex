@@ -34,30 +34,36 @@
             </p>
 
             <!-- Add User Form -->
-            <form
-              method="post"
-              action={~p"/#{@organization.slug}/groups/#{@group.id}/users"}
-              class="mb-4"
-            >
-              <input
-                type="hidden"
-                name="_csrf_token"
-                value={Plug.CSRFProtection.get_csrf_token()}
-              />
-              <div class="input-group">
-                <select name="user_id" class="form-select" required>
-                  <option value="">Select a user to add...</option>
-                  <%= for user <- @users do %>
-                    <option value={user.id}>
-                      {Authify.Accounts.User.get_primary_email_value(user)} - {user.first_name} {user.last_name}
-                    </option>
-                  <% end %>
-                </select>
-                <button type="submit" class="btn btn-primary">
-                  <i class="bi bi-plus-circle"></i> Add
-                </button>
-              </div>
-            </form>
+            <%= if @users == [] do %>
+              <p class="text-muted small mb-3">
+                <i class="bi bi-info-circle"></i> No users available to add.
+              </p>
+            <% else %>
+              <form
+                method="post"
+                action={~p"/#{@organization.slug}/groups/#{@group.id}/users"}
+                class="mb-4"
+              >
+                <input
+                  type="hidden"
+                  name="_csrf_token"
+                  value={Plug.CSRFProtection.get_csrf_token()}
+                />
+                <div class="input-group">
+                  <select name="user_id" class="form-select" required>
+                    <option value="">Select a user to add...</option>
+                    <%= for user <- @users do %>
+                      <option value={user.id}>
+                        {Authify.Accounts.User.get_primary_email_value(user)} - {user.first_name} {user.last_name}
+                      </option>
+                    <% end %>
+                  </select>
+                  <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Add
+                  </button>
+                </div>
+              </form>
+            <% end %>
 
             <!-- Current Users List -->
             <%= if Enum.empty?(@group.users) do %>

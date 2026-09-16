@@ -141,11 +141,47 @@ defmodule Authify.Groups do
 
   @doc """
   Adds a user to a group.
+
+  Returns a validation error if the user does not belong to the group's
+  organization, or if the user is already a member of the group.
   """
   def add_user_to_group(%User{} = user, %Group{} = group) do
     %GroupMembership{}
     |> GroupMembership.changeset(%{user_id: user.id, group_id: group.id})
+    |> validate_user_in_organization(user, group)
     |> Repo.insert()
+  end
+
+  defp validate_user_in_organization(
+         %Ecto.Changeset{valid?: false} = changeset,
+         _user,
+         _group
+       ),
+       do: changeset
+
+  defp validate_user_in_organization(
+         changeset,
+         %User{organization_id: org_id},
+         %Group{organization_id: org_id}
+       )
+       when not is_nil(org_id),
+       do: changeset
+
+  defp validate_user_in_organization(changeset, _user, _group) do
+    Ecto.Changeset.add_error(changeset, :user_id, "does not belong to this organization")
+  end
+
+  @doc """
+  Returns the users available to add to a group, excluding those already in it.
+  """
+  def available_group_users(%Group{} = group, %Organization{} = organization) do
+    group = Repo.preload(group, :users)
+    member_ids = MapSet.new(group.users, & &1.id)
+
+    organization.id
+    |> Authify.Accounts.list_users()
+    |> Repo.preload(:emails)
+    |> Enum.reject(&MapSet.member?(member_ids, &1.id))
   end
 
   @doc """
