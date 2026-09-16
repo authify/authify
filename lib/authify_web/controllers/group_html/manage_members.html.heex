@@ -164,7 +164,7 @@
                   <select name="application_id" class="form-select">
                     <option value="">Select SAML provider...</option>
                     <%= for sp <- @saml_providers do %>
-                      <option value={sp.id}>{sp.entity_id}</option>
+                      <option value={sp.id}>{sp.name}</option>
                     <% end %>
                   </select>
                   <input type="hidden" name="application_type" value="saml" />
@@ -193,7 +193,7 @@
                         <i class="bi bi-diagram-3 me-2 text-success"></i>
                         <span class="badge bg-success me-2">SAML</span>
                       <% end %>
-                      <span class="small">ID: {member.application_id}</span>
+                      <span>{Authify.Accounts.GroupApplication.display_name(member)}</span>
                     </div>
                     <form
                       method="post"

@@ -12,10 +12,21 @@ defmodule Authify.Accounts.GroupApplication do
   schema "group_applications" do
     field :application_id, :integer
     field :application_type, :string
+    field :application_name, :string, virtual: true
 
     belongs_to :group, Group
 
     timestamps(type: :utc_datetime)
+  end
+
+  @doc """
+  Returns a human-readable name for the group application, falling back to a
+  type- and ID-qualified label when the application can no longer be resolved.
+  """
+  def display_name(%__MODULE__{application_name: name}) when is_binary(name), do: name
+
+  def display_name(%__MODULE__{application_type: type, application_id: id}) do
+    "Unknown #{type} application (#{id})"
   end
 
   @doc false
@@ -25,6 +36,7 @@ defmodule Authify.Accounts.GroupApplication do
     |> validate_required([:application_id, :application_type, :group_id])
     |> validate_inclusion(:application_type, ["oauth2", "saml"])
     |> unique_constraint([:application_id, :application_type, :group_id],
+      name: :group_apps_app_type_group_unique,
       message: "Application is already in this group"
     )
     |> foreign_key_constraint(:group_id)
