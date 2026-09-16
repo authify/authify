@@ -7,6 +7,7 @@ defmodule AuthifyWeb.Auth.OrganizationContextTest do
   describe "organization context middleware" do
     setup do
       n = System.unique_integer([:positive])
+
       # Create organization and user
       {:ok, organization} =
         Accounts.create_organization(%{name: "Test Org #{n}", slug: "test-org-#{n}"})

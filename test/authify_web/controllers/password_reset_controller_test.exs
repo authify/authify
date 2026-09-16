@@ -236,6 +236,7 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
 
       response = html_response(conn, 200)
       assert response =~ "Reset Your Password"
+
       # Should render the form again with validation errors
 
       events =
@@ -270,6 +271,7 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
 
       response = html_response(conn, 200)
       assert response =~ "Reset Your Password"
+
       # Should render the form again with validation errors
 
       events =
@@ -304,6 +306,7 @@ defmodule AuthifyWeb.PasswordResetControllerTest do
 
       response = html_response(conn, 200)
       assert response =~ "Reset Your Password"
+
       # Should render the form again with validation errors
 
       events =

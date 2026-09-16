@@ -327,6 +327,7 @@ defmodule AuthifyWeb.OAuthController do
 
   defp validate_pkce_for_application(application, params, organization) do
     code_challenge = params["code_challenge"]
+
     # PKCE is required when the application requires it, the client is public,
     # or the org has OAuth 2.1 strict mode enabled (PKCE for all clients)
     requires_pkce =

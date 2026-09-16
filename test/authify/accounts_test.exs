@@ -895,6 +895,7 @@ defmodule Authify.AccountsTest do
     } do
       n = System.unique_integer([:positive])
       rollback_email = "test.user-#{n}@example.com"
+
       # Use invalid organization ID to trigger error in user_organization creation
       user_attrs = %{
         "first_name" => "Test",

@@ -44,6 +44,7 @@ defmodule AuthifyWeb.IdPCertificateIntegrationTest do
         })
 
       assert cert.usage == "saml_signing"
+
       # Note: is_active may be false by default, activate if needed
       cert =
         if cert.is_active,
