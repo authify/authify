@@ -188,20 +188,121 @@ defmodule Authify.Groups do
 
   @doc """
   Adds an application to a group.
-  """
-  def add_application_to_group(%Group{} = group, application_id, application_type)
-      when application_type in ["oauth2", "saml"] do
-    # Handle both string and integer application IDs
-    app_id =
-      if is_binary(application_id), do: String.to_integer(application_id), else: application_id
 
+  Application IDs may be provided as integers or numeric strings; they are
+  normalized by the changeset. Invalid or blank IDs, or IDs that do not belong
+  to the group's organization, result in a validation error rather than raising.
+  """
+  def add_application_to_group(%Group{} = group, application_id, application_type) do
     %GroupApplication{}
     |> GroupApplication.changeset(%{
       group_id: group.id,
-      application_id: app_id,
+      application_id: application_id,
       application_type: application_type
     })
+    |> validate_application_in_organization(group)
     |> Repo.insert()
+  end
+
+  defp validate_application_in_organization(%Ecto.Changeset{valid?: false} = changeset, _group) do
+    changeset
+  end
+
+  defp validate_application_in_organization(changeset, %Group{organization_id: org_id}) do
+    type = Ecto.Changeset.get_field(changeset, :application_type)
+    id = Ecto.Changeset.get_field(changeset, :application_id)
+
+    if application_in_organization?(type, id, org_id) do
+      changeset
+    else
+      Ecto.Changeset.add_error(
+        changeset,
+        :application_id,
+        "does not exist in this organization"
+      )
+    end
+  end
+
+  defp application_in_organization?("oauth2", id, org_id) do
+    Authify.OAuth.Application
+    |> where([a], a.id == ^id and a.organization_id == ^org_id)
+    |> Repo.exists?()
+  end
+
+  defp application_in_organization?("saml", id, org_id) do
+    Authify.SAML.ServiceProvider
+    |> where([sp], sp.id == ^id and sp.organization_id == ^org_id)
+    |> Repo.exists?()
+  end
+
+  defp application_in_organization?(_type, _id, _org_id), do: false
+
+  @doc """
+  Returns the applications available to add to a group, excluding those already
+  assigned to it.
+
+  Returns a map with `:oauth_apps` and `:saml_providers` keys.
+  """
+  def available_group_applications(%Group{} = group, %Organization{} = organization) do
+    group = Repo.preload(group, :group_applications)
+
+    assigned =
+      group.group_applications
+      |> MapSet.new(&{&1.application_type, &1.application_id})
+
+    oauth_apps =
+      Authify.OAuth.list_oauth_applications(organization)
+      |> Enum.reject(&MapSet.member?(assigned, {"oauth2", &1.id}))
+
+    saml_providers =
+      Authify.SAML.list_service_providers(organization)
+      |> Enum.reject(&MapSet.member?(assigned, {"saml", &1.id}))
+
+    %{oauth_apps: oauth_apps, saml_providers: saml_providers}
+  end
+
+  @doc """
+  Populates the `:application_name` virtual field on each group application so
+  templates can display human-readable names instead of raw IDs.
+
+  Lookups are scoped to the given organization.
+  """
+  def annotate_application_names(%Group{} = group, %Organization{} = organization) do
+    group = Repo.preload(group, :group_applications)
+    group_applications = group.group_applications
+
+    oauth_ids =
+      for ga <- group_applications, ga.application_type == "oauth2", do: ga.application_id
+
+    saml_ids = for ga <- group_applications, ga.application_type == "saml", do: ga.application_id
+
+    oauth_names = names_by_id(Authify.OAuth.Application, oauth_ids, organization)
+    saml_names = names_by_id(Authify.SAML.ServiceProvider, saml_ids, organization)
+
+    annotated =
+      Enum.map(group_applications, fn ga ->
+        names =
+          case ga.application_type do
+            "oauth2" -> oauth_names
+            "saml" -> saml_names
+            _ -> %{}
+          end
+
+        %{ga | application_name: Map.get(names, ga.application_id)}
+      end)
+
+    %{group | group_applications: annotated}
+  end
+
+  defp names_by_id(_schema, [], _organization), do: %{}
+
+  defp names_by_id(schema, ids, %Organization{id: org_id}) do
+    from(a in schema,
+      where: a.id in ^ids and a.organization_id == ^org_id,
+      select: {a.id, a.name}
+    )
+    |> Repo.all()
+    |> Map.new()
   end
 
   @doc """

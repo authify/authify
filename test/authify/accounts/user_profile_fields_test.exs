@@ -196,6 +196,7 @@ defmodule Authify.Accounts.UserProfileFieldsTest do
     test "returns gravatar URL when emails are not preloaded (falls back to DB query)" do
       organization = organization_fixture()
       user = user_for_organization_fixture(organization)
+
       # Strip the preloaded emails association to simulate unloaded
       user_no_emails = %{
         user

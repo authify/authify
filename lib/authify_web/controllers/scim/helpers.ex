@@ -234,6 +234,7 @@ defmodule AuthifyWeb.SCIM.Helpers do
   # Filter nested attributes (e.g., name.givenName)
   defp filter_nested_attributes(value, parent_key, attr_set) when is_map(value) do
     parent_key_string = to_string(parent_key)
+
     # Find all sub-attributes requested for this parent
     sub_attrs =
       attr_set

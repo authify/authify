@@ -238,6 +238,7 @@ defmodule AuthifyWeb.OAuthRealWorldFlowsTest do
 
       userinfo = json_response(conn, 200)
       assert userinfo["sub"]
+
       # Old token still doesn't return email (scope is stored with token)
       # Note: This depends on implementation - some systems check token scopes, others check app scopes
 

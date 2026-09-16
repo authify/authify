@@ -895,6 +895,7 @@ defmodule Authify.AccountsTest do
     } do
       n = System.unique_integer([:positive])
       rollback_email = "test.user-#{n}@example.com"
+
       # Use invalid organization ID to trigger error in user_organization creation
       user_attrs = %{
         "first_name" => "Test",
@@ -1809,6 +1810,59 @@ defmodule Authify.AccountsTest do
       Groups.remove_user_from_group(user, group)
       members = Groups.list_group_members(group)
       refute Enum.any?(members, &(&1.id == user.id))
+    end
+
+    test "add_application_to_group/3 adds an application in the same organization", %{
+      organization: org,
+      group: group
+    } do
+      {:ok, app} =
+        OAuth.create_application(%{
+          name: "Same Org App",
+          organization_id: org.id,
+          redirect_uris: "https://example.com/callback"
+        })
+
+      assert {:ok, %Authify.Accounts.GroupApplication{}} =
+               Groups.add_application_to_group(group, app.id, "oauth2")
+    end
+
+    test "add_application_to_group/3 rejects an application from another organization", %{
+      group: group
+    } do
+      n = System.unique_integer([:positive])
+
+      {:ok, other_org} =
+        Accounts.create_organization(%{name: "Other Org #{n}", slug: "other-org-#{n}"})
+
+      {:ok, foreign_app} =
+        OAuth.create_application(%{
+          name: "Foreign App",
+          organization_id: other_org.id,
+          redirect_uris: "https://example.com/callback"
+        })
+
+      assert {:error, changeset} =
+               Groups.add_application_to_group(group, foreign_app.id, "oauth2")
+
+      assert "does not exist in this organization" in errors_on(changeset).application_id
+    end
+
+    test "add_application_to_group/3 rejects a duplicate without raising", %{
+      organization: org,
+      group: group
+    } do
+      {:ok, app} =
+        OAuth.create_application(%{
+          name: "Dup App",
+          organization_id: org.id,
+          redirect_uris: "https://example.com/callback"
+        })
+
+      assert {:ok, _} = Groups.add_application_to_group(group, app.id, "oauth2")
+
+      assert {:error, changeset} = Groups.add_application_to_group(group, app.id, "oauth2")
+      assert "Application is already in this group" in errors_on(changeset).application_id
     end
 
     test "list_group_members/1 returns all users in the group", %{

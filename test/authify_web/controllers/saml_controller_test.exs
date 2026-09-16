@@ -235,6 +235,7 @@ defmodule AuthifyWeb.SAMLControllerTest do
       organization: organization
     } do
       logout_request = sample_saml_logout_request()
+
       # Modify to use unknown issuer
       unknown_issuer_request =
         String.replace(logout_request, "https://sp.example.com", "https://unknown-sp.example.com")

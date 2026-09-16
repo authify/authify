@@ -196,7 +196,9 @@
                       <i class="bi bi-diagram-3 me-2 text-success"></i>
                       <span class="badge bg-success me-2">SAML</span>
                     <% end %>
-                    <span class="small text-muted">ID: {member.application_id}</span>
+                    <span class="small">
+                      {Authify.Accounts.GroupApplication.display_name(member)}
+                    </span>
                   </div>
                 </div>
               <% end %>

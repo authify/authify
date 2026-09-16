@@ -4,8 +4,6 @@ defmodule AuthifyWeb.GroupController do
   alias Authify.Accounts
   alias Authify.Accounts.Group
   alias Authify.Groups
-  alias Authify.OAuth
-  alias Authify.SAML
 
   # Safely convert string to atom, only for known valid values
   defp safe_to_atom(string)
@@ -44,6 +42,8 @@ defmodule AuthifyWeb.GroupController do
   def show(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
     group = get_group_with_details!(id, organization)
+
+    group = Groups.annotate_application_names(group, organization)
 
     render(conn, :show, group: group, organization: organization)
   end
@@ -116,10 +116,12 @@ defmodule AuthifyWeb.GroupController do
   def manage_members(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
     group = get_group_with_details!(id, organization)
+    group = Groups.annotate_application_names(group, organization)
 
     users = Accounts.list_users(organization.id) |> Authify.Repo.preload(:emails)
-    oauth_apps = OAuth.list_oauth_applications(organization)
-    saml_providers = SAML.list_service_providers(organization)
+
+    %{oauth_apps: oauth_apps, saml_providers: saml_providers} =
+      Groups.available_group_applications(group, organization)
 
     render(conn, :manage_members,
       group: group,

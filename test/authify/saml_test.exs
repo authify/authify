@@ -266,6 +266,7 @@ defmodule Authify.SAMLTest do
 
     test "get_active_certificate/2 returns active certificate for purpose" do
       organization = organization_fixture()
+
       # Create active signing certificate
       signing_cert =
         certificate_fixture(%{

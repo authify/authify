@@ -608,6 +608,7 @@ defmodule Authify.Accounts.User do
   def password_reset_changeset(%__MODULE__{} = user) do
     plaintext_token = generate_password_reset_token()
     token_hash = hash_password_reset_token(plaintext_token)
+
     # 24 hours
     expires_at =
       DateTime.utc_now() |> DateTime.add(24 * 60 * 60, :second) |> DateTime.truncate(:second)
