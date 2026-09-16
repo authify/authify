@@ -1805,6 +1805,31 @@ defmodule Authify.AccountsTest do
       assert "User is already in this group" in errors_on(changeset).user_id
     end
 
+    test "add_user_to_group/2 rejects a user from another organization", %{group: group} do
+      n = System.unique_integer([:positive])
+
+      {:ok, other_org} =
+        Accounts.create_organization(%{name: "Other Org #{n}", slug: "other-org-#{n}"})
+
+      {:ok, foreign_user} =
+        Accounts.create_user_with_role(
+          %{
+            "emails" => [
+              %{"value" => "foreign-user-#{n}@example.com", "type" => "work", "primary" => true}
+            ],
+            "first_name" => "Foreign",
+            "last_name" => "User",
+            "password" => "SecureP@ssw0rd!",
+            "password_confirmation" => "SecureP@ssw0rd!"
+          },
+          other_org.id,
+          "user"
+        )
+
+      assert {:error, changeset} = Groups.add_user_to_group(foreign_user, group)
+      assert "does not belong to this organization" in errors_on(changeset).user_id
+    end
+
     test "remove_user_from_group/2 removes the user from the group", %{user: user, group: group} do
       {:ok, _} = Groups.add_user_to_group(user, group)
       Groups.remove_user_from_group(user, group)

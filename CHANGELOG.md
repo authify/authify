@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.4] - 2026-09-16
+
+### Fixed
+
+- Group user management no longer lists users who are already members of the group in the add dropdown; the add form is hidden with a hint when no users remain to add
+- Adding a user to a group now verifies the user belongs to the group's organization, rejecting cross-organization membership with a validation error instead of silently associating the user
+- Submitting the group's add-user form with a blank or unknown user ID no longer crashes with an `Ecto.Query.CastError` (500); it now returns a friendly error
+
 ## [0.21.3] - 2026-09-15
 
 ### Fixed
@@ -815,7 +823,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.21.3...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.21.4...HEAD
+[0.21.4]: https://github.com/authify/authify/compare/v0.21.3...v0.21.4
 [0.21.3]: https://github.com/authify/authify/compare/v0.21.2...v0.21.3
 [0.21.2]: https://github.com/authify/authify/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/authify/authify/compare/v0.21.0...v0.21.1

@@ -118,7 +118,7 @@ defmodule AuthifyWeb.GroupController do
     group = get_group_with_details!(id, organization)
     group = Groups.annotate_application_names(group, organization)
 
-    users = Accounts.list_users(organization.id) |> Authify.Repo.preload(:emails)
+    users = Groups.available_group_users(group, organization)
 
     %{oauth_apps: oauth_apps, saml_providers: saml_providers} =
       Groups.available_group_applications(group, organization)
@@ -135,36 +135,50 @@ defmodule AuthifyWeb.GroupController do
   def add_user(conn, %{"id" => id, "user_id" => user_id}) do
     organization = conn.assigns.current_organization
     group = get_group!(id, organization)
-    user = Accounts.get_user!(user_id)
 
-    case Groups.add_user_to_group(user, group) do
-      {:ok, _membership} ->
+    case get_user_in_organization(user_id, organization) do
+      nil ->
         conn
-        |> put_flash(:info, "User added to group successfully.")
+        |> put_flash(:error, "User does not exist in this organization.")
         |> redirect(to: ~p"/#{organization.slug}/groups/#{id}/members")
 
-      {:error, changeset} ->
-        conn
-        |> put_flash(:error, "Failed to add user: #{format_errors(changeset)}")
-        |> redirect(to: ~p"/#{organization.slug}/groups/#{id}/members")
+      user ->
+        case Groups.add_user_to_group(user, group) do
+          {:ok, _membership} ->
+            conn
+            |> put_flash(:info, "User added to group successfully.")
+            |> redirect(to: ~p"/#{organization.slug}/groups/#{id}/members")
+
+          {:error, changeset} ->
+            conn
+            |> put_flash(:error, "Failed to add user: #{format_errors(changeset)}")
+            |> redirect(to: ~p"/#{organization.slug}/groups/#{id}/members")
+        end
     end
   end
 
   def remove_user(conn, %{"id" => id, "user_id" => user_id}) do
     organization = conn.assigns.current_organization
     group = get_group!(id, organization)
-    user = Accounts.get_user!(user_id)
 
-    {count, _} = Groups.remove_user_from_group(user, group)
+    case get_user_in_organization(user_id, organization) do
+      nil ->
+        conn
+        |> put_flash(:error, "User does not exist in this organization.")
+        |> redirect(to: ~p"/#{organization.slug}/groups/#{id}/members")
 
-    if count > 0 do
-      conn
-      |> put_flash(:info, "User removed from group successfully.")
-      |> redirect(to: ~p"/#{organization.slug}/groups/#{id}/members")
-    else
-      conn
-      |> put_flash(:error, "User was not in the group.")
-      |> redirect(to: ~p"/#{organization.slug}/groups/#{id}/members")
+      user ->
+        {count, _} = Groups.remove_user_from_group(user, group)
+
+        if count > 0 do
+          conn
+          |> put_flash(:info, "User removed from group successfully.")
+          |> redirect(to: ~p"/#{organization.slug}/groups/#{id}/members")
+        else
+          conn
+          |> put_flash(:error, "User was not in the group.")
+          |> redirect(to: ~p"/#{organization.slug}/groups/#{id}/members")
+        end
     end
   end
 
@@ -210,6 +224,10 @@ defmodule AuthifyWeb.GroupController do
 
   defp get_group!(id, organization) do
     Groups.get_group!(id, organization)
+  end
+
+  defp get_user_in_organization(user_id, organization) do
+    Accounts.get_user_in_organization(user_id, organization.id)
   end
 
   defp get_group_with_details!(id, organization) do
