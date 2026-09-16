@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.3] - 2026-09-15
+
+### Fixed
+
+- Group application management no longer displays raw application IDs. Group applications now show the OAuth application or SAML service provider name, falling back to `Unknown <type> application (<id>)` when the application can no longer be resolved, and SAML provider dropdowns show names instead of entity IDs
+- Already-assigned applications are now filtered out of the group's add dropdowns, and the add form is hidden with a hint when nothing remains to add
+- Adding an application that is already in a group now returns a validation error instead of raising `Ecto.ConstraintError` (500), because the changeset's `unique_constraint` did not specify the actual unique index name
+- Adding an application that does not belong to the group's organization is now rejected with a validation error instead of silently associating another organization's application
+- Submitting the group's add-application form with a blank selection no longer crashes; it now returns a validation error
+
 ## [0.21.2] - 2026-09-14
 
 ### Security
@@ -805,7 +815,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.21.2...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.21.3...HEAD
+[0.21.3]: https://github.com/authify/authify/compare/v0.21.2...v0.21.3
 [0.21.2]: https://github.com/authify/authify/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/authify/authify/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/authify/authify/compare/v0.20.1...v0.21.0
