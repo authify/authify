@@ -23,7 +23,9 @@ defmodule Authify.Accounts.GroupApplication do
   Returns a human-readable name for the group application, falling back to a
   type- and ID-qualified label when the application can no longer be resolved.
   """
-  def display_name(%__MODULE__{application_name: name}) when is_binary(name), do: name
+  def display_name(%__MODULE__{application_name: name})
+      when is_binary(name) and name != "",
+      do: name
 
   def display_name(%__MODULE__{application_type: type, application_id: id}) do
     "Unknown #{type} application (#{id})"

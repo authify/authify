@@ -41,7 +41,9 @@ defmodule AuthifyWeb.GroupController do
 
   def show(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
-    group = get_group_with_details!(id, organization) |> Groups.annotate_application_names()
+    group = get_group_with_details!(id, organization)
+
+    group = Groups.annotate_application_names(group, organization)
 
     render(conn, :show, group: group, organization: organization)
   end
@@ -113,7 +115,8 @@ defmodule AuthifyWeb.GroupController do
 
   def manage_members(conn, %{"id" => id}) do
     organization = conn.assigns.current_organization
-    group = get_group_with_details!(id, organization) |> Groups.annotate_application_names()
+    group = get_group_with_details!(id, organization)
+    group = Groups.annotate_application_names(group, organization)
 
     users = Accounts.list_users(organization.id) |> Authify.Repo.preload(:emails)
 

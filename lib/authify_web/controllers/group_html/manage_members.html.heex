@@ -121,59 +121,71 @@
             </p>
 
             <!-- Add Application Form -->
-            <form
-              method="post"
-              action={~p"/#{@organization.slug}/groups/#{@group.id}/applications"}
-              class="mb-4"
-            >
-              <input
-                type="hidden"
-                name="_csrf_token"
-                value={Plug.CSRFProtection.get_csrf_token()}
-              />
-              <div class="mb-2">
-                <label class="form-label small fw-bold">OAuth Applications</label>
-                <div class="input-group mb-2">
-                  <select name="application_id" class="form-select">
-                    <option value="">Select OAuth app...</option>
-                    <%= for app <- @oauth_apps do %>
-                      <option value={app.id}>{app.name}</option>
-                    <% end %>
-                  </select>
-                  <input type="hidden" name="application_type" value="oauth2" />
-                  <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i>
-                  </button>
+            <%= if @oauth_apps == [] do %>
+              <p class="text-muted small mb-2">
+                <i class="bi bi-info-circle"></i> No OAuth applications available to add.
+              </p>
+            <% else %>
+              <form
+                method="post"
+                action={~p"/#{@organization.slug}/groups/#{@group.id}/applications"}
+                class="mb-4"
+              >
+                <input
+                  type="hidden"
+                  name="_csrf_token"
+                  value={Plug.CSRFProtection.get_csrf_token()}
+                />
+                <div class="mb-2">
+                  <label class="form-label small fw-bold">OAuth Applications</label>
+                  <div class="input-group mb-2">
+                    <select name="application_id" class="form-select">
+                      <option value="">Select OAuth app...</option>
+                      <%= for app <- @oauth_apps do %>
+                        <option value={app.id}>{app.name}</option>
+                      <% end %>
+                    </select>
+                    <input type="hidden" name="application_type" value="oauth2" />
+                    <button type="submit" class="btn btn-primary">
+                      <i class="bi bi-plus-circle"></i>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </form>
+              </form>
+            <% end %>
 
-            <form
-              method="post"
-              action={~p"/#{@organization.slug}/groups/#{@group.id}/applications"}
-              class="mb-4"
-            >
-              <input
-                type="hidden"
-                name="_csrf_token"
-                value={Plug.CSRFProtection.get_csrf_token()}
-              />
-              <div class="mb-2">
-                <label class="form-label small fw-bold">SAML Service Providers</label>
-                <div class="input-group">
-                  <select name="application_id" class="form-select">
-                    <option value="">Select SAML provider...</option>
-                    <%= for sp <- @saml_providers do %>
-                      <option value={sp.id}>{sp.name}</option>
-                    <% end %>
-                  </select>
-                  <input type="hidden" name="application_type" value="saml" />
-                  <button type="submit" class="btn btn-success">
-                    <i class="bi bi-plus-circle"></i>
-                  </button>
+            <%= if @saml_providers == [] do %>
+              <p class="text-muted small mb-2">
+                <i class="bi bi-info-circle"></i> No SAML service providers available to add.
+              </p>
+            <% else %>
+              <form
+                method="post"
+                action={~p"/#{@organization.slug}/groups/#{@group.id}/applications"}
+                class="mb-4"
+              >
+                <input
+                  type="hidden"
+                  name="_csrf_token"
+                  value={Plug.CSRFProtection.get_csrf_token()}
+                />
+                <div class="mb-2">
+                  <label class="form-label small fw-bold">SAML Service Providers</label>
+                  <div class="input-group">
+                    <select name="application_id" class="form-select">
+                      <option value="">Select SAML provider...</option>
+                      <%= for sp <- @saml_providers do %>
+                        <option value={sp.id}>{sp.name}</option>
+                      <% end %>
+                    </select>
+                    <input type="hidden" name="application_type" value="saml" />
+                    <button type="submit" class="btn btn-success">
+                      <i class="bi bi-plus-circle"></i>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </form>
+              </form>
+            <% end %>
 
             <!-- Current Applications List -->
             <%= if Enum.empty?(@group.group_applications) do %>

@@ -63,11 +63,33 @@ defmodule AuthifyWeb.GroupControllerTest do
       organization: organization
     } do
       group = group_fixture(organization: organization)
-      {:ok, _} = Groups.add_application_to_group(group, 999_999, "oauth2")
+
+      {:ok, _} =
+        %Authify.Accounts.GroupApplication{}
+        |> Authify.Accounts.GroupApplication.changeset(%{
+          group_id: group.id,
+          application_id: 999_999,
+          application_type: "oauth2"
+        })
+        |> Authify.Repo.insert()
 
       conn = get(conn, ~p"/#{organization.slug}/groups/#{group.id}/members")
 
       assert html_response(conn, 200) =~ "Unknown oauth2 application (999999)"
+    end
+
+    test "hides the add form when no applications are available", %{
+      conn: conn,
+      organization: organization
+    } do
+      group = group_fixture(organization: organization)
+
+      conn = get(conn, ~p"/#{organization.slug}/groups/#{group.id}/members")
+
+      html = html_response(conn, 200)
+      assert html =~ "No OAuth applications available to add."
+      assert html =~ "No SAML service providers available to add."
+      refute html =~ ~s(<option value="">Select OAuth app...)
     end
   end
 
@@ -128,6 +150,31 @@ defmodule AuthifyWeb.GroupControllerTest do
 
       assert redirected_to(conn) == ~p"/#{organization.slug}/groups/#{group.id}/members"
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Failed to add application"
+    end
+
+    test "rejects an application belonging to another organization", %{
+      conn: conn,
+      organization: organization
+    } do
+      group = group_fixture(organization: organization)
+      other_org = organization_fixture()
+      foreign_app = application_fixture(organization: other_org)
+
+      conn =
+        post(conn, ~p"/#{organization.slug}/groups/#{group.id}/applications", %{
+          application_id: foreign_app.id,
+          application_type: "oauth2"
+        })
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/groups/#{group.id}/members"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+               "does not exist in this organization"
+
+      members =
+        Groups.get_group!(group.id, organization) |> Authify.Repo.preload(:group_applications)
+
+      assert members.group_applications == []
     end
   end
 end
