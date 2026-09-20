@@ -70,7 +70,10 @@ defmodule AuthifyWeb.OAuthController do
   end
 
   defp redirect_to_login(conn) do
-    login_url = "/login?" <> URI.encode_query(%{"return_to" => current_url(conn)})
+    # Pass only the local path so caller-controlled values (such as the
+    # OAuth redirect_uri in the query string) never end up in return_to as
+    # an absolute URL. See AuthifyWeb.Auth.ReturnTo.
+    login_url = "/login?" <> URI.encode_query(%{"return_to" => current_path(conn)})
     redirect(conn, to: login_url)
   end
 

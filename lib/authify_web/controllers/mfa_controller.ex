@@ -124,6 +124,11 @@ defmodule AuthifyWeb.MfaController do
         |> Authify.Guardian.Plug.sign_in(updated_user)
         |> put_session(:current_organization_id, organization.id)
 
+      default_destination =
+        AuthifyWeb.Auth.Navigation.dashboard_path_for_user(updated_user, organization)
+
+      {conn, destination} = AuthifyWeb.Auth.ReturnTo.destination(conn, default_destination)
+
       if has_new_codes do
         # Show backup codes for first MFA method
         conn
@@ -136,15 +141,14 @@ defmodule AuthifyWeb.MfaController do
           organization: organization,
           backup_codes: backup_codes,
           show_download: true,
-          mandatory_setup: true
+          mandatory_setup: true,
+          continue_url: destination
         )
       else
-        # User already had codes, just redirect to dashboard
+        # User already had codes, continue to their destination
         conn
         |> put_flash(:info, "TOTP has been successfully enabled!")
-        |> redirect(
-          to: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(updated_user, organization)
-        )
+        |> redirect(to: destination)
       end
     else
       # Voluntary setup
@@ -625,14 +629,17 @@ defmodule AuthifyWeb.MfaController do
       end
 
     # Sign in and redirect
+    default_destination =
+      AuthifyWeb.Auth.Navigation.dashboard_path_for_user(updated_user, organization)
+
+    {conn, destination} = AuthifyWeb.Auth.ReturnTo.destination(conn, default_destination)
+
     conn
     |> Authify.Guardian.Plug.sign_in(updated_user)
     |> put_session(:current_organization_id, organization.id)
     |> AuthifyWeb.Auth.Navigation.clear_mfa_session()
     |> put_flash(:info, "Welcome back!")
-    |> redirect(
-      to: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(updated_user, organization)
-    )
+    |> redirect(to: destination)
   end
 
   defp handle_verification_result(
@@ -830,9 +837,12 @@ defmodule AuthifyWeb.MfaController do
 
     conn = AuthifyWeb.Auth.Navigation.complete_mfa_login(conn, user, organization)
 
+    default_destination = AuthifyWeb.Auth.Navigation.dashboard_path_for_user(user, organization)
+    {conn, destination} = AuthifyWeb.Auth.ReturnTo.destination(conn, default_destination)
+
     json(conn, %{
       success: true,
-      redirect_url: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(user, organization)
+      redirect_url: destination
     })
   end
 
