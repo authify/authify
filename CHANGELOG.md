@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-20
+
+### Added
+
+- Post-login `return_to` destinations are now validated and honored. After signing in (including through MFA verification, WebAuthn, or mandatory MFA setup), users are returned to the same-origin path they were originally heading to, such as an OAuth authorize or SAML SSO request. Only same-origin absolute paths are stored, and the destination is used at most once
+
+### Security
+
+- OAuth authorize no longer places an absolute URL (including a caller-supplied `redirect_uri`) into the login `return_to` query parameter; only a local path is passed. `return_to` is validated at both store and consume time against same-origin absolute paths, rejecting absolute URLs, protocol-relative and backslash forms, encoded slashes and control characters, invalid UTF-8, and oversized values. Validation never raises, and the length bound prevents a crafted value from overflowing the session cookie (`Plug.Conn.CookieOverflowError`)
+
 ### Fixed
 
 - `scim_rate_limit` overrides are now validated against the organization's SCIM quota. The quota-validation list in `Configurations` omitted `:scim_rate_limit`, so it bypassed the ceiling every other rate-limit override is subject to and accepted any positive integer (and even non-positive values). The list is now derived from the configuration schema, so newly added scopes are validated automatically
@@ -828,7 +838,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.21.4...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/authify/authify/compare/v0.21.4...v0.22.0
 [0.21.4]: https://github.com/authify/authify/compare/v0.21.3...v0.21.4
 [0.21.3]: https://github.com/authify/authify/compare/v0.21.2...v0.21.3
 [0.21.2]: https://github.com/authify/authify/compare/v0.21.1...v0.21.2
