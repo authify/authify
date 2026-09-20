@@ -178,6 +178,63 @@ defmodule Authify.ConfigurationsTest do
     end
   end
 
+  describe "rate limit quota validation" do
+    alias Authify.Configurations.Schemas.Organization
+
+    test "every organization rate limit setting is quota-validated" do
+      org = organization_fixture()
+      Configurations.get_or_create_configuration("Organization", org.id, "organization")
+
+      for setting <- Organization.rate_limit_settings() do
+        assert Organization.quota_validated_setting?(setting.name),
+               "#{setting.name} is not registered for quota validation"
+
+        quota_name = Organization.quota_name_for_setting(setting.name)
+        {:ok, _} = Configurations.set_setting("Organization", org.id, quota_name, 7)
+
+        assert {:ok, _} = Configurations.set_organization_setting(org, setting.name, 7)
+
+        assert {:error, message} =
+                 Configurations.set_organization_setting(org, setting.name, 8)
+
+        assert message =~ "quota"
+      end
+    end
+
+    test "scim_rate_limit rejects a value above the quota" do
+      org = organization_fixture()
+      Configurations.get_or_create_configuration("Organization", org.id, "organization")
+
+      # Default SCIM quota is 100
+      assert {:ok, _} =
+               Configurations.set_organization_setting(org, :scim_rate_limit, 99)
+
+      assert {:error, message} =
+               Configurations.set_organization_setting(org, :scim_rate_limit, 101)
+
+      assert message =~ "quota"
+    end
+
+    test "rate limit settings reject non-positive values" do
+      org = organization_fixture()
+      Configurations.get_or_create_configuration("Organization", org.id, "organization")
+
+      assert {:error, _} =
+               Configurations.set_organization_setting(org, :scim_rate_limit, -5)
+
+      assert {:error, _} =
+               Configurations.set_organization_setting(org, :scim_rate_limit, 0)
+    end
+
+    test "rate limit settings accept nil and empty string to fall back to the quota" do
+      org = organization_fixture()
+      Configurations.get_or_create_configuration("Organization", org.id, "organization")
+
+      assert {:ok, _} = Configurations.set_organization_setting(org, :scim_rate_limit, nil)
+      assert {:ok, _} = Configurations.set_organization_setting(org, :scim_rate_limit, "")
+    end
+  end
+
   describe "configuration value casting" do
     test "casts boolean strings correctly" do
       assert {:ok, true} = Configurations.Schema.cast_value(:boolean, "true")

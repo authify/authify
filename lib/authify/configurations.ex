@@ -254,8 +254,8 @@ defmodule Authify.Configurations do
         setting_name == :email_link_domain and schema_module == Schemas.Organization ->
           Schemas.Organization.validate_email_link_domain(org, value)
 
-        setting_name in [:auth_rate_limit, :oauth_rate_limit, :saml_rate_limit, :api_rate_limit] and
-            schema_module == Schemas.Organization ->
+        schema_module == Schemas.Organization and
+            Schemas.Organization.quota_validated_setting?(setting_name) ->
           Schemas.Organization.validate_rate_limit_with_quota(org, setting_name, value)
 
         true ->

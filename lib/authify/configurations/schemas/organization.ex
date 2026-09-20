@@ -393,7 +393,13 @@ defmodule Authify.Configurations.Schemas.Organization do
   end
 
   # Rate limit settings (organization admin configurable)
-  defp rate_limit_settings do
+  @doc """
+  Returns the organization rate-limit override settings.
+
+  Each of these is subject to quota validation; see
+  `quota_validated_setting?/1` and `validate_rate_limit_with_quota/3`.
+  """
+  def rate_limit_settings do
     [
       %{
         name: :auth_rate_limit,
@@ -471,7 +477,7 @@ defmodule Authify.Configurations.Schemas.Organization do
   Empty strings are treated as nil (not set), meaning the quota value will be used as the default.
   """
   def validate_rate_limit_with_quota(org, setting_name, value) do
-    case get_quota_name_for_setting(setting_name) do
+    case quota_name_for_setting(setting_name) do
       nil ->
         # Not a rate limit setting, just validate it's positive
         validate_positive_integer(value)
@@ -490,8 +496,18 @@ defmodule Authify.Configurations.Schemas.Organization do
     end
   end
 
-  # Maps rate limit setting names to their corresponding quota setting names
-  defp get_quota_name_for_setting(setting_name) do
+  @doc """
+  Returns true if the given setting is a quota-validated rate-limit override.
+  """
+  def quota_validated_setting?(setting_name) do
+    not is_nil(quota_name_for_setting(setting_name))
+  end
+
+  @doc """
+  Maps a rate limit setting name to its corresponding quota setting name, or
+  `nil` if the setting is not a quota-validated rate-limit override.
+  """
+  def quota_name_for_setting(setting_name) do
     case setting_name do
       :auth_rate_limit -> :quota_auth_rate_limit
       :oauth_rate_limit -> :quota_oauth_rate_limit

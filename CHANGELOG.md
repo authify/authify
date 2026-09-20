@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `scim_rate_limit` overrides are now validated against the organization's SCIM quota. The quota-validation list in `Configurations` omitted `:scim_rate_limit`, so it bypassed the ceiling every other rate-limit override is subject to and accepted any positive integer (and even non-positive values). The list is now derived from the configuration schema, so newly added scopes are validated automatically
+- Configuration audit events now tag `scim_rate_limit` and `quota_scim_rate_limit` changes as `rate_limit_changes`. The audit field list was hardcoded and had drifted behind the schema; it is now derived from the organization rate-limit settings so it cannot drift again
+
 ## [0.21.4] - 2026-09-16
 
 ### Fixed
