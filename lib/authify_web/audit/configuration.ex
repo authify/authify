@@ -3,26 +3,31 @@ defmodule AuthifyWeb.Audit.Configuration do
   Audit logging for configuration change events.
   """
 
+  alias Authify.Configurations.Schemas.Organization
   alias AuthifyWeb.Audit.Base
 
-  @rate_limit_fields MapSet.new(~w(
-    quota_auth_rate_limit
-    quota_oauth_rate_limit
-    quota_saml_rate_limit
-    quota_api_rate_limit
-    auth_rate_limit
-    oauth_rate_limit
-    saml_rate_limit
-    api_rate_limit
-  ))
-
   @sensitive_fields MapSet.new(~w(smtp_password))
+
+  @doc """
+  Returns the set of rate-limit setting names, including both override and quota
+  settings.
+
+  Derived from the organization configuration schema so the audit tagging cannot
+  drift behind newly added rate-limit scopes.
+  """
+  def rate_limit_fields do
+    Organization.rate_limit_settings()
+    |> Enum.flat_map(fn %{name: name} ->
+      [to_string(name), to_string(Organization.quota_name_for_setting(name))]
+    end)
+    |> MapSet.new()
+  end
 
   @doc """
   Logs a configuration change event, summarizing differences between settings.
   """
   def log_configuration_update(conn, schema_name, old_settings, new_settings, opts \\ []) do
-    rate_limit_fields = Base.kwargs_to_set(opts[:rate_limit_fields], @rate_limit_fields)
+    rate_limit_field_set = Base.kwargs_to_set(opts[:rate_limit_fields], rate_limit_fields())
     sensitive_fields = Base.kwargs_to_set(opts[:sensitive_fields], @sensitive_fields)
 
     changes = Base.diff_settings(old_settings, new_settings, sensitive_fields)
@@ -30,7 +35,7 @@ defmodule AuthifyWeb.Audit.Configuration do
     if changes != [] do
       rate_limit_changes =
         Enum.filter(changes, fn %{"field" => field} ->
-          MapSet.member?(rate_limit_fields, field)
+          MapSet.member?(rate_limit_field_set, field)
         end)
 
       metadata =

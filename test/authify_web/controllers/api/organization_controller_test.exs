@@ -127,6 +127,46 @@ defmodule AuthifyWeb.API.OrganizationControllerTest do
       assert event.metadata["source"] == "api"
     end
 
+    test "tags every rate-limit change, including scim, as rate_limit_changes", %{
+      conn: conn,
+      organization: organization
+    } do
+      conn =
+        put(conn, "/#{organization.slug}/api/organization/configuration", %{
+          "settings" => %{
+            "auth_rate_limit" => "5",
+            "scim_rate_limit" => "50"
+          }
+        })
+
+      assert %{"data" => %{"type" => "configuration"}} = json_response(conn, 200)
+
+      events =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "settings_updated"
+        )
+
+      event = hd(events)
+      tagged_fields = Enum.map(event.metadata["rate_limit_changes"], & &1["field"])
+
+      assert "auth_rate_limit" in tagged_fields
+      assert "scim_rate_limit" in tagged_fields
+    end
+
+    test "audit rate limit fields are derived from every organization rate limit setting" do
+      fields = AuthifyWeb.Audit.Configuration.rate_limit_fields()
+
+      for setting <- Authify.Configurations.Schemas.Organization.rate_limit_settings() do
+        assert MapSet.member?(fields, to_string(setting.name))
+
+        quota_name =
+          Authify.Configurations.Schemas.Organization.quota_name_for_setting(setting.name)
+
+        assert MapSet.member?(fields, to_string(quota_name))
+      end
+    end
+
     test "accepts sign_audit_logs boolean setting", %{conn: conn, organization: organization} do
       conn =
         put(conn, "/#{organization.slug}/api/organization/configuration", %{
