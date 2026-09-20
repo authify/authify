@@ -6,26 +6,36 @@ defmodule AuthifyWeb.SessionController do
   alias Authify.Guardian
   alias Authify.MFA
   alias AuthifyWeb.Audit.Sessions
+  alias AuthifyWeb.Auth.ReturnTo
 
   def new(conn, params) do
     # If user is already authenticated with a valid organization, redirect to their dashboard
     case Guardian.Plug.current_resource(conn) do
       nil ->
-        # No authenticated user, show login form
-        # Clear any stale session data when showing login form
-        conn = Guardian.Plug.sign_out(conn)
+        # No authenticated user, show login form.
+        # Clear any stale session data before storing the requested destination,
+        # because signing out may renew the session and drop existing keys.
+        conn =
+          conn
+          |> Guardian.Plug.sign_out()
+          |> ReturnTo.store(params["return_to"])
+
         render_login_form(conn, params)
 
       user ->
         # User is authenticated - determine their current organization context
+        # and honor any requested destination (see AuthifyWeb.Auth.ReturnTo).
+        conn = ReturnTo.store(conn, params["return_to"])
         user_with_org = Accounts.get_user_with_organizations!(user.id)
 
         # Check for current organization in session (respects "Switch To" functionality)
         organization = get_current_organization_for_redirect(conn, user_with_org)
 
         if organization do
-          # Valid organization exists, redirect to their dashboard
-          redirect(conn, to: ~p"/#{organization.slug}/dashboard")
+          # Valid organization exists, redirect to their destination (or the
+          # org dashboard if no post-login destination was requested)
+          {conn, destination} = ReturnTo.destination(conn, ~p"/#{organization.slug}/dashboard")
+          redirect(conn, to: destination)
         else
           # Organization is missing/invalid - sign out and show login with error
           conn
@@ -246,12 +256,15 @@ defmodule AuthifyWeb.SessionController do
 
   # Complete the login process (extracted for reuse)
   defp complete_login(conn, user, organization) do
+    default_destination = AuthifyWeb.Auth.Navigation.dashboard_path_for_user(user, organization)
+    {conn, destination} = ReturnTo.destination(conn, default_destination)
+
     conn
     |> Guardian.Plug.sign_out()
     |> Guardian.Plug.sign_in(user)
     |> put_session(:current_organization_id, organization.id)
     |> AuthifyWeb.Auth.Navigation.clear_mfa_session()
     |> put_flash(:info, "Welcome back!")
-    |> redirect(to: AuthifyWeb.Auth.Navigation.dashboard_path_for_user(user, organization))
+    |> redirect(to: destination)
   end
 end

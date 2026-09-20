@@ -36,6 +36,34 @@ defmodule AuthifyWeb.OAuthControllerTest do
       assert redirected_to(conn) =~ "/login"
     end
 
+    test "return_to is a same-origin local path", %{
+      conn: conn,
+      application: application,
+      organization: organization
+    } do
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid profile"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      login_url = redirected_to(conn)
+      %URI{scheme: scheme, host: host, query: query} = URI.parse(login_url)
+
+      # Local redirect only — no scheme/host in the login URL itself.
+      assert scheme == nil
+      assert host == nil
+
+      # return_to is an absolute path on this host, never an absolute URL.
+      assert %{"return_to" => return_to} = URI.decode_query(query)
+      assert String.starts_with?(return_to, "/")
+      refute String.contains?(return_to, "https://")
+      refute String.contains?(return_to, "//")
+    end
+
     test "shows consent screen when user authenticated", %{
       conn: conn,
       user: user,

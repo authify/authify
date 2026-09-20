@@ -84,15 +84,15 @@
               <%= if assigns[:mandatory_setup] do %>
                 <a
                   href={
-                    if assigns[:user].is_global_admin do
-                      ~p"/#{@organization.slug}/dashboard"
-                    else
-                      ~p"/#{@organization.slug}/user/dashboard"
-                    end
+                    assigns[:continue_url] ||
+                      if(assigns[:user].is_global_admin,
+                        do: ~p"/#{@organization.slug}/dashboard",
+                        else: ~p"/#{@organization.slug}/user/dashboard"
+                      )
                   }
                   class="btn btn-primary btn-lg"
                 >
-                  <i class="bi bi-arrow-right"></i> Continue to Dashboard
+                  <i class="bi bi-arrow-right"></i> Continue
                 </a>
               <% else %>
                 <a

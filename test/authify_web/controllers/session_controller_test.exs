@@ -270,6 +270,131 @@ defmodule AuthifyWeb.SessionControllerTest do
       assert redirected_to(conn) == ~p"/#{organization.slug}/user/dashboard"
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Welcome back!"
     end
+
+    test "honors a valid return_to destination after login", %{conn: conn} do
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
+
+      email = "john-#{System.unique_integer([:positive])}@test.com"
+
+      user_attrs = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "email" => email,
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      {:ok, _user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
+
+      destination = "/#{organization.slug}/groups/42/members"
+
+      login_params = %{
+        "organization_slug" => slug,
+        "email" => email,
+        "password" => "SecureP@ssw0rd!"
+      }
+
+      conn =
+        conn
+        |> get(~p"/login", return_to: destination)
+        |> recycle()
+        |> post(~p"/login", login: login_params)
+
+      assert redirected_to(conn) == destination
+    end
+
+    test "ignores an unsafe return_to destination after login", %{conn: conn} do
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
+
+      email = "john-#{System.unique_integer([:positive])}@test.com"
+
+      user_attrs = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "email" => email,
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      {:ok, _user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
+
+      login_params = %{
+        "organization_slug" => slug,
+        "email" => email,
+        "password" => "SecureP@ssw0rd!"
+      }
+
+      conn =
+        conn
+        |> get(~p"/login", return_to: "https://attacker.example/steal")
+        |> recycle()
+        |> post(~p"/login", login: login_params)
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/user/dashboard"
+    end
+
+    test "does not overflow the session cookie for an oversized return_to", %{conn: conn} do
+      oversized = "/" <> String.duplicate("a", 8000)
+
+      conn = get(conn, ~p"/login", return_to: oversized)
+
+      # Must render the form rather than raising Plug.Conn.CookieOverflowError,
+      # and the unsafe value must not be stored.
+      assert html_response(conn, 200) =~ "Sign In"
+      assert get_session(conn, :return_to) == nil
+    end
+
+    test "carries return_to through the MFA detour and redirects there", %{conn: conn} do
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
+
+      email = "john-#{System.unique_integer([:positive])}@test.com"
+
+      user_attrs = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "email" => email,
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      {:ok, user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
+
+      {:ok, secret} = Authify.MFA.setup_totp(user)
+      code = NimbleTOTP.verification_code(secret)
+      {:ok, _user, _codes} = Authify.MFA.complete_totp_setup(user, code, secret)
+
+      destination = "/#{organization.slug}/groups/42/members"
+
+      login_params = %{
+        "organization_slug" => slug,
+        "email" => email,
+        "password" => "SecureP@ssw0rd!"
+      }
+
+      # Password step redirects to MFA, preserving the requested destination
+      conn =
+        conn
+        |> get(~p"/login", return_to: destination)
+        |> recycle()
+        |> post(~p"/login", login: login_params)
+
+      assert redirected_to(conn) == ~p"/mfa/verify"
+      assert get_session(conn, :return_to) == destination
+
+      # Completing MFA resumes the original destination rather than the dashboard
+      verify_code = NimbleTOTP.verification_code(secret)
+
+      conn =
+        post(conn, ~p"/mfa/verify", %{
+          "totp_code" => verify_code
+        })
+
+      assert redirected_to(conn) == destination
+      assert get_session(conn, :return_to) == nil
+    end
   end
 
   describe "DELETE /logout" do
