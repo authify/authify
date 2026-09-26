@@ -85,6 +85,9 @@ defmodule AuthifyWeb.OAuthControllerTest do
       assert body =~ application.name
       # Consent is a standalone document; it must not be wrapped in the app root layout.
       assert length(String.split(body, "<!DOCTYPE")) - 1 == 1
+      # Styles must be self-hosted (no third-party CDN dependency on auth pages).
+      assert body =~ ~p"/assets/app.css"
+      refute body =~ "cdn.jsdelivr.net"
     end
 
     test "returns error for invalid client_id", %{
@@ -160,6 +163,9 @@ defmodule AuthifyWeb.OAuthControllerTest do
       assert body =~ "invalid_client"
       # Error page is a standalone document; it must not be wrapped twice.
       assert length(String.split(body, "<!DOCTYPE")) - 1 == 1
+      # Styles must be self-hosted (no third-party CDN dependency on auth pages).
+      assert body =~ ~p"/assets/app.css"
+      refute body =~ "cdn.jsdelivr.net"
     end
 
     test "does not redirect to unvalidated redirect_uri for a known client", %{

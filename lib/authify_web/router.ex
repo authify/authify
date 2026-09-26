@@ -41,11 +41,13 @@ defmodule AuthifyWeb.Router do
   end
 
   pipeline :oauth_api do
+    plug AuthifyWeb.Plugs.NoStoreCache
     plug :accepts, ["json"]
     plug AuthifyWeb.Plugs.RateLimiter, :oauth_rate_limit
   end
 
   pipeline :management_api do
+    plug AuthifyWeb.Plugs.NoStoreCache
     plug :accepts, ["json"]
     plug AuthifyWeb.Plugs.RateLimiter, :api_rate_limit
     plug AuthifyWeb.Plugs.ApiVersionNegotiation
@@ -53,11 +55,16 @@ defmodule AuthifyWeb.Router do
   end
 
   pipeline :scim do
+    plug AuthifyWeb.Plugs.NoStoreCache
     plug :accepts, ["json", "scim+json"]
     plug AuthifyWeb.Plugs.RateLimiter, :scim_rate_limit
     plug AuthifyWeb.Auth.APIAuth
     plug AuthifyWeb.Plugs.ScimFeatureToggle
     plug AuthifyWeb.Plugs.SCIMETagValidation
+  end
+
+  pipeline :no_store do
+    plug AuthifyWeb.Plugs.NoStoreCache
   end
 
   pipeline :oauth do
@@ -122,19 +129,24 @@ defmodule AuthifyWeb.Router do
     get "/login", SessionController, :new
     post "/login", SessionController, :create
 
-    # Password reset (rate limited to prevent abuse)
-    get "/password_reset/new", PasswordResetController, :new
-    post "/password_reset", PasswordResetController, :create
-    get "/password_reset/:token/edit", PasswordResetController, :edit
-    put "/password_reset/:token", PasswordResetController, :update
-
     # Invitation acceptance POST (rate limited)
     post "/invite/:token/accept", InvitationController, :accept_invitation
   end
 
+  # Password reset (rate limited to prevent abuse). Responses are marked
+  # `no-store` because reset tokens appear in the URL and form.
+  scope "/", AuthifyWeb do
+    pipe_through [:browser, :auth_endpoints, :no_store]
+
+    get "/password_reset/new", PasswordResetController, :new
+    post "/password_reset", PasswordResetController, :create
+    get "/password_reset/:token/edit", PasswordResetController, :edit
+    put "/password_reset/:token", PasswordResetController, :update
+  end
+
   # MFA verification during login (requires pending MFA session, not full auth)
   scope "/mfa", AuthifyWeb do
-    pipe_through [:browser, :auth_endpoints]
+    pipe_through [:browser, :auth_endpoints, :no_store]
 
     get "/verify", MfaController, :verify_form
     post "/verify", MfaController, :verify_code
