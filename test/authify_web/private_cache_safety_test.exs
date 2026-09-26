@@ -1,12 +1,13 @@
 defmodule AuthifyWeb.PrivateCacheSafetyTest do
   @moduledoc """
   Guards the cache-header contract that keeps private content out of shared
-  caches (browsers, reverse proxies, and CDNs such as Fastly).
+  caches (browsers, reverse proxies, and CDNs).
 
-  Authify sets no explicit `cache-control` headers on dynamic responses; it
-  relies on Plug's default of `max-age=0, private, must-revalidate`. That
-  default is safe for authenticated content but is only one dependency bump
-  away from changing. These tests lock in the contract:
+  Most dynamic responses carry no explicit `cache-control` header; they rely
+  on Plug's default of `max-age=0, private, must-revalidate`. That default is
+  safe for shared caches but is only one dependency bump away from changing.
+  Sensitive endpoints add `no-store` on top (see
+  `AuthifyWeb.Plugs.NoStoreCacheTest`). These tests lock in the contract:
 
     * dynamic responses (public and authenticated) must not be publicly
       cacheable
