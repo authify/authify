@@ -38,7 +38,7 @@ defmodule AuthifyWeb.Layouts do
     <header class="navbar navbar-expand-lg bg-body-tertiary px-4">
       <div class="container-fluid">
         <a href="/" class="navbar-brand d-flex align-items-center">
-          <img src={~p"/images/logo.svg"} width="36" class="me-2" />
+          <img src={~p"/images/logo-no-text.svg"} width="36" class="me-2" />
           <span class="fs-6 fw-semibold">v{Application.spec(:phoenix, :vsn)}</span>
         </a>
         <div class="navbar-nav ms-auto">
