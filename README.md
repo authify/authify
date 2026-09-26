@@ -139,6 +139,8 @@ docker run --rm -p 4000:4000 -p 9568:9568 \
 
 This affects absolute URLs such as the OIDC discovery endpoints and the ID token `iss` claim.
 
+> **Note:** Production marks the session cookie `Secure`, so it is only sent over HTTPS. If you run a production image over plain HTTP, sessions will not work unless you recompile with `config :authify, :session_secure, false` (see `config/prod.exs`).
+
 **For complete deployment options** including Docker Compose, Kubernetes manifests, scaling strategies, and operational best practices, see the **[Operations Guide](https://github.com/authify/authify/wiki/Operations)**.
 
 ## 📚 Documentation

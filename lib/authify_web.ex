@@ -19,6 +19,14 @@ defmodule AuthifyWeb do
 
   def static_paths, do: ~w(assets fonts images favicon.ico favicon.svg robots.txt)
 
+  # Files at the root of `priv/static` whose digested form
+  # (`favicon-<hash>.svg`) must still be served. The directory-relative
+  # entries in `static_paths/0` (`assets fonts images`) are already matched
+  # as prefixes, but root-level filenames are matched exactly and so fail
+  # once `phx.digest` appends a hash. Plug.Static's `:only_matching`
+  # provides the required prefix matching.
+  def static_match_prefixes, do: ~w(favicon robots)
+
   def router do
     quote do
       use Phoenix.Router, helpers: false

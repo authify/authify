@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-26
+
+### Security
+
+- Session cookie is now marked `Secure` in production so it is only ever sent over HTTPS. Configurable via `:session_secure`, since dev, test, and documented plain-HTTP deployments need it disabled to send the cookie at all
+- Sensitive responses now send `Cache-Control: no-store` (with `Pragma: no-cache` for HTTP/1.0 intermediaries). Applied to the OAuth token and userinfo endpoints (as required by RFC 6749 Section 5.1), the Management API, SCIM 2.0, MFA verification, and password reset screens, so tokens, credentials, and personal data are never written to a browser's on-disk cache
+
+### Changed
+
+- OAuth consent and error pages now use the self-hosted `app.css` bundle instead of loading Bootstrap and Bootstrap Icons from `cdn.jsdelivr.net`, removing a third-party dependency (and a CSP/availability risk) from authentication screens
+
+### Fixed
+
+- Digested root-level static assets (`favicon.ico`, `favicon.svg`, `robots.txt`) are now served in production. `Plug.Static`'s `:only` matched path segments exactly, so the digested filenames emitted by `cache_static_manifest` (e.g. `/favicon-<hash>.svg?vsn=d`) all 404'd, including the favicon on every page. Added a regression test that exercises the real endpoint pipeline
+- The default application layout referenced a nonexistent `/images/logo.svg`, producing a latent 404; it now uses the existing `logo-no-text.svg`
+
 ## [0.22.0] - 2026-09-20
 
 ### Added
@@ -838,7 +854,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/authify/authify/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/authify/authify/compare/v0.21.4...v0.22.0
 [0.21.4]: https://github.com/authify/authify/compare/v0.21.3...v0.21.4
 [0.21.3]: https://github.com/authify/authify/compare/v0.21.2...v0.21.3
