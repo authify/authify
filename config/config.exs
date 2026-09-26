@@ -22,6 +22,10 @@ config :authify, AuthifyWeb.Endpoint,
   pubsub_server: Authify.PubSub,
   live_view: [signing_salt: "H9twhOz4"]
 
+# Whether the session cookie is marked `Secure` (HTTPS-only). Disabled by
+# default for dev/test over plain HTTP; enabled in production (see prod.exs).
+config :authify, :session_secure, false
+
 # Configures the mailer
 #
 # By default it uses the "Local" adapter which stores the emails

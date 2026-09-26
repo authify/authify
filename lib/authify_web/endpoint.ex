@@ -4,11 +4,17 @@ defmodule AuthifyWeb.Endpoint do
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
   # Set :encryption_salt if you would also like to encrypt it.
+  #
+  # `:secure` is enabled in production so the session cookie is only ever
+  # sent over HTTPS (TLS terminates at the CDN/ingress in front of the app).
+  # It is disabled in dev/test and plain-HTTP deployments, where a Secure
+  # cookie would never be sent and sessions would not work.
   @session_options [
     store: :cookie,
     key: "_authify_key",
     signing_salt: "afgN/h7v",
-    same_site: "Lax"
+    same_site: "Lax",
+    secure: Application.compile_env(:authify, :session_secure, false)
   ]
 
   socket "/live", Phoenix.LiveView.Socket,
