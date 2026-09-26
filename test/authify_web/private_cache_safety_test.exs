@@ -57,10 +57,12 @@ defmodule AuthifyWeb.PrivateCacheSafetyTest do
     assert_private(conn)
   end
 
-  test "digested static assets are long-lived and publicly cacheable", %{conn: conn} do
-    # The undigested URL is served by Plug.Static with an ETag; either way it
-    # must be marked public so a CDN can cache it.
-    conn = get(conn, ~p"/assets/app.css")
+  test "static assets are publicly cacheable", %{conn: conn} do
+    # Served by Plug.Static. The undigested URL carries an ETag; the digested
+    # (`?vsn=d`) URL is longer-lived. Either way it must be marked public so a
+    # CDN can cache it. Uses a checked-in asset since built assets are absent
+    # in CI.
+    conn = get(conn, ~p"/images/logo-no-text.svg")
     assert response(conn, 200)
 
     [cache_control] = Plug.Conn.get_resp_header(conn, "cache-control")
