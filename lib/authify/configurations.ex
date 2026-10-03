@@ -203,6 +203,17 @@ defmodule Authify.Configurations do
   end
 
   @doc """
+  Returns true if SAML identity provider functionality is enabled for the
+  organization.
+
+  Defaults to true when unset, matching the schema default, so existing
+  organizations keep working without an explicit configuration row.
+  """
+  def allow_saml?(org) do
+    get_organization_setting(org, :allow_saml) != false
+  end
+
+  @doc """
   Gets an organization-specific setting value.
   """
   def get_organization_setting(org, setting_name) do

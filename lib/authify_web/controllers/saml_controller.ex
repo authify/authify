@@ -4,6 +4,9 @@ defmodule AuthifyWeb.SAMLController do
   alias Authify.SAML
   alias AuthifyWeb.Audit.SAML, as: SAMLAudit
 
+  # The :organization pipeline assigns current_organization before this runs.
+  plug AuthifyWeb.Plugs.SamlFeatureToggle
+
   # Helper to escape HTML and convert to string
   defp html_escape_to_string(value) when is_binary(value) do
     {:safe, iodata} = Phoenix.HTML.html_escape(value)

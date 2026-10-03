@@ -195,5 +195,22 @@ defmodule AuthifyWeb.AppLinkControllerTest do
       assert redirected_to(conn) == "/#{org.slug}/user/dashboard"
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Access denied"
     end
+
+    test "redirects to user dashboard when SAML is disabled", %{
+      conn: conn,
+      user: user,
+      group: group,
+      saml_sp: saml_sp,
+      organization: org
+    } do
+      {:ok, _} = Groups.add_user_to_group(user, group)
+      Authify.Configurations.set_organization_setting(org, :allow_saml, false)
+
+      conn = get(conn, ~p"/#{org.slug}/user/apps/saml/#{saml_sp.id}")
+
+      assert redirected_to(conn) == "/#{org.slug}/user/dashboard"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "SAML SSO is not enabled"
+    end
   end
 end
