@@ -36,8 +36,6 @@ defmodule AuthifyWeb.Plugs.ScimFeatureToggle do
   end
 
   defp scim_enabled?(organization) do
-    # Default to true if not configured (backwards compatibility)
-    Configurations.get_organization_setting(organization, :scim_inbound_provisioning_enabled) !=
-      false
+    Configurations.feature_enabled?(organization, :scim_inbound_provisioning_enabled)
   end
 end

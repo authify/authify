@@ -7,6 +7,6 @@ Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:484,4CB30CE
 Config.CSRFRoute: CSRF via Action Reuse,lib/authify_web/router.ex:487,6043EB4
 SQL.Query: SQL injection,lib/authify_web/controllers/maintenance_controller.ex:198,3B7FEA5
 SQL.Query: SQL injection,lib/authify_web/controllers/maintenance_controller.ex:222,3524CA7
-XSS.SendResp: XSS in `send_resp`,lib/authify_web/controllers/saml_controller.ex:80,5759188
-XSS.SendResp: XSS in `send_resp`,lib/authify_web/controllers/saml_controller.ex:429,527CB4D
-XSS.SendResp: XSS in `send_resp`,lib/authify_web/controllers/saml_controller.ex:470,7CA883D
+XSS.SendResp: XSS in `send_resp`,lib/authify_web/controllers/saml_controller.ex:82,68D793A
+XSS.SendResp: XSS in `send_resp`,lib/authify_web/controllers/saml_controller.ex:431,567A820
+XSS.SendResp: XSS in `send_resp`,lib/authify_web/controllers/saml_controller.ex:472,3B90CB9

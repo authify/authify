@@ -203,6 +203,18 @@ defmodule Authify.Configurations do
   end
 
   @doc """
+  Returns true if a default-enabled organization feature toggle is enabled.
+
+  Feature toggles are considered enabled unless they are explicitly set to
+  `false`, so an organization without an explicit configuration row inherits the
+  schema default. Use this for the `allow_*` feature toggles and other toggles
+  that default to `true`.
+  """
+  def feature_enabled?(org, setting) when is_atom(setting) do
+    get_organization_setting(org, setting) != false
+  end
+
+  @doc """
   Returns true if SAML identity provider functionality is enabled for the
   organization.
 
@@ -210,7 +222,7 @@ defmodule Authify.Configurations do
   organizations keep working without an explicit configuration row.
   """
   def allow_saml?(org) do
-    get_organization_setting(org, :allow_saml) != false
+    feature_enabled?(org, :allow_saml)
   end
 
   @doc """
@@ -222,7 +234,7 @@ defmodule Authify.Configurations do
   refresh_token grants) but not the Management API's client_credentials flow.
   """
   def allow_oauth?(org) do
-    get_organization_setting(org, :allow_oauth) != false
+    feature_enabled?(org, :allow_oauth)
   end
 
   @doc """
@@ -232,7 +244,7 @@ defmodule Authify.Configurations do
   does not invalidate invitations that were already issued.
   """
   def allow_invitations?(org) do
-    get_organization_setting(org, :allow_invitations) != false
+    feature_enabled?(org, :allow_invitations)
   end
 
   @doc """
@@ -242,7 +254,7 @@ defmodule Authify.Configurations do
   WebAuthn authentication during login.
   """
   def allow_webauthn?(org) do
-    get_organization_setting(org, :allow_webauthn) != false
+    feature_enabled?(org, :allow_webauthn)
   end
 
   @doc """

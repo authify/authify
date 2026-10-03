@@ -17,7 +17,11 @@ defmodule AuthifyWeb.WebAuthnController do
 
   # Existing credentials stay manageable, but registration is gated by the
   # organization's :allow_webauthn setting.
-  plug AuthifyWeb.Plugs.WebAuthnFeatureToggle
+  plug AuthifyWeb.Plugs.FeatureToggle,
+       [
+         feature: :allow_webauthn,
+         message: "WebAuthn is not enabled for this organization"
+       ]
        when action in [:setup, :register_begin, :register_complete, :setup_complete]
 
   # ============================================================================

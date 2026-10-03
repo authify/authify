@@ -5,7 +5,9 @@ defmodule AuthifyWeb.SAMLController do
   alias AuthifyWeb.Audit.SAML, as: SAMLAudit
 
   # The :organization pipeline assigns current_organization before this runs.
-  plug AuthifyWeb.Plugs.SamlFeatureToggle
+  plug AuthifyWeb.Plugs.FeatureToggle,
+    feature: :allow_saml,
+    message: "SAML is not enabled for this organization"
 
   # Helper to escape HTML and convert to string
   defp html_escape_to_string(value) when is_binary(value) do

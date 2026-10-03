@@ -13,7 +13,9 @@ defmodule AuthifyWeb.OAuthController do
   # The :allow_oauth setting is enforced per-grant-type on the token endpoint
   # (see token/2), so client_credentials keeps working for Management API
   # service accounts even when third-party OAuth is disabled.
-  plug AuthifyWeb.Plugs.OAuthFeatureToggle when action in [:authorize, :consent, :userinfo]
+  plug AuthifyWeb.Plugs.FeatureToggle,
+       [feature: :allow_oauth, message: "OAuth2/OIDC is not enabled for this organization"]
+       when action in [:authorize, :consent, :userinfo]
 
   @doc """
   OAuth2 Authorization endpoint.

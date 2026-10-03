@@ -94,6 +94,7 @@ defmodule AuthifyWeb do
       import Phoenix.HTML
       # Core UI components
       import AuthifyWeb.CoreComponents
+      import AuthifyWeb.Components.FeatureComponents
       import AuthifyWeb.NavigationComponents
       import AuthifyWeb.LayoutComponents
 

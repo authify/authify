@@ -1,10 +1,10 @@
-defmodule AuthifyWeb.Plugs.SamlFeatureToggleTest do
+defmodule AuthifyWeb.Plugs.FeatureToggleTest do
   use AuthifyWeb.ConnCase, async: true
 
   import Authify.AccountsFixtures
 
   alias Authify.Configurations
-  alias AuthifyWeb.Plugs.SamlFeatureToggle
+  alias AuthifyWeb.Plugs.FeatureToggle
 
   setup %{conn: conn} do
     organization = organization_fixture()
@@ -14,28 +14,29 @@ defmodule AuthifyWeb.Plugs.SamlFeatureToggleTest do
     {:ok, conn: conn, organization: organization}
   end
 
-  describe "call/2" do
-    test "allows access when SAML is enabled (default)", %{conn: conn} do
-      conn = SamlFeatureToggle.call(conn, [])
+  @opts [feature: :allow_saml, message: "SAML is not enabled for this organization"]
 
-      refute conn.halted
+  describe "call/2" do
+    test "allows access when the feature is enabled (default)", %{conn: conn} do
+      refute FeatureToggle.call(conn, @opts).halted
     end
 
-    test "allows access when SAML is explicitly enabled", %{
+    test "allows access when the feature is explicitly enabled", %{
       conn: conn,
       organization: organization
     } do
       Configurations.set_organization_setting(organization, :allow_saml, true)
 
-      conn = SamlFeatureToggle.call(conn, [])
-
-      refute conn.halted
+      refute FeatureToggle.call(conn, @opts).halted
     end
 
-    test "blocks access when SAML is disabled", %{conn: conn, organization: organization} do
+    test "blocks access when the feature is disabled", %{
+      conn: conn,
+      organization: organization
+    } do
       Configurations.set_organization_setting(organization, :allow_saml, false)
 
-      conn = SamlFeatureToggle.call(conn, [])
+      conn = FeatureToggle.call(conn, @opts)
 
       assert conn.halted
       assert conn.status == 404
@@ -46,7 +47,7 @@ defmodule AuthifyWeb.Plugs.SamlFeatureToggleTest do
       conn =
         conn
         |> assign(:current_organization, nil)
-        |> SamlFeatureToggle.call([])
+        |> FeatureToggle.call(@opts)
 
       assert conn.halted
       assert conn.status == 404
