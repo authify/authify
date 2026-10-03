@@ -80,12 +80,18 @@ defmodule AuthifyWeb.OAuthController do
   @doc """
   User consent handling - approve or deny authorization.
   Includes PKCE parameters when creating authorization code.
+
+  Requires an authenticated resource owner. An unauthenticated request is
+  rejected with a `400 access_denied` rather than raising (RFC 6749 §4.1.2.1
+  permits `access_denied` when the authorization server denies the request). A
+  missing or unknown `approve` value is rejected with a `400 invalid_request`.
   """
   def consent(conn, %{"approve" => "true"} = params) do
     user = Authify.Guardian.Plug.current_resource(conn)
     organization = conn.assigns.current_organization
 
-    with {:ok, application} <- validate_client_id(params["client_id"], organization),
+    with :ok <- require_authenticated(user),
+         {:ok, application} <- validate_client_id(params["client_id"], organization),
          {:ok, redirect_uri} <- validate_redirect_uri(application, params["redirect_uri"]) do
       case process_authorization_approval(conn, user, application, redirect_uri, params) do
         {:ok, result} ->
@@ -108,12 +114,10 @@ defmodule AuthifyWeb.OAuthController do
     user = Authify.Guardian.Plug.current_resource(conn)
     organization = conn.assigns.current_organization
 
-    if user do
-      AuditOAuth.log_authorization_denied(conn, organization, user, params)
-    end
-
-    with {:ok, application} <- validate_client_id(params["client_id"], organization),
+    with :ok <- require_authenticated(user),
+         {:ok, application} <- validate_client_id(params["client_id"], organization),
          {:ok, redirect_uri} <- validate_redirect_uri(application, params["redirect_uri"]) do
+      AuditOAuth.log_authorization_denied(conn, organization, user, params)
       handle_consent_denial(conn, redirect_uri, params)
     else
       # Never redirect to an unvalidated redirect_uri — see authorize/2.
@@ -121,6 +125,12 @@ defmodule AuthifyWeb.OAuthController do
         render_error(conn, error)
     end
   end
+
+  # A missing or unknown `approve` value is a malformed consent submission.
+  def consent(conn, _params), do: render_error(conn, "invalid_request")
+
+  defp require_authenticated(%User{}), do: :ok
+  defp require_authenticated(nil), do: {:error, "access_denied"}
 
   defp process_authorization_approval(_conn, user, application, redirect_uri, params) do
     with {:ok, scopes} <- validate_scopes(application, params["scope"]),
@@ -477,10 +487,11 @@ defmodule AuthifyWeb.OAuthController do
   defp maybe_add_param(map, _key, nil), do: map
   defp maybe_add_param(map, key, value), do: Map.put(map, key, value)
 
-  # Renders an OAuth error for a request whose client and redirect_uri could
-  # not be validated. Per RFC 6749 §4.1.2.1 we must NOT redirect to the
-  # unvalidated redirect_uri (open redirect); return the error directly.
-  # Browser requests get an HTML page; API clients get JSON.
+  # Renders an OAuth error directly (400) instead of redirecting to the client.
+  # Used when the request is unauthenticated or malformed, or when the client
+  # and redirect_uri could not be validated. Per RFC 6749 §4.1.2.1 we must NOT
+  # redirect to an unvalidated redirect_uri (open redirect). Browser requests
+  # get an HTML page; API clients get JSON.
   defp render_error(conn, error) do
     conn = put_status(conn, :bad_request)
 
