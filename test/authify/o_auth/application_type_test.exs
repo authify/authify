@@ -215,4 +215,28 @@ defmodule Authify.OAuth.ApplicationTypeTest do
              )
     end
   end
+
+  describe "scopes_list/1" do
+    test "raises when the :scopes association is not loaded" do
+      application = %Application{id: 123, application_type: "management_api_app"}
+
+      assert_raise ArgumentError, ~r/:scopes association is not loaded/, fn ->
+        Application.scopes_list(application)
+      end
+    end
+
+    test "returns the loaded scopes for a management_api_app" do
+      application = management_api_application_fixture()
+
+      assert Enum.sort(Application.scopes_list(application)) ==
+               Enum.sort(Authify.Scopes.management_api_scopes())
+    end
+
+    test "returns the loaded scopes for an oauth2_app" do
+      application = application_fixture()
+
+      assert Enum.sort(Application.scopes_list(application)) ==
+               Enum.sort(["openid", "profile", "email"])
+    end
+  end
 end

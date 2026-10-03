@@ -355,12 +355,20 @@ defmodule Authify.OAuth.Application do
 
   def redirect_uris_list(_), do: []
 
+  @doc """
+  Returns the list of scopes granted to this application.
+
+  The `:scopes` association must be preloaded. Raises `ArgumentError` when it
+  is not, so that a missing preload surfaces as an error instead of silently
+  returning fabricated defaults.
+  """
   def scopes_list(%__MODULE__{} = application) do
     if Ecto.assoc_loaded?(application.scopes) do
       Enum.map(application.scopes, & &1.scope)
     else
-      # Default to OAuth scopes if not loaded
-      ["openid", "profile", "email"]
+      raise ArgumentError,
+            "the :scopes association is not loaded for Application #{inspect(application.id)}; " <>
+              "preload it with Repo.preload(application, :scopes) before calling scopes_list/1"
     end
   end
 
