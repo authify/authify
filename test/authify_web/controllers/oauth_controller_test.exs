@@ -1952,6 +1952,104 @@ defmodule AuthifyWeb.OAuthControllerTest do
       # Authorization should succeed
       assert redirected_to(conn) =~ "https://example.com/callback"
     end
+
+    test "unauthenticated approval returns 400 access_denied (no 500)", %{
+      conn: conn,
+      application: application,
+      organization: organization
+    } do
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "scope" => "openid profile",
+        "approve" => "true"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      assert response(conn, 400)
+      assert html_response(conn, 400) =~ "access_denied"
+      refute conn.status in [301, 302, 303, 307, 308]
+    end
+
+    test "unauthenticated approval returns JSON error for API clients", %{
+      conn: conn,
+      application: application,
+      organization: organization
+    } do
+      conn = put_req_header(conn, "accept", "application/json")
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "scope" => "openid profile",
+        "approve" => "true"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      assert json_response(conn, 400) == %{"error" => "access_denied"}
+    end
+
+    test "unauthenticated denial returns 400 access_denied", %{
+      conn: conn,
+      application: application,
+      organization: organization
+    } do
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "scope" => "openid profile",
+        "approve" => "false"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      assert response(conn, 400)
+      assert html_response(conn, 400) =~ "access_denied"
+      refute conn.status in [301, 302, 303, 307, 308]
+    end
+
+    test "missing approve parameter returns 400 invalid_request", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "scope" => "openid"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      assert response(conn, 400)
+      assert html_response(conn, 400) =~ "invalid_request"
+    end
+
+    test "unknown approve value returns 400 invalid_request", %{
+      conn: conn,
+      user: user,
+      application: application,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "scope" => "openid",
+        "approve" => "maybe"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/consent", params)
+
+      assert response(conn, 400)
+      assert html_response(conn, 400) =~ "invalid_request"
+    end
   end
 
   describe "OAuth 2.1 strict compliance mode" do
