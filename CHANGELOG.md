@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-03
+
+### Added
+
+- Organization feature toggles are now enforced. Previously configurable but inert, disabling `allow_saml`, `allow_oauth`, `allow_invitations`, or `allow_webauthn` now actually disables the corresponding functionality:
+  - SAML identity provider endpoints (`/saml/metadata`, `/saml/sso`, `/saml/continue`, `/saml/slo`) return `404`, and IdP-initiated SSO and the post-logout SLO redirect are short-circuited
+  - OAuth2/OIDC `/authorize`, `/consent`, `/userinfo`, and `/.well-known` discovery/JWKS return `404`, and the `authorization_code`/`refresh_token` grants return `unauthorized_client`. The Management API `client_credentials` flow and its applications are unaffected
+  - New invitations cannot be created (web or Management API), while invitations already issued remain acceptable
+  - WebAuthn registration and WebAuthn MFA authentication are blocked, while existing credentials remain manageable
+- Each affected section shows a warning banner when its feature is disabled, so configuration can still be prepared ahead of enabling the feature
+
 ## [0.23.0] - 2026-09-26
 
 ### Security
@@ -854,7 +865,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/authify/authify/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/authify/authify/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/authify/authify/compare/v0.21.4...v0.22.0
 [0.21.4]: https://github.com/authify/authify/compare/v0.21.3...v0.21.4
