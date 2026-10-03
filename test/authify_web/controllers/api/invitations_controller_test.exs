@@ -245,6 +245,29 @@ defmodule AuthifyWeb.API.InvitationsControllerTest do
       refute Map.has_key?(attributes, "token")
     end
 
+    test "returns 403 when invitations are disabled", %{
+      conn: conn,
+      organization: organization
+    } do
+      Authify.Configurations.set_organization_setting(organization, :allow_invitations, false)
+
+      invitation_attrs = %{
+        "invitation" => %{
+          "email" => "blocked@example.com",
+          "role" => "user"
+        }
+      }
+
+      conn = post(conn, "/#{organization.slug}/api/invitations", invitation_attrs)
+
+      assert %{
+               "error" => %{
+                 "type" => "invitations_disabled",
+                 "message" => "Invitations are not enabled for this organization"
+               }
+             } = json_response(conn, 403)
+    end
+
     test "creates admin invitation", %{conn: conn, organization: organization} do
       invitation_attrs = %{
         "invitation" => %{

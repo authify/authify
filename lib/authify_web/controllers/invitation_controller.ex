@@ -3,6 +3,7 @@ defmodule AuthifyWeb.InvitationController do
 
   alias Authify.Accounts
   alias Authify.Accounts.{Invitation, User}
+  alias Authify.Configurations
   alias Authify.Invitations
   alias AuthifyWeb.Helpers.AuditHelper
 
@@ -36,6 +37,16 @@ defmodule AuthifyWeb.InvitationController do
     organization = conn.assigns.current_organization
     current_user = conn.assigns.current_user
 
+    if Configurations.allow_invitations?(organization) do
+      create_invitation(conn, organization, current_user, invitation_params)
+    else
+      conn
+      |> put_flash(:error, "Invitations are not enabled for this organization.")
+      |> redirect(to: ~p"/#{organization.slug}/invitations")
+    end
+  end
+
+  defp create_invitation(conn, organization, current_user, invitation_params) do
     invitation_params_with_org = Map.put(invitation_params, "organization_id", organization.id)
 
     case Invitations.create_invitation_and_send_email(invitation_params_with_org, current_user) do

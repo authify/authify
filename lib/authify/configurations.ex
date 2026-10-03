@@ -226,6 +226,16 @@ defmodule Authify.Configurations do
   end
 
   @doc """
+  Returns true if organization admins may invite new users.
+
+  Defaults to true when unset. Disabling invitations blocks new invitations but
+  does not invalidate invitations that were already issued.
+  """
+  def allow_invitations?(org) do
+    get_organization_setting(org, :allow_invitations) != false
+  end
+
+  @doc """
   Gets an organization-specific setting value.
   """
   def get_organization_setting(org, setting_name) do
