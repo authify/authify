@@ -391,6 +391,23 @@ defmodule AuthifyWeb.MfaControllerTest do
       assert html_response(conn, 200) =~ "Register Security Key (WebAuthn)"
     end
 
+    test "shows the disabled banner and hides registration when WebAuthn is disabled", %{
+      conn: conn,
+      organization: organization,
+      user: user
+    } do
+      Authify.Configurations.set_organization_setting(organization, :allow_webauthn, false)
+
+      conn =
+        conn
+        |> log_in_user(user, organization)
+        |> get(~p"/#{organization.slug}/profile/mfa")
+
+      response = html_response(conn, 200)
+      assert response =~ "WebAuthn Disabled"
+      refute response =~ "Register Security Key"
+    end
+
     test "shows MFA status and management options for user with TOTP", %{
       conn: conn,
       organization: organization,
