@@ -214,6 +214,18 @@ defmodule Authify.Configurations do
   end
 
   @doc """
+  Returns true if OAuth2/OIDC identity provider functionality is enabled for
+  the organization.
+
+  Defaults to true when unset. This gates the third-party OAuth/OIDC surface
+  (authorize, consent, userinfo, discovery, and the authorization_code /
+  refresh_token grants) but not the Management API's client_credentials flow.
+  """
+  def allow_oauth?(org) do
+    get_organization_setting(org, :allow_oauth) != false
+  end
+
+  @doc """
   Gets an organization-specific setting value.
   """
   def get_organization_setting(org, setting_name) do

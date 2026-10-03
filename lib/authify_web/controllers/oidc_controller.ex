@@ -3,6 +3,9 @@ defmodule AuthifyWeb.OIDCController do
 
   alias Authify.Certificates
 
+  # OIDC discovery is part of the OAuth2/OIDC identity provider surface.
+  plug AuthifyWeb.Plugs.OAuthFeatureToggle
+
   @doc """
   OIDC Discovery endpoint.
   Returns the OpenID Connect configuration for this provider.

@@ -10,6 +10,11 @@ defmodule AuthifyWeb.OAuthController do
   alias Authify.OAuth
   alias AuthifyWeb.Audit.OAuth, as: AuditOAuth
 
+  # The :allow_oauth setting is enforced per-grant-type on the token endpoint
+  # (see token/2), so client_credentials keeps working for Management API
+  # service accounts even when third-party OAuth is disabled.
+  plug AuthifyWeb.Plugs.OAuthFeatureToggle when action in [:authorize, :consent, :userinfo]
+
   @doc """
   OAuth2 Authorization endpoint.
   Displays consent screen and handles user authorization.
@@ -232,10 +237,18 @@ defmodule AuthifyWeb.OAuthController do
 
     case params["grant_type"] do
       "authorization_code" ->
-        handle_authorization_code_grant(conn, params)
+        if oauth_enabled?(conn) do
+          handle_authorization_code_grant(conn, params)
+        else
+          oauth_disabled_error(conn)
+        end
 
       "refresh_token" ->
-        handle_refresh_token_grant(conn, params)
+        if oauth_enabled?(conn) do
+          handle_refresh_token_grant(conn, params)
+        else
+          oauth_disabled_error(conn)
+        end
 
       "client_credentials" ->
         handle_client_credentials_grant(conn, params)
@@ -247,6 +260,21 @@ defmodule AuthifyWeb.OAuthController do
             "Supported grant types: authorization_code, refresh_token, client_credentials"
         })
     end
+  end
+
+  defp oauth_enabled?(conn) do
+    Configurations.allow_oauth?(conn.assigns.current_organization)
+  end
+
+  # RFC 6749 `unauthorized_client`: the client is not authorized to use this
+  # grant type because the organization has OAuth2/OIDC disabled.
+  defp oauth_disabled_error(conn) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{
+      error: "unauthorized_client",
+      error_description: "OAuth2/OIDC is not enabled for this organization"
+    })
   end
 
   defp extract_client_credentials(conn, params) do
