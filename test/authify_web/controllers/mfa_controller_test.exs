@@ -391,6 +391,23 @@ defmodule AuthifyWeb.MfaControllerTest do
       assert html_response(conn, 200) =~ "Register Security Key (WebAuthn)"
     end
 
+    test "shows the disabled banner and hides registration when WebAuthn is disabled", %{
+      conn: conn,
+      organization: organization,
+      user: user
+    } do
+      Authify.Configurations.set_organization_setting(organization, :allow_webauthn, false)
+
+      conn =
+        conn
+        |> log_in_user(user, organization)
+        |> get(~p"/#{organization.slug}/profile/mfa")
+
+      response = html_response(conn, 200)
+      assert response =~ "WebAuthn Disabled"
+      refute response =~ "Register Security Key"
+    end
+
     test "shows MFA status and management options for user with TOTP", %{
       conn: conn,
       organization: organization,
@@ -655,6 +672,16 @@ defmodule AuthifyWeb.MfaControllerTest do
       assert response["error"] =~ "No security keys registered"
     end
 
+    test "returns error when WebAuthn is disabled", %{conn: conn, organization: organization} do
+      Authify.Configurations.set_organization_setting(organization, :allow_webauthn, false)
+
+      conn = post(conn, ~p"/mfa/webauthn/authenticate/begin")
+
+      response = json_response(conn, 200)
+      assert response["success"] == false
+      assert response["error"] =~ "WebAuthn is not enabled"
+    end
+
     test "requires MFA session" do
       # Create new conn without MFA session
       conn =
@@ -713,6 +740,24 @@ defmodule AuthifyWeb.MfaControllerTest do
       # Should fail with WebAuthn error
       response = json_response(conn, 200)
       assert response["success"] == false
+    end
+
+    test "returns error when WebAuthn is disabled", %{user: user, organization: organization} do
+      Authify.Configurations.set_organization_setting(organization, :allow_webauthn, false)
+
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(%{
+          mfa_pending_user_id: user.id,
+          mfa_pending_organization_id: organization.id
+        })
+        |> post(~p"/mfa/webauthn/authenticate/complete", %{
+          "assertionResponse" => %{}
+        })
+
+      response = json_response(conn, 200)
+      assert response["success"] == false
+      assert response["error"] =~ "WebAuthn is not enabled"
     end
 
     test "requires MFA session" do

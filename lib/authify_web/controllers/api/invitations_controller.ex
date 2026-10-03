@@ -1,6 +1,7 @@
 defmodule AuthifyWeb.API.InvitationsController do
   use AuthifyWeb.API.BaseController
 
+  alias Authify.Configurations
   alias Authify.Invitations
   alias AuthifyWeb.Helpers.AuditHelper
 
@@ -108,32 +109,41 @@ defmodule AuthifyWeb.API.InvitationsController do
         organization = conn.assigns.current_organization
         current_user = conn.assigns.current_user
 
-        invitation_params_with_org =
-          invitation_params
-          |> Map.put("organization_id", organization.id)
+        if Configurations.allow_invitations?(organization) do
+          invitation_params_with_org =
+            invitation_params
+            |> Map.put("organization_id", organization.id)
 
-        case Invitations.create_invitation_and_send_email(
-               invitation_params_with_org,
-               current_user
-             ) do
-          {:ok, invitation} ->
-            AuditHelper.log_invitation_sent(conn, invitation,
-              extra_metadata: %{"source" => "api"}
-            )
+          case Invitations.create_invitation_and_send_email(
+                 invitation_params_with_org,
+                 current_user
+               ) do
+            {:ok, invitation} ->
+              AuditHelper.log_invitation_sent(conn, invitation,
+                extra_metadata: %{"source" => "api"}
+              )
 
-            render_api_response(conn, invitation,
-              resource_type: "invitation",
-              exclude: [:token],
-              status: :created
-            )
+              render_api_response(conn, invitation,
+                resource_type: "invitation",
+                exclude: [:token],
+                status: :created
+              )
 
-          {:error, %Ecto.Changeset{} = changeset} ->
-            AuditHelper.log_invitation_send_failure(conn, changeset,
-              invitation_changeset: changeset,
-              extra_metadata: %{"source" => "api"}
-            )
+            {:error, %Ecto.Changeset{} = changeset} ->
+              AuditHelper.log_invitation_send_failure(conn, changeset,
+                invitation_changeset: changeset,
+                extra_metadata: %{"source" => "api"}
+              )
 
-            render_validation_errors(conn, changeset)
+              render_validation_errors(conn, changeset)
+          end
+        else
+          render_error_response(
+            conn,
+            :forbidden,
+            "invitations_disabled",
+            "Invitations are not enabled for this organization"
+          )
         end
 
       {:error, response} ->

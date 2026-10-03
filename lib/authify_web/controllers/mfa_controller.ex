@@ -3,7 +3,7 @@ defmodule AuthifyWeb.MfaController do
 
   import AuthifyWeb.Helpers.ConnHelpers, only: [get_client_ip: 1, get_user_agent: 1]
 
-  alias Authify.{Accounts, MFA, Organizations, Repo}
+  alias Authify.{Accounts, Configurations, MFA, Organizations, Repo}
   alias Authify.Accounts.User
   alias Authify.MFA.Flow
   alias AuthifyWeb.Helpers.AuditHelper
@@ -313,25 +313,32 @@ defmodule AuthifyWeb.MfaController do
         json(conn, %{success: false, error: "No active MFA session"})
 
       {:ok, user, organization} ->
-        # Get authentication options from WebAuthn context
-        opts = [
-          ip_address: get_client_ip(conn),
-          user_agent: get_user_agent(conn),
-          rp_id: Organizations.resolve_webauthn_rp_id(organization, conn.host)
-        ]
+        if Configurations.allow_webauthn?(organization) do
+          # Get authentication options from WebAuthn context
+          opts = [
+            ip_address: get_client_ip(conn),
+            user_agent: get_user_agent(conn),
+            rp_id: Organizations.resolve_webauthn_rp_id(organization, conn.host)
+          ]
 
-        case MFA.WebAuthn.begin_authentication(user, opts) do
-          {:ok, %{challenge: challenge, options: options}} ->
-            # Store challenge in session
-            conn
-            |> put_session(:webauthn_authentication_challenge, challenge)
-            |> json(%{success: true, options: options})
+          case MFA.WebAuthn.begin_authentication(user, opts) do
+            {:ok, %{challenge: challenge, options: options}} ->
+              # Store challenge in session
+              conn
+              |> put_session(:webauthn_authentication_challenge, challenge)
+              |> json(%{success: true, options: options})
 
-          {:error, :no_credentials} ->
-            json(conn, %{success: false, error: "No security keys registered"})
+            {:error, :no_credentials} ->
+              json(conn, %{success: false, error: "No security keys registered"})
 
-          {:error, _reason} ->
-            json(conn, %{success: false, error: "Failed to generate challenge"})
+            {:error, _reason} ->
+              json(conn, %{success: false, error: "Failed to generate challenge"})
+          end
+        else
+          json(conn, %{
+            success: false,
+            error: "WebAuthn is not enabled for this organization"
+          })
         end
     end
   end
@@ -341,6 +348,7 @@ defmodule AuthifyWeb.MfaController do
   """
   def webauthn_authenticate_complete(conn, params) do
     with {:ok, user, organization} <- load_mfa_session(conn),
+         :ok <- ensure_webauthn_enabled(organization),
          {:ok, challenge} <- get_authentication_challenge(conn),
          conn <- assign_user_and_org(conn, user, organization),
          {:allow, _} <- MFA.check_rate_limit(user, organization) do
@@ -547,6 +555,14 @@ defmodule AuthifyWeb.MfaController do
         user = Repo.get(User, uid) |> Repo.preload(:organization)
         organization = Repo.get(Accounts.Organization, oid)
         {:ok, user, organization}
+    end
+  end
+
+  defp ensure_webauthn_enabled(organization) do
+    if Configurations.allow_webauthn?(organization) do
+      :ok
+    else
+      {:error, "WebAuthn is not enabled for this organization"}
     end
   end
 

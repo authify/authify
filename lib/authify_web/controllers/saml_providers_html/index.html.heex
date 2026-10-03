@@ -7,6 +7,12 @@
     />
   </:sidebar>
   <:main>
+    <.feature_disabled_banner
+      enabled={Authify.Configurations.allow_saml?(@organization)}
+      feature_label="SAML"
+      organization={@organization}
+      message="SAML SSO will not work for this organization while it is disabled."
+    />
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
       <h1 class="h2">SAML Service Providers</h1>
       <div class="btn-toolbar mb-2 mb-md-0">

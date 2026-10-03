@@ -203,6 +203,61 @@ defmodule Authify.Configurations do
   end
 
   @doc """
+  Returns true if a default-enabled organization feature toggle is enabled.
+
+  Feature toggles are considered enabled unless they are explicitly set to
+  `false`, so an organization without an explicit configuration row inherits the
+  schema default. Use this for the `allow_*` feature toggles and other toggles
+  that default to `true`.
+  """
+  def feature_enabled?(org, setting) when is_atom(setting) do
+    get_organization_setting(org, setting) != false
+  end
+
+  @doc """
+  Returns true if SAML identity provider functionality is enabled for the
+  organization.
+
+  Defaults to true when unset, matching the schema default, so existing
+  organizations keep working without an explicit configuration row.
+  """
+  def allow_saml?(org) do
+    feature_enabled?(org, :allow_saml)
+  end
+
+  @doc """
+  Returns true if OAuth2/OIDC identity provider functionality is enabled for
+  the organization.
+
+  Defaults to true when unset. This gates the third-party OAuth/OIDC surface
+  (authorize, consent, userinfo, discovery, and the authorization_code /
+  refresh_token grants) but not the Management API's client_credentials flow.
+  """
+  def allow_oauth?(org) do
+    feature_enabled?(org, :allow_oauth)
+  end
+
+  @doc """
+  Returns true if organization admins may invite new users.
+
+  Defaults to true when unset. Disabling invitations blocks new invitations but
+  does not invalidate invitations that were already issued.
+  """
+  def allow_invitations?(org) do
+    feature_enabled?(org, :allow_invitations)
+  end
+
+  @doc """
+  Returns true if WebAuthn/FIDO2 authentication is enabled for the organization.
+
+  Defaults to true when unset. This gates both new credential registration and
+  WebAuthn authentication during login.
+  """
+  def allow_webauthn?(org) do
+    feature_enabled?(org, :allow_webauthn)
+  end
+
+  @doc """
   Gets an organization-specific setting value.
   """
   def get_organization_setting(org, setting_name) do

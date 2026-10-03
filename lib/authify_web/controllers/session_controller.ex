@@ -170,7 +170,12 @@ defmodule AuthifyWeb.SessionController do
     else
       # Regular logout - check for active SAML sessions
       if current_user do
-        active_saml_sessions = Authify.SAML.get_active_sessions_for_user(current_user)
+        active_saml_sessions =
+          if Authify.Configurations.allow_saml?(current_user.organization) do
+            Authify.SAML.get_active_sessions_for_user(current_user)
+          else
+            []
+          end
 
         if Enum.empty?(active_saml_sessions) do
           # No SAML sessions, just do regular logout

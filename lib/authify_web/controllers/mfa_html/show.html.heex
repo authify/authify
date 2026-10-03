@@ -7,6 +7,12 @@
     />
   </:sidebar>
   <:main>
+    <.feature_disabled_banner
+      enabled={Authify.Configurations.allow_webauthn?(@organization)}
+      feature_label="WebAuthn"
+      organization={@organization}
+      message="Registering new security keys and signing in with WebAuthn are unavailable while it is disabled; existing keys can still be managed."
+    />
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
       <h1 class="h2">Multi-Factor Authentication</h1>
       <div class="btn-toolbar mb-2 mb-md-0">
@@ -54,12 +60,14 @@
                 >
                   <i class="bi bi-phone"></i> Setup Authenticator App (TOTP)
                 </a>
-                <a
-                  href={~p"/#{@organization.slug}/profile/webauthn/setup"}
-                  class="btn btn-primary"
-                >
-                  <i class="bi bi-shield-check"></i> Register Security Key (WebAuthn)
-                </a>
+                <%= if Authify.Configurations.allow_webauthn?(@organization) do %>
+                  <a
+                    href={~p"/#{@organization.slug}/profile/webauthn/setup"}
+                    class="btn btn-primary"
+                  >
+                    <i class="bi bi-shield-check"></i> Register Security Key (WebAuthn)
+                  </a>
+                <% end %>
               </div>
             <% end %>
           </div>
@@ -180,23 +188,27 @@
                 >
                   <i class="bi bi-gear"></i> Manage Security Keys
                 </a>
-                <a
-                  href={~p"/#{@organization.slug}/profile/webauthn/setup"}
-                  class="btn btn-outline-secondary btn-sm"
-                >
-                  <i class="bi bi-plus-circle"></i> Add Another
-                </a>
+                <%= if Authify.Configurations.allow_webauthn?(@organization) do %>
+                  <a
+                    href={~p"/#{@organization.slug}/profile/webauthn/setup"}
+                    class="btn btn-outline-secondary btn-sm"
+                  >
+                    <i class="bi bi-plus-circle"></i> Add Another
+                  </a>
+                <% end %>
               </div>
             <% else %>
               <p class="text-muted mb-3">
                 Use physical security keys (YubiKey, etc.) or built-in biometrics (Touch ID, Face ID, Windows Hello) for passwordless authentication.
               </p>
-              <a
-                href={~p"/#{@organization.slug}/profile/webauthn/setup"}
-                class="btn btn-outline-primary btn-sm"
-              >
-                <i class="bi bi-plus-circle"></i> Register Security Key
-              </a>
+              <%= if Authify.Configurations.allow_webauthn?(@organization) do %>
+                <a
+                  href={~p"/#{@organization.slug}/profile/webauthn/setup"}
+                  class="btn btn-outline-primary btn-sm"
+                >
+                  <i class="bi bi-plus-circle"></i> Register Security Key
+                </a>
+              <% end %>
             <% end %>
           </div>
         </div>

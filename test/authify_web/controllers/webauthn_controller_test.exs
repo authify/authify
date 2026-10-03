@@ -455,6 +455,53 @@ defmodule AuthifyWeb.WebAuthnControllerTest do
     end
   end
 
+  describe "feature disabled (allow_webauthn = false)" do
+    test "setup returns 404 when WebAuthn is disabled", %{
+      conn: conn,
+      organization: organization,
+      user: user
+    } do
+      Authify.Configurations.set_organization_setting(organization, :allow_webauthn, false)
+
+      conn =
+        conn
+        |> log_in_user(user, organization)
+        |> get(~p"/#{organization.slug}/profile/webauthn/setup")
+
+      assert response(conn, 404) =~ "WebAuthn is not enabled"
+    end
+
+    test "register/begin returns 404 when WebAuthn is disabled", %{
+      conn: conn,
+      organization: organization,
+      user: user
+    } do
+      Authify.Configurations.set_organization_setting(organization, :allow_webauthn, false)
+
+      conn =
+        conn
+        |> log_in_user(user, organization)
+        |> post(~p"/#{organization.slug}/profile/webauthn/register/begin", %{})
+
+      assert response(conn, 404) =~ "WebAuthn is not enabled"
+    end
+
+    test "credential list remains available when WebAuthn is disabled", %{
+      conn: conn,
+      organization: organization,
+      user: user
+    } do
+      Authify.Configurations.set_organization_setting(organization, :allow_webauthn, false)
+
+      conn =
+        conn
+        |> log_in_user(user, organization)
+        |> get(~p"/#{organization.slug}/profile/webauthn")
+
+      assert html_response(conn, 200)
+    end
+  end
+
   # ============================================================================
   # Helper Functions
   # ============================================================================

@@ -26,6 +26,17 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert html_response(conn, 200) =~ "No invitations found"
       assert html_response(conn, 200) =~ "Invite your first user"
     end
+
+    test "shows the disabled banner when invitations are disabled", %{
+      conn: conn,
+      organization: org
+    } do
+      Authify.Configurations.set_organization_setting(org, :allow_invitations, false)
+
+      conn = get(conn, ~p"/#{org.slug}/invitations")
+
+      assert html_response(conn, 200) =~ "Invitations Disabled"
+    end
   end
 
   describe "new invitation" do
@@ -67,6 +78,27 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert event.metadata["invited_email"] == invitation_params["email"]
       assert event.metadata["invited_role"] == invitation_params["role"]
       assert event.metadata["source"] == "web"
+    end
+
+    test "does not create an invitation when invitations are disabled", %{
+      conn: conn,
+      organization: org
+    } do
+      Authify.Configurations.set_organization_setting(org, :allow_invitations, false)
+
+      invitation_params = %{
+        "email" => unique_user_email(),
+        "role" => "user"
+      }
+
+      conn = post(conn, ~p"/#{org.slug}/invitations", invitation: invitation_params)
+
+      assert redirected_to(conn) == ~p"/#{org.slug}/invitations"
+
+      conn = get(conn, ~p"/#{org.slug}/invitations")
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Invitations are not enabled"
+
+      assert Invitations.list_invitations(org.id) == []
     end
 
     test "renders errors when data is invalid", %{conn: conn, organization: org} do
@@ -320,6 +352,26 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert event.metadata["invited_email"] == invitation.email
       assert event.metadata["user_id"] == user.id
       assert event.metadata["source"] == "web"
+    end
+
+    test "accepts an already-issued invitation when invitations are disabled", %{conn: conn} do
+      organization = organization_fixture()
+      admin = admin_user_fixture(organization)
+      invitation = invitation_for_organization_fixture(organization, admin)
+
+      Authify.Configurations.set_organization_setting(organization, :allow_invitations, false)
+
+      user_params = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      conn = post(conn, ~p"/invite/#{invitation.token}/accept", user: user_params)
+
+      assert redirected_to(conn) == ~p"/login?org_slug=#{organization.slug}"
+      assert Accounts.get_user_by_email_and_organization(invitation.email, organization.id)
     end
 
     @tag :capture_log

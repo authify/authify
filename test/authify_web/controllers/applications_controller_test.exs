@@ -23,6 +23,17 @@ defmodule AuthifyWeb.ApplicationsControllerTest do
       conn = get(conn, ~p"/#{organization.slug}/applications")
       assert html_response(conn, 200) =~ "OAuth Applications"
     end
+
+    test "shows the disabled banner when OAuth is disabled", %{
+      conn: conn,
+      organization: organization
+    } do
+      Authify.Configurations.set_organization_setting(organization, :allow_oauth, false)
+
+      conn = get(conn, ~p"/#{organization.slug}/applications")
+
+      assert html_response(conn, 200) =~ "OAuth2/OIDC Disabled"
+    end
   end
 
   describe "new" do

@@ -1,6 +1,7 @@
 defmodule AuthifyWeb.AppLinkController do
   use AuthifyWeb, :controller
 
+  alias Authify.Configurations
   alias Authify.Groups
   alias Authify.OAuth
   alias Authify.SAML
@@ -51,16 +52,22 @@ defmodule AuthifyWeb.AppLinkController do
     user = conn.assigns.current_user
     organization = conn.assigns.current_organization
 
-    with {sp_id, ""} <- Integer.parse(sp_id),
-         {:ok, _sp} <- safe_get_saml_service_provider(sp_id, organization),
-         true <- user_has_access_to_app?(user, organization, sp_id, "saml") do
-      # IdP-initiated SSO: redirect to SAML SSO endpoint with sp_id parameter
-      redirect(conn, to: ~p"/#{organization.slug}/saml/sso?sp_id=#{sp_id}")
+    if Configurations.allow_saml?(organization) do
+      with {sp_id, ""} <- Integer.parse(sp_id),
+           {:ok, _sp} <- safe_get_saml_service_provider(sp_id, organization),
+           true <- user_has_access_to_app?(user, organization, sp_id, "saml") do
+        # IdP-initiated SSO: redirect to SAML SSO endpoint with sp_id parameter
+        redirect(conn, to: ~p"/#{organization.slug}/saml/sso?sp_id=#{sp_id}")
+      else
+        _ ->
+          conn
+          |> put_flash(:error, "Access denied or service provider not found.")
+          |> redirect(to: ~p"/#{organization.slug}/user/dashboard")
+      end
     else
-      _ ->
-        conn
-        |> put_flash(:error, "Access denied or service provider not found.")
-        |> redirect(to: ~p"/#{organization.slug}/user/dashboard")
+      conn
+      |> put_flash(:error, "SAML SSO is not enabled for this organization.")
+      |> redirect(to: ~p"/#{organization.slug}/user/dashboard")
     end
   end
 
