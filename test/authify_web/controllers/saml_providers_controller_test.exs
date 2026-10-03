@@ -17,6 +17,22 @@ defmodule AuthifyWeb.SAMLProvidersControllerTest do
     %{conn: conn, admin_user: admin_user, organization: organization}
   end
 
+  describe "feature disabled (allow_saml = false)" do
+    test "index shows the disabled banner", %{conn: conn, organization: organization} do
+      Authify.Configurations.set_organization_setting(organization, :allow_saml, false)
+
+      conn = get(conn, ~p"/#{organization.slug}/saml_providers")
+
+      assert html_response(conn, 200) =~ "SAML is disabled"
+    end
+
+    test "index does not show the banner when enabled", %{conn: conn, organization: organization} do
+      conn = get(conn, ~p"/#{organization.slug}/saml_providers")
+
+      refute html_response(conn, 200) =~ "SAML is disabled"
+    end
+  end
+
   describe "audit logging" do
     test "logs service provider creation", %{
       conn: conn,
