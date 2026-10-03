@@ -236,6 +236,16 @@ defmodule Authify.Configurations do
   end
 
   @doc """
+  Returns true if WebAuthn/FIDO2 authentication is enabled for the organization.
+
+  Defaults to true when unset. This gates both new credential registration and
+  WebAuthn authentication during login.
+  """
+  def allow_webauthn?(org) do
+    get_organization_setting(org, :allow_webauthn) != false
+  end
+
+  @doc """
   Gets an organization-specific setting value.
   """
   def get_organization_setting(org, setting_name) do

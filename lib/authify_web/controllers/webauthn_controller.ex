@@ -15,6 +15,11 @@ defmodule AuthifyWeb.WebAuthnController do
   alias Authify.Accounts.User
   alias Authify.MFA.WebAuthn
 
+  # Existing credentials stay manageable, but registration is gated by the
+  # organization's :allow_webauthn setting.
+  plug AuthifyWeb.Plugs.WebAuthnFeatureToggle
+       when action in [:setup, :register_begin, :register_complete, :setup_complete]
+
   # ============================================================================
   # Registration Flow
   # ============================================================================
