@@ -7,6 +7,12 @@
     />
   </:sidebar>
   <:main>
+    <.feature_disabled_banner
+      enabled={Authify.Configurations.allow_oauth?(@organization)}
+      feature_label="OAuth2/OIDC"
+      organization={@organization}
+      message="OAuth2/OIDC authorization will not work for this organization while it is disabled."
+    />
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
       <h1 class="h2">OAuth Applications</h1>
       <div class="btn-toolbar mb-2 mb-md-0">
