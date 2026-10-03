@@ -26,6 +26,17 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert html_response(conn, 200) =~ "No invitations found"
       assert html_response(conn, 200) =~ "Invite your first user"
     end
+
+    test "shows the disabled banner when invitations are disabled", %{
+      conn: conn,
+      organization: org
+    } do
+      Authify.Configurations.set_organization_setting(org, :allow_invitations, false)
+
+      conn = get(conn, ~p"/#{org.slug}/invitations")
+
+      assert html_response(conn, 200) =~ "Invitations Disabled"
+    end
   end
 
   describe "new invitation" do

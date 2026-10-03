@@ -23,13 +23,13 @@ defmodule AuthifyWeb.SAMLProvidersControllerTest do
 
       conn = get(conn, ~p"/#{organization.slug}/saml_providers")
 
-      assert html_response(conn, 200) =~ "SAML is disabled"
+      assert html_response(conn, 200) =~ "SAML Disabled"
     end
 
     test "index does not show the banner when enabled", %{conn: conn, organization: organization} do
       conn = get(conn, ~p"/#{organization.slug}/saml_providers")
 
-      refute html_response(conn, 200) =~ "SAML is disabled"
+      refute html_response(conn, 200) =~ "SAML Disabled"
     end
   end
 

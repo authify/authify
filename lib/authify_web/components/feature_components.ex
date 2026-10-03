@@ -27,7 +27,7 @@ defmodule AuthifyWeb.Components.FeatureComponents do
     ~H"""
     <div :if={!@enabled} class="alert alert-warning" role="alert">
       <i class="bi bi-exclamation-triangle"></i>
-      <strong>{@feature_label} is disabled</strong>
+      <strong>{@feature_label} Disabled</strong>
       <p class="mb-0">
         {@message} It can be configured now, but will not take effect until it is enabled in <a
           href={"/#{@organization.slug}/settings/configuration"}

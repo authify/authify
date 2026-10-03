@@ -32,7 +32,7 @@ defmodule AuthifyWeb.ApplicationsControllerTest do
 
       conn = get(conn, ~p"/#{organization.slug}/applications")
 
-      assert html_response(conn, 200) =~ "OAuth2/OIDC is disabled"
+      assert html_response(conn, 200) =~ "OAuth2/OIDC Disabled"
     end
   end
 

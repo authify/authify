@@ -4,6 +4,12 @@
   </:sidebar>
 
   <:main>
+    <.feature_disabled_banner
+      enabled={Authify.Configurations.allow_invitations?(@organization)}
+      feature_label="Invitations"
+      organization={@organization}
+      message="New invitations cannot be sent for this organization while it is disabled; existing invitations can still be accepted."
+    />
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
       <h1 class="h2">Invitations</h1>
       <div class="btn-toolbar mb-2 mb-md-0">
