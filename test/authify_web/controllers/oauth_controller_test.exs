@@ -36,6 +36,25 @@ defmodule AuthifyWeb.OAuthControllerTest do
       assert redirected_to(conn) =~ "/login"
     end
 
+    test "returns 404 when OAuth is disabled for the organization", %{
+      conn: conn,
+      application: application,
+      organization: organization
+    } do
+      Authify.Configurations.set_organization_setting(organization, :allow_oauth, false)
+
+      params = %{
+        "client_id" => application.client_id,
+        "redirect_uri" => "https://example.com/callback",
+        "response_type" => "code",
+        "scope" => "openid profile"
+      }
+
+      conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
+
+      assert response(conn, 404) =~ "OAuth2/OIDC is not enabled"
+    end
+
     test "return_to is a same-origin local path", %{
       conn: conn,
       application: application,
@@ -510,6 +529,27 @@ defmodule AuthifyWeb.OAuthControllerTest do
       }
     end
 
+    test "rejects authorization_code grant when OAuth is disabled", %{
+      conn: conn,
+      application: application,
+      auth_code: auth_code,
+      organization: organization
+    } do
+      Authify.Configurations.set_organization_setting(organization, :allow_oauth, false)
+
+      params = %{
+        "grant_type" => "authorization_code",
+        "client_id" => application.client_id,
+        "client_secret" => application.client_secret,
+        "code" => auth_code.code
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/token", params)
+      response = json_response(conn, 400)
+
+      assert response["error"] == "unauthorized_client"
+    end
+
     test "exchanges valid authorization code for access token", %{
       conn: conn,
       application: application,
@@ -698,6 +738,27 @@ defmodule AuthifyWeb.OAuthControllerTest do
       assert response["scope"] == "management_app:read users:read"
       # Should NOT include ID token for client credentials
       refute response["id_token"]
+    end
+
+    test "still issues Management API tokens when OAuth is disabled", %{
+      conn: conn,
+      application: application,
+      organization: organization
+    } do
+      Authify.Configurations.set_organization_setting(organization, :allow_oauth, false)
+
+      params = %{
+        "grant_type" => "client_credentials",
+        "client_id" => application.client_id,
+        "client_secret" => application.client_secret,
+        "scope" => "management_app:read users:read"
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/token", params)
+      response = json_response(conn, 200)
+
+      assert response["access_token"]
+      assert response["token_type"] == "Bearer"
     end
 
     test "exchanges client credentials for token using client_secret_basic", %{

@@ -25,6 +25,35 @@ defmodule AuthifyWeb.SAMLControllerTest do
     end
   end
 
+  describe "feature disabled (allow_saml = false)" do
+    test "GET /saml/metadata returns 404 when SAML is disabled", %{conn: conn} do
+      organization = organization_fixture()
+      Authify.Configurations.set_organization_setting(organization, :allow_saml, false)
+
+      conn = get(conn, ~p"/#{organization.slug}/saml/metadata")
+
+      assert response(conn, 404) =~ "SAML is not enabled"
+    end
+
+    test "GET /saml/sso returns 404 when SAML is disabled", %{conn: conn} do
+      organization = organization_fixture()
+      Authify.Configurations.set_organization_setting(organization, :allow_saml, false)
+
+      conn = get(conn, ~p"/#{organization.slug}/saml/sso")
+
+      assert response(conn, 404) =~ "SAML is not enabled"
+    end
+
+    test "POST /saml/slo returns 404 when SAML is disabled", %{conn: conn} do
+      organization = organization_fixture()
+      Authify.Configurations.set_organization_setting(organization, :allow_saml, false)
+
+      conn = post(conn, ~p"/#{organization.slug}/saml/slo")
+
+      assert response(conn, 404) =~ "SAML is not enabled"
+    end
+  end
+
   describe "sso" do
     setup do
       organization = organization_fixture()

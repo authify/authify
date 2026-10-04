@@ -107,4 +107,24 @@ defmodule AuthifyWeb.OIDCControllerTest do
       assert response["keys"] == []
     end
   end
+
+  describe "feature disabled (allow_oauth = false)" do
+    test "discovery returns 404 when OAuth is disabled", %{conn: conn} do
+      organization = organization_fixture()
+      Authify.Configurations.set_organization_setting(organization, :allow_oauth, false)
+
+      conn = get(conn, ~p"/#{organization.slug}/.well-known/openid-configuration")
+
+      assert response(conn, 404) =~ "OAuth2/OIDC is not enabled"
+    end
+
+    test "jwks returns 404 when OAuth is disabled", %{conn: conn} do
+      organization = organization_fixture()
+      Authify.Configurations.set_organization_setting(organization, :allow_oauth, false)
+
+      conn = get(conn, ~p"/#{organization.slug}/.well-known/jwks")
+
+      assert response(conn, 404) =~ "OAuth2/OIDC is not enabled"
+    end
+  end
 end
