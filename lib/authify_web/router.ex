@@ -255,6 +255,7 @@ defmodule AuthifyWeb.Router do
     patch "/users/:id/demote_global", UsersController, :demote_from_global_admin
     patch "/users/:id/role/:role", UsersController, :update_role
     post "/users/:id/reset_password", UsersController, :force_password_reset
+    post "/users/:id/verify_email", UsersController, :verify_primary_email
     patch "/users/:id/disable", UsersController, :disable_user
     patch "/users/:id/enable", UsersController, :enable_user
     post "/users/:id/mfa/unlock", UsersController, :unlock_mfa

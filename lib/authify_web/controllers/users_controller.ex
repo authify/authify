@@ -459,14 +459,7 @@ defmodule AuthifyWeb.UsersController do
     target_user = Authify.Repo.preload(target_user, :emails)
     changeset = Accounts.change_user_form(target_user)
 
-    render(conn, :edit,
-      changeset: changeset,
-      user: target_user,
-      primary_email: User.get_primary_email_value(target_user),
-      organization: organization,
-      locale_options: LocaleHelpers.locale_options(),
-      timezone_options: LocaleHelpers.timezone_options()
-    )
+    render_edit_form(conn, changeset, target_user, organization)
   end
 
   def update(conn, %{"id" => id, "user" => user_params}) do
@@ -508,14 +501,81 @@ defmodule AuthifyWeb.UsersController do
       {:error, changeset} ->
         target_user = Authify.Repo.preload(target_user, :emails)
 
-        render(conn, :edit,
-          changeset: changeset,
-          user: target_user,
-          primary_email: User.get_primary_email_value(target_user),
-          organization: organization,
-          locale_options: LocaleHelpers.locale_options(),
-          timezone_options: LocaleHelpers.timezone_options()
-        )
+        render_edit_form(conn, changeset, target_user, organization)
+    end
+  end
+
+  @doc """
+  Manually marks a user's primary email as verified.
+
+  Administrative override for cases where ownership of the address has been
+  confirmed out-of-band, so it can be advertised as `email_verified` to OIDC
+  clients without the token email flow.
+  """
+  def verify_primary_email(conn, %{"id" => id}) do
+    organization = conn.assigns.current_organization
+
+    case fetch_organization_user(conn, organization, id) do
+      {:ok, target_user} ->
+        case Accounts.verify_primary_email(target_user) do
+          {:ok, user} ->
+            log_audit_event(conn, :user_updated, user, %{
+              updated_user_email: User.get_primary_email_value(user),
+              updated_fields: [],
+              primary_email_verified: true
+            })
+
+            conn
+            |> put_flash(
+              :info,
+              "#{Accounts.User.full_name(user)}'s primary email has been marked as verified."
+            )
+            |> redirect(to: ~p"/#{organization.slug}/users/#{user.id}/edit")
+
+          {:error, _reason} ->
+            conn
+            |> put_flash(:error, "Could not mark the primary email as verified.")
+            |> redirect(to: ~p"/#{organization.slug}/users/#{target_user.id}/edit")
+        end
+
+      {:not_found, halted_conn} ->
+        halted_conn
+    end
+  end
+
+  # Renders the admin edit form with the assigns it expects.
+  defp render_edit_form(conn, changeset, target_user, organization) do
+    render(conn, :edit,
+      changeset: changeset,
+      user: target_user,
+      primary_email: User.get_primary_email_value(target_user),
+      primary_email_verified: User.primary_email_verified?(target_user),
+      organization: organization,
+      locale_options: LocaleHelpers.locale_options(),
+      timezone_options: LocaleHelpers.timezone_options()
+    )
+  end
+
+  # Resolves a user by id within the admin's current organization scope.
+  # Global admins may target any user. Renders a 404 and returns the halted
+  # connection when the user is outside the organization.
+  defp fetch_organization_user(conn, organization, id) do
+    if organization.slug == "authify-global" do
+      {:ok, Accounts.get_user_globally!(id)}
+    else
+      user = Accounts.get_user!(id)
+
+      if Accounts.User.member_of?(user, organization.id) do
+        {:ok, user}
+      else
+        halted_conn =
+          conn
+          |> put_status(:not_found)
+          |> put_view(AuthifyWeb.ErrorHTML)
+          |> render(:"404")
+
+        {:not_found, halted_conn}
+      end
     end
   end
 

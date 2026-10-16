@@ -959,6 +959,38 @@ defmodule Authify.Accounts do
   end
 
   @doc """
+  Marks a user's primary email as verified.
+
+  This is an administrative override: it verifies the primary email without
+  going through the token email flow, for cases where ownership has been
+  confirmed out-of-band. No-op when the primary email is already verified.
+
+  ## Returns
+    * `{:ok, user}` - Updated user with emails preloaded
+    * `{:error, reason}` - Verification failed
+  """
+  def verify_primary_email(%User{} = user) do
+    user = Repo.preload(user, :emails, force: true)
+
+    if User.primary_email_verified?(user) do
+      {:ok, user}
+    else
+      primary_email = User.get_primary_email(user)
+
+      case verify_email(primary_email.id) do
+        {:ok, updated_email} ->
+          emails =
+            Enum.map(user.emails, &if(&1.id == updated_email.id, do: updated_email, else: &1))
+
+          {:ok, %{user | emails: emails}}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  @doc """
   Emits event to trigger email verification workflow.
 
   ## Parameters
