@@ -16,6 +16,11 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      # The image version tag actually pushed (e.g. `0.24.1`). `metadata-action`
+      # strips the leading `v` from the git tag for `type=semver`, so this is not
+      # the same as `github.ref_name`.
+      version: ${{ steps.meta.outputs.version }}
 
     steps:
       - name: Checkout code
@@ -96,7 +101,7 @@ jobs:
           ## Docker Image
 
           \`\`\`bash
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.version }}
           \`\`\`
 
           ## Installation
