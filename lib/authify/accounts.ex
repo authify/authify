@@ -720,11 +720,13 @@ defmodule Authify.Accounts do
   end
 
   @doc """
-  Forces a password reset for a user.
+  Forces a user to change their password before continuing.
+
+  Sets the `password_reset_required` flag so the user is redirected to the
+  password change page after their next successful sign-in. The flag is cleared
+  automatically the next time the user sets a password.
   """
   def force_password_reset(user) do
-    # For now, we'll update the user to require a password change
-    # In a real implementation, you might want to generate a reset token
     update_user(user, %{"password_reset_required" => true})
   end
 

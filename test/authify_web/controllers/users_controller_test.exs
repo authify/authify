@@ -79,6 +79,32 @@ defmodule AuthifyWeb.UsersControllerTest do
     end
   end
 
+  describe "force_password_reset" do
+    test "admin forcing a password reset flags the target user", %{conn: conn} do
+      organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+      regular_user = user_for_organization_fixture(organization)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      conn = post(conn, ~p"/#{organization.slug}/users/#{regular_user.id}/reset_password")
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/users/#{regular_user.id}"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
+               "Password reset initiated"
+
+      # The flag must actually persist (regression test for the previous no-op)
+      assert Accounts.get_user!(regular_user.id).password_reset_required
+    end
+  end
+
   describe "new user creation" do
     test "admin can access new user form", %{conn: conn} do
       organization = organization_fixture()

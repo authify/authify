@@ -158,6 +158,25 @@ defmodule AuthifyWeb.ProfileControllerTest do
       assert event.metadata["user_id"] == user.id
     end
 
+    test "successful password change clears a pending reset requirement", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, _flagged_user} = Accounts.force_password_reset(user)
+
+      conn =
+        patch(conn, ~p"/#{user.organization.slug}/profile/password", %{
+          "user" => %{
+            "current_password" => "SecureP@ssw0rd!",
+            "password" => "NewP@ss1word!",
+            "password_confirmation" => "NewP@ss1word!"
+          }
+        })
+
+      assert redirected_to(conn) == ~p"/#{user.organization.slug}/profile"
+      refute Accounts.get_user!(user.id).password_reset_required
+    end
+
     test "invalid current password logs failure", %{conn: conn, user: user} do
       params = %{
         "current_password" => "wrong-password",

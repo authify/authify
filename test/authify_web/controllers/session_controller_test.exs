@@ -126,6 +126,67 @@ defmodule AuthifyWeb.SessionControllerTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Welcome back!"
     end
 
+    test "redirects to password change when a reset is required", %{conn: conn} do
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
+
+      email = "john-#{System.unique_integer([:positive])}@test.com"
+
+      user_attrs = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "email" => email,
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      {:ok, user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
+      {:ok, _user} = Accounts.force_password_reset(user)
+
+      login_params = %{
+        "organization_slug" => slug,
+        "email" => email,
+        "password" => "SecureP@ssw0rd!"
+      }
+
+      conn = post(conn, ~p"/login", login: login_params)
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/profile/password"
+      assert Phoenix.Flash.get(conn.assigns.flash, :warning) =~ "must change your password"
+    end
+
+    test "a required password reset ignores a pending return_to destination", %{conn: conn} do
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
+
+      email = "john-#{System.unique_integer([:positive])}@test.com"
+
+      user_attrs = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "email" => email,
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      {:ok, user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
+      {:ok, _user} = Accounts.force_password_reset(user)
+
+      login_params = %{
+        "organization_slug" => slug,
+        "email" => email,
+        "password" => "SecureP@ssw0rd!"
+      }
+
+      conn =
+        conn
+        |> get(~p"/login", return_to: "/#{organization.slug}/dashboard")
+        |> recycle()
+        |> post(~p"/login", login: login_params)
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/profile/password"
+    end
+
     test "shows error with invalid organization", %{conn: conn} do
       login_params = %{
         "organization_slug" => "nonexistent",

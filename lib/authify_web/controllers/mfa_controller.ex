@@ -124,10 +124,12 @@ defmodule AuthifyWeb.MfaController do
         |> Authify.Guardian.Plug.sign_in(updated_user)
         |> put_session(:current_organization_id, organization.id)
 
-      default_destination =
-        AuthifyWeb.Auth.Navigation.dashboard_path_for_user(updated_user, organization)
-
-      {conn, destination} = AuthifyWeb.Auth.ReturnTo.destination(conn, default_destination)
+      {conn, destination} =
+        AuthifyWeb.Auth.Navigation.post_authentication_destination(
+          conn,
+          updated_user,
+          organization
+        )
 
       if has_new_codes do
         # Show backup codes for first MFA method
@@ -645,16 +647,17 @@ defmodule AuthifyWeb.MfaController do
       end
 
     # Sign in and redirect
-    default_destination =
-      AuthifyWeb.Auth.Navigation.dashboard_path_for_user(updated_user, organization)
+    {conn, destination} =
+      AuthifyWeb.Auth.Navigation.post_authentication_destination(conn, updated_user, organization)
 
-    {conn, destination} = AuthifyWeb.Auth.ReturnTo.destination(conn, default_destination)
+    {flash_level, flash_message} =
+      AuthifyWeb.Auth.Navigation.post_authentication_flash(updated_user)
 
     conn
     |> Authify.Guardian.Plug.sign_in(updated_user)
     |> put_session(:current_organization_id, organization.id)
     |> AuthifyWeb.Auth.Navigation.clear_mfa_session()
-    |> put_flash(:info, "Welcome back!")
+    |> put_flash(flash_level, flash_message)
     |> redirect(to: destination)
   end
 
@@ -853,8 +856,8 @@ defmodule AuthifyWeb.MfaController do
 
     conn = AuthifyWeb.Auth.Navigation.complete_mfa_login(conn, user, organization)
 
-    default_destination = AuthifyWeb.Auth.Navigation.dashboard_path_for_user(user, organization)
-    {conn, destination} = AuthifyWeb.Auth.ReturnTo.destination(conn, default_destination)
+    {conn, destination} =
+      AuthifyWeb.Auth.Navigation.post_authentication_destination(conn, user, organization)
 
     json(conn, %{
       success: true,
