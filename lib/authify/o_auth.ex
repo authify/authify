@@ -430,7 +430,7 @@ defmodule Authify.OAuth do
   def get_access_token(token) do
     AccessToken
     |> where([at], at.token == ^token)
-    |> preload([:application, :user])
+    |> preload([:application, :user, user: :emails])
     |> Repo.one()
   end
 
