@@ -657,4 +657,79 @@ defmodule AuthifyWeb.SessionControllerTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Authentication required"
     end
   end
+
+  describe "password reset enforcement" do
+    test "a user who must change their password is redirected from other pages", %{conn: conn} do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      {:ok, flagged_user} = Accounts.force_password_reset(user)
+
+      conn =
+        conn
+        |> log_in_user(Accounts.get_user!(flagged_user.id))
+        |> put_session(:current_organization_id, organization.id)
+
+      conn = get(conn, ~p"/#{organization.slug}/dashboard")
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/profile/password"
+      assert Phoenix.Flash.get(conn.assigns.flash, :warning) =~ "must change your password"
+    end
+
+    test "a user who must change their password can reach the password page", %{conn: conn} do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      {:ok, flagged_user} = Accounts.force_password_reset(user)
+
+      conn =
+        conn
+        |> log_in_user(Accounts.get_user!(flagged_user.id))
+        |> put_session(:current_organization_id, organization.id)
+
+      conn = get(conn, ~p"/#{organization.slug}/profile/password")
+
+      assert html_response(conn, 200) =~ "Change Password"
+    end
+
+    test "access is restored once the password has been changed", %{conn: conn} do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      {:ok, flagged_user} = Accounts.force_password_reset(user)
+
+      conn =
+        conn
+        |> log_in_user(Accounts.get_user!(flagged_user.id))
+        |> put_session(:current_organization_id, organization.id)
+
+      conn =
+        patch(conn, ~p"/#{organization.slug}/profile/password", %{
+          "user" => %{
+            "current_password" => "SecureP@ssw0rd!",
+            "password" => "BrandNewP@ss1!",
+            "password_confirmation" => "BrandNewP@ss1!"
+          }
+        })
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/profile"
+
+      # The (re-issued) session can now reach the dashboard again.
+      conn = get(recycle(conn), ~p"/#{organization.slug}/dashboard")
+      assert html_response(conn, 200)
+    end
+
+    test "a user who must change their password can still log out", %{conn: conn} do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      {:ok, flagged_user} = Accounts.force_password_reset(user)
+
+      conn =
+        conn
+        |> log_in_user(Accounts.get_user!(flagged_user.id))
+        |> put_session(:current_organization_id, organization.id)
+
+      conn = delete(conn, ~p"/logout")
+
+      assert redirected_to(conn) == ~p"/"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "logged out"
+    end
+  end
 end
