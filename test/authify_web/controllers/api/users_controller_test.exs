@@ -777,4 +777,105 @@ defmodule AuthifyWeb.API.UsersControllerTest do
              } = json_response(conn, 403)
     end
   end
+
+  describe "POST /api/users/:id/verify_email" do
+    test "marks an unverified primary email as verified", %{
+      conn: conn,
+      regular_user: regular_user,
+      organization: organization
+    } do
+      refute User.primary_email_verified?(regular_user)
+
+      conn = post(conn, "/#{organization.slug}/api/users/#{regular_user.id}/verify_email")
+
+      assert %{
+               "data" => %{
+                 "id" => user_id,
+                 "type" => "user",
+                 "attributes" => %{"primary_email" => primary_email}
+               }
+             } = json_response(conn, 200)
+
+      assert user_id == to_string(regular_user.id)
+      assert primary_email == User.get_primary_email_value(regular_user)
+
+      updated =
+        Authify.Accounts.get_user!(regular_user.id)
+        |> Authify.Repo.preload(:emails, force: true)
+
+      assert User.primary_email_verified?(updated)
+    end
+
+    test "is idempotent for an already-verified primary email", %{
+      conn: conn,
+      regular_user: regular_user,
+      organization: organization
+    } do
+      {:ok, verified_email} =
+        Authify.Accounts.verify_email(User.get_primary_email(regular_user).id)
+
+      conn = post(conn, "/#{organization.slug}/api/users/#{regular_user.id}/verify_email")
+
+      assert %{"data" => %{"id" => user_id}} = json_response(conn, 200)
+      assert user_id == to_string(regular_user.id)
+
+      updated =
+        Authify.Accounts.get_user!(regular_user.id)
+        |> Authify.Repo.preload(:emails, force: true)
+
+      # Verification was not re-applied, so the timestamp is unchanged
+      assert User.get_primary_email(updated).verified_at == verified_email.verified_at
+    end
+
+    test "returns 404 when user not found in organization", %{
+      conn: conn,
+      organization: organization
+    } do
+      conn = post(conn, "/#{organization.slug}/api/users/99999/verify_email")
+
+      assert %{
+               "error" => %{
+                 "type" => "resource_not_found",
+                 "message" => "User not found in organization"
+               }
+             } = json_response(conn, 404)
+    end
+
+    test "returns 404 for a user in another organization", %{
+      conn: conn,
+      organization: organization
+    } do
+      other_organization = organization_fixture()
+      other_user = user_fixture(organization: other_organization)
+
+      conn = post(conn, "/#{organization.slug}/api/users/#{other_user.id}/verify_email")
+
+      assert %{"error" => %{"type" => "resource_not_found"}} = json_response(conn, 404)
+
+      updated =
+        Authify.Accounts.get_user!(other_user.id)
+        |> Authify.Repo.preload(:emails, force: true)
+
+      refute User.primary_email_verified?(updated)
+    end
+
+    test "requires users:write scope", %{
+      conn: conn,
+      regular_user: regular_user,
+      organization: organization
+    } do
+      conn =
+        conn
+        |> assign(:current_scopes, ["users:read"])
+
+      conn = post(conn, "/#{organization.slug}/api/users/#{regular_user.id}/verify_email")
+
+      assert %{
+               "error" => %{
+                 "type" => "insufficient_scope",
+                 "message" => "Insufficient scope to access this resource"
+               }
+             } = json_response(conn, 403)
+    end
+  end
 end

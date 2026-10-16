@@ -13,6 +13,7 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Users do
       "/{org_slug}/api/users" => users_collection(),
       "/{org_slug}/api/users/{id}" => user_resource(),
       "/{org_slug}/api/users/{id}/role" => user_role(),
+      "/{org_slug}/api/users/{id}/verify_email" => user_verify_email(),
       "/{org_slug}/api/users/{id}/mfa" => user_mfa_status(),
       "/{org_slug}/api/users/{id}/mfa/unlock" => user_mfa_unlock(),
       "/{org_slug}/api/users/{id}/mfa/reset" => user_mfa_reset()
@@ -259,6 +260,49 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Users do
         responses: %{
           "200" => %{
             description: "User role updated successfully",
+            content: %{
+              "application/vnd.authify.v1+json" => %{
+                schema: %{"$ref" => "#/components/schemas/UserResponse"}
+              }
+            }
+          },
+          "401" => %{"$ref" => "#/components/responses/Unauthorized"},
+          "403" => %{"$ref" => "#/components/responses/Forbidden"},
+          "404" => %{"$ref" => "#/components/responses/NotFound"},
+          "422" => %{"$ref" => "#/components/responses/ValidationError"}
+        }
+      }
+    }
+  end
+
+  defp user_verify_email do
+    %{
+      parameters: [
+        %{"$ref" => "#/components/parameters/OrgSlug"},
+        %{"$ref" => "#/components/parameters/AcceptHeader"}
+      ],
+      post: %{
+        tags: ["Users"],
+        summary: "Manually verify a user's primary email",
+        description:
+          "Mark a user's primary email address as verified without the email token flow. Use this when ownership of the address has been confirmed out-of-band. Only verified emails are advertised as `email_verified` to OIDC clients. Verifying an already-verified email is a no-op.",
+        security: [
+          %{"OAuth2" => ["users:write"]},
+          %{"BearerAuth" => []},
+          %{"SessionAuth" => []}
+        ],
+        parameters: [
+          %{
+            name: "id",
+            in: "path",
+            required: true,
+            description: "User ID",
+            schema: %{type: "string"}
+          }
+        ],
+        responses: %{
+          "200" => %{
+            description: "User's primary email verified successfully",
             content: %{
               "application/vnd.authify.v1+json" => %{
                 schema: %{"$ref" => "#/components/schemas/UserResponse"}

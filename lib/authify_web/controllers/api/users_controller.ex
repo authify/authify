@@ -305,6 +305,66 @@ defmodule AuthifyWeb.API.UsersController do
     end
   end
 
+  @doc """
+  POST /{org_slug}/api/users/:id/verify_email
+
+  Manually mark a user's primary email as verified.
+  Requires users:write scope.
+  """
+  def verify_email(conn, %{"id" => id}) do
+    case ensure_scope(conn, "users:write") do
+      :ok ->
+        organization = conn.assigns.current_organization
+
+        case Accounts.get_user_in_organization(id, organization.id) do
+          nil ->
+            render_error_response(
+              conn,
+              :not_found,
+              "resource_not_found",
+              "User not found in organization"
+            )
+
+          user ->
+            case Accounts.verify_primary_email(user) do
+              {:ok, verified_user} ->
+                AuditHelper.log_event_async(
+                  conn,
+                  :user_updated,
+                  "user",
+                  verified_user.id,
+                  "success",
+                  %{
+                    "source" => "api",
+                    "admin_update" => true,
+                    "target_user_email" => User.get_primary_email_value(verified_user),
+                    "primary_email_verified" => true
+                  }
+                )
+
+                render_api_response(conn, verified_user,
+                  resource_type: "user",
+                  exclude: [:password_hash, :password_reset_token]
+                )
+
+              {:error, %Ecto.Changeset{} = changeset} ->
+                render_validation_errors(conn, changeset)
+
+              {:error, _reason} ->
+                render_error_response(
+                  conn,
+                  :unprocessable_entity,
+                  "verification_failed",
+                  "Could not verify the user's primary email"
+                )
+            end
+        end
+
+      {:error, response} ->
+        response
+    end
+  end
+
   defp normalize_api_email_params(params) do
     case params do
       %{"email" => email_value} = p when is_binary(email_value) ->

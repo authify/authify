@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Admins can manually mark an unverified primary email as verified from the user edit page. The action only appears for unverified emails and asks for confirmation, giving a way to set the state that OIDC `email_verified` now reports
+- Management API: `POST /{org_slug}/api/users/:id/verify_email` manually marks a user's primary email as verified. It requires the `users:write` scope and is documented in the OpenAPI specification
 
 ### Fixed
 
