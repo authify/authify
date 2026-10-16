@@ -16,6 +16,13 @@ jobs:
     name: Test (Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }} / Partition ${{ matrix.partition }})
     runs-on: ubuntu-latest
 
+    # The `main` Elixir build is a rolling development snapshot that can regress
+    # independently of our code (for example, a protocol-consolidation crash in
+    # 1.21.0-dev). Keep reporting on it, but do not let it fail the workflow.
+    # Dependants treat a tolerated failure as success, while the pinned release
+    # above still blocks; remove this once `main` is stable enough to gate on.
+    continue-on-error: ${{ matrix.elixir == 'main' }}
+
     strategy:
       fail-fast: false
       matrix:
