@@ -11,4 +11,5 @@ defmodule AuthifyWeb.Auth.Pipeline do
   plug Guardian.Plug.VerifySession, claims: %{"typ" => "access"}
   plug Guardian.Plug.VerifyHeader, claims: %{"typ" => "access"}
   plug Guardian.Plug.LoadResource, allow_blank: true
+  plug AuthifyWeb.Plugs.EnforcePasswordReset
 end

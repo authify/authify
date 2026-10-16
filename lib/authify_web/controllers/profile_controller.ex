@@ -91,7 +91,11 @@ defmodule AuthifyWeb.ProfileController do
             extra_metadata: %{"source" => "web", "method" => "self_service"}
           )
 
+          # Changing the password bumps the session version, which revokes all
+          # prior tokens (including the current one). Re-issue a token for the
+          # updated user so this session stays signed in while others do not.
           conn
+          |> Authify.Guardian.Plug.sign_in(updated_user)
           |> put_flash(:info, "Password updated successfully.")
           |> redirect(to: ~p"/#{conn.assigns.current_organization.slug}/profile")
 

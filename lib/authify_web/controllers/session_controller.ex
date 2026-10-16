@@ -261,15 +261,18 @@ defmodule AuthifyWeb.SessionController do
 
   # Complete the login process (extracted for reuse)
   defp complete_login(conn, user, organization) do
-    default_destination = AuthifyWeb.Auth.Navigation.dashboard_path_for_user(user, organization)
-    {conn, destination} = ReturnTo.destination(conn, default_destination)
+    {conn, destination} =
+      AuthifyWeb.Auth.Navigation.post_authentication_destination(conn, user, organization)
+
+    {flash_level, flash_message} =
+      AuthifyWeb.Auth.Navigation.post_authentication_flash(user)
 
     conn
     |> Guardian.Plug.sign_out()
     |> Guardian.Plug.sign_in(user)
     |> put_session(:current_organization_id, organization.id)
     |> AuthifyWeb.Auth.Navigation.clear_mfa_session()
-    |> put_flash(:info, "Welcome back!")
+    |> put_flash(flash_level, flash_message)
     |> redirect(to: destination)
   end
 end

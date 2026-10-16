@@ -1,6 +1,8 @@
 defmodule AuthifyWeb.SessionControllerTest do
   use AuthifyWeb.ConnCase, async: true
 
+  import Authify.AccountsFixtures
+
   alias Authify.Accounts
 
   describe "GET /login" do
@@ -124,6 +126,67 @@ defmodule AuthifyWeb.SessionControllerTest do
 
       assert redirected_to(conn) == ~p"/#{organization.slug}/user/dashboard"
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Welcome back!"
+    end
+
+    test "redirects to password change when a reset is required", %{conn: conn} do
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
+
+      email = "john-#{System.unique_integer([:positive])}@test.com"
+
+      user_attrs = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "email" => email,
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      {:ok, user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
+      {:ok, _user} = Accounts.force_password_reset(user)
+
+      login_params = %{
+        "organization_slug" => slug,
+        "email" => email,
+        "password" => "SecureP@ssw0rd!"
+      }
+
+      conn = post(conn, ~p"/login", login: login_params)
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/profile/password"
+      assert Phoenix.Flash.get(conn.assigns.flash, :warning) =~ "must change your password"
+    end
+
+    test "a required password reset ignores a pending return_to destination", %{conn: conn} do
+      slug = "test-org-#{System.unique_integer([:positive])}"
+      {:ok, organization} = Accounts.create_organization(%{name: "Test Org", slug: slug})
+
+      email = "john-#{System.unique_integer([:positive])}@test.com"
+
+      user_attrs = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "email" => email,
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      {:ok, user} = Accounts.create_user_with_role(user_attrs, organization.id, "user")
+      {:ok, _user} = Accounts.force_password_reset(user)
+
+      login_params = %{
+        "organization_slug" => slug,
+        "email" => email,
+        "password" => "SecureP@ssw0rd!"
+      }
+
+      conn =
+        conn
+        |> get(~p"/login", return_to: "/#{organization.slug}/dashboard")
+        |> recycle()
+        |> post(~p"/login", login: login_params)
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/profile/password"
     end
 
     test "shows error with invalid organization", %{conn: conn} do
@@ -571,6 +634,102 @@ defmodule AuthifyWeb.SessionControllerTest do
       # Should redirect to MFA verification (not setup)
       assert redirected_to(conn) == ~p"/mfa/verify"
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "authentication code"
+    end
+  end
+
+  describe "session revocation" do
+    test "forcing a password reset invalidates an existing session", %{conn: conn} do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+
+      # Establish a session for the user, then force a reset.
+      conn =
+        conn
+        |> log_in_user(user)
+        |> put_session(:current_organization_id, organization.id)
+
+      {:ok, _user} = Accounts.force_password_reset(user)
+
+      conn = get(conn, ~p"/#{organization.slug}/dashboard")
+
+      # The stale token is rejected and the user is sent back to the login page.
+      assert redirected_to(conn) == ~p"/login"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Authentication required"
+    end
+  end
+
+  describe "password reset enforcement" do
+    test "a user who must change their password is redirected from other pages", %{conn: conn} do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      {:ok, flagged_user} = Accounts.force_password_reset(user)
+
+      conn =
+        conn
+        |> log_in_user(Accounts.get_user!(flagged_user.id))
+        |> put_session(:current_organization_id, organization.id)
+
+      conn = get(conn, ~p"/#{organization.slug}/dashboard")
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/profile/password"
+      assert Phoenix.Flash.get(conn.assigns.flash, :warning) =~ "must change your password"
+    end
+
+    test "a user who must change their password can reach the password page", %{conn: conn} do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      {:ok, flagged_user} = Accounts.force_password_reset(user)
+
+      conn =
+        conn
+        |> log_in_user(Accounts.get_user!(flagged_user.id))
+        |> put_session(:current_organization_id, organization.id)
+
+      conn = get(conn, ~p"/#{organization.slug}/profile/password")
+
+      assert html_response(conn, 200) =~ "Change Password"
+    end
+
+    test "access is restored once the password has been changed", %{conn: conn} do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      {:ok, flagged_user} = Accounts.force_password_reset(user)
+
+      conn =
+        conn
+        |> log_in_user(Accounts.get_user!(flagged_user.id))
+        |> put_session(:current_organization_id, organization.id)
+
+      conn =
+        patch(conn, ~p"/#{organization.slug}/profile/password", %{
+          "user" => %{
+            "current_password" => "SecureP@ssw0rd!",
+            "password" => "BrandNewP@ss1!",
+            "password_confirmation" => "BrandNewP@ss1!"
+          }
+        })
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/profile"
+
+      # The (re-issued) session can now reach the dashboard again.
+      conn = get(recycle(conn), ~p"/#{organization.slug}/dashboard")
+      assert html_response(conn, 200)
+    end
+
+    test "a user who must change their password can still log out", %{conn: conn} do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      {:ok, flagged_user} = Accounts.force_password_reset(user)
+
+      conn =
+        conn
+        |> log_in_user(Accounts.get_user!(flagged_user.id))
+        |> put_session(:current_organization_id, organization.id)
+
+      conn = delete(conn, ~p"/logout")
+
+      assert redirected_to(conn) == ~p"/"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "logged out"
     end
   end
 end

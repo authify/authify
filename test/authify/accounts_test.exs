@@ -1057,6 +1057,78 @@ defmodule Authify.AccountsTest do
     end
   end
 
+  describe "force password reset" do
+    setup do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      %{organization: organization, user: user}
+    end
+
+    test "force_password_reset/1 sets the password_reset_required flag", %{user: user} do
+      refute user.password_reset_required
+
+      assert {:ok, updated_user} = Accounts.force_password_reset(user)
+      assert updated_user.password_reset_required
+
+      # Persisted, not just returned in-memory
+      assert Accounts.get_user!(user.id).password_reset_required
+    end
+
+    test "update_user_password/2 clears the password_reset_required flag", %{user: user} do
+      {:ok, flagged_user} = Accounts.force_password_reset(user)
+      assert flagged_user.password_reset_required
+
+      assert {:ok, updated_user} =
+               Accounts.update_user_password(flagged_user, %{
+                 "password" => "NewSecureP@ssw0rd!",
+                 "password_confirmation" => "NewSecureP@ssw0rd!"
+               })
+
+      refute updated_user.password_reset_required
+      assert User.valid_password?(updated_user, "NewSecureP@ssw0rd!")
+    end
+
+    test "reset_password_with_token/2 clears the password_reset_required flag", %{user: user} do
+      {:ok, _flagged_user} = Accounts.force_password_reset(user)
+
+      {:ok, _token_user, token} =
+        Accounts.generate_password_reset_token(Accounts.get_user!(user.id))
+
+      assert {:ok, reset_user} =
+               Accounts.reset_password_with_token(token, %{
+                 "password" => "NewSecureP@ssw0rd!",
+                 "password_confirmation" => "NewSecureP@ssw0rd!"
+               })
+
+      refute reset_user.password_reset_required
+    end
+
+    test "force_password_reset/1 revokes existing sessions", %{user: user} do
+      original_version = user.session_version
+
+      assert {:ok, updated_user} = Accounts.force_password_reset(user)
+      assert updated_user.session_version == original_version + 1
+    end
+
+    test "revoke_user_sessions/1 increments the session version", %{user: user} do
+      assert {:ok, updated_user} = Accounts.revoke_user_sessions(user)
+      assert updated_user.session_version == user.session_version + 1
+      assert Accounts.get_user!(user.id).session_version == user.session_version + 1
+    end
+
+    test "update_user_password/2 revokes other sessions", %{user: user} do
+      original_version = user.session_version
+
+      assert {:ok, updated_user} =
+               Accounts.update_user_password(user, %{
+                 "password" => "NewSecureP@ssw0rd!",
+                 "password_confirmation" => "NewSecureP@ssw0rd!"
+               })
+
+      assert updated_user.session_version == original_version + 1
+    end
+  end
+
   describe "password reset utilities" do
     test "User.valid_password_reset_token?/1 validates token expiration" do
       # Valid token (not expired)

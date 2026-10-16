@@ -22,6 +22,7 @@ defmodule Authify.Accounts.User do
              :groups,
              :emails,
              :hashed_password,
+             :session_version,
              :password_reset_token,
              :password_reset_expires_at,
              :password,
@@ -42,6 +43,8 @@ defmodule Authify.Accounts.User do
           organization_id: integer() | nil,
           role: String.t(),
           active: boolean(),
+          password_reset_required: boolean(),
+          session_version: non_neg_integer(),
           organization: Organization.t(),
           emails: [UserEmail.t()],
           inserted_at: DateTime.t(),
@@ -55,6 +58,8 @@ defmodule Authify.Accounts.User do
     field :username, :string
     field :role, :string, default: "user"
     field :active, :boolean, default: true
+    field :password_reset_required, :boolean, default: false
+    field :session_version, :integer, default: 0
     field :password_reset_token, :string
     field :plaintext_reset_token, :string, virtual: true
     field :password_reset_expires_at, :utc_datetime
@@ -99,6 +104,7 @@ defmodule Authify.Accounts.User do
     :organization_id,
     :role,
     :active,
+    :password_reset_required,
     :theme_preference,
     :external_id,
     :avatar_url,
@@ -174,6 +180,7 @@ defmodule Authify.Accounts.User do
     |> cast(attrs, @password_fields)
     |> validate_password(policy)
     |> put_password_hash()
+    |> maybe_clear_password_reset_required()
   end
 
   @doc """
@@ -407,6 +414,17 @@ defmodule Authify.Accounts.User do
 
   defp put_password_hash(changeset), do: changeset
 
+  # A successful password change satisfies any outstanding "must change
+  # password" requirement and revokes tokens issued before the change (so any
+  # other active sessions are signed out).
+  defp maybe_clear_password_reset_required(%Ecto.Changeset{changes: %{password: _}} = changeset) do
+    changeset
+    |> put_change(:password_reset_required, false)
+    |> put_change(:session_version, (changeset.data.session_version || 0) + 1)
+  end
+
+  defp maybe_clear_password_reset_required(changeset), do: changeset
+
   @doc """
   Returns the avatar URL for a user.
 
@@ -475,6 +493,14 @@ defmodule Authify.Accounts.User do
     Bcrypt.no_user_verify()
     false
   end
+
+  @doc """
+  Returns true when the user must change their password before continuing.
+
+  Set by admins via `Authify.Accounts.force_password_reset/1` and cleared when
+  the user successfully changes their password.
+  """
+  def password_reset_required?(%__MODULE__{password_reset_required: value}), do: value == true
 
   @doc """
   Returns the user's full name.

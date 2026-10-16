@@ -33,6 +33,41 @@ defmodule AuthifyWeb.Auth.Navigation do
   end
 
   @doc """
+  Returns the `{conn, destination}` a freshly-authenticated user should be sent
+  to.
+
+  Users flagged as requiring a password reset are always sent to the password
+  change page, and any pending `return_to` destination is discarded so it cannot
+  bypass the requirement. Everyone else resumes a pending `return_to` or lands
+  on their dashboard.
+  """
+  def post_authentication_destination(conn, user, organization) do
+    if User.password_reset_required?(user) do
+      {delete_session(conn, :return_to), password_change_path(organization)}
+    else
+      AuthifyWeb.Auth.ReturnTo.destination(conn, dashboard_path_for_user(user, organization))
+    end
+  end
+
+  @doc """
+  Returns the `{flash_level, message}` to show after authentication.
+  """
+  def post_authentication_flash(user) do
+    if User.password_reset_required?(user) do
+      {:warning, "You must change your password before continuing."}
+    else
+      {:info, "Welcome back!"}
+    end
+  end
+
+  @doc """
+  Absolute path to the self-service password change page for an organization.
+  """
+  def password_change_path(organization) do
+    ~p"/#{organization.slug}/profile/password"
+  end
+
+  @doc """
   Clears MFA-related session keys from the connection.
 
   Removes the pending user/organization ids, the pending timestamp, and any
