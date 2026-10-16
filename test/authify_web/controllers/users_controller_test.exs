@@ -392,6 +392,42 @@ defmodule AuthifyWeb.UsersControllerTest do
       assert created_user.role == "user"
     end
 
+    test "created user is sent an email verification link", %{conn: conn} do
+      organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+
+      user_params = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "email" => "verify-me@example.com",
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!",
+        "role" => "user"
+      }
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      conn = post(conn, ~p"/#{organization.slug}/users", user: user_params)
+
+      assert %{id: id} = redirected_params(conn)
+      created_user = Accounts.get_user!(id)
+
+      # Creating a user triggers the email verification workflow
+      {event_tasks, _} =
+        Authify.Tasks.list_tasks(organization.id,
+          type: "event",
+          action: "email_verification_needed"
+        )
+
+      assert Enum.any?(event_tasks, &(&1.params["user_id"] == created_user.id))
+    end
+
     test "admin can create admin user", %{conn: conn} do
       organization = organization_fixture()
       admin_user = admin_user_fixture(organization)

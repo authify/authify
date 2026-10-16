@@ -88,6 +88,11 @@ defmodule AuthifyWeb.API.UsersController do
 
         case Accounts.create_user(user_attrs) do
           {:ok, user} ->
+            # New users are created directly (not via invitation), so trigger the
+            # email verification workflow so they can verify their address.
+            user = Authify.Repo.preload(user, :emails)
+            _ = Accounts.send_email_verification(user, User.get_primary_email(user))
+
             AuditHelper.log_user_created(conn, user, extra_metadata: %{"source" => "api"})
 
             render_api_response(conn, user,

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - OIDC `email_verified` now reflects the actual verification state of the user's primary email in both the `/userinfo` response and the ID token, instead of being hardcoded to `true`
+- New users created via organization signup, the admin user form, or the Management API now have the email verification workflow triggered on creation, so they receive a verification link (subject to SMTP being configured for the organization)
 
 ### Security
 

@@ -605,7 +605,7 @@ defmodule AuthifyWeb.UsersController do
     role = Map.get(user_params, "role", "user")
     user_attrs = user_params |> Map.delete("role") |> normalize_email_params()
 
-    case Accounts.create_user_with_role(user_attrs, organization.id, role) do
+    case Accounts.create_user_and_send_verification(user_attrs, organization.id, role) do
       {:ok, user} ->
         # Log user creation
         log_audit_event(conn, :user_created, user, %{

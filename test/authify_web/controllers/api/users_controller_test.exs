@@ -176,6 +176,37 @@ defmodule AuthifyWeb.API.UsersControllerTest do
       assert attributes["last_name"] == "User"
     end
 
+    test "created user is sent an email verification link", %{
+      conn: conn,
+      organization: organization
+    } do
+      user_attrs = %{
+        "user" => %{
+          "emails" => [
+            %{"value" => "verify-api@example.com", "primary" => true, "type" => "work"}
+          ],
+          "first_name" => "Veri",
+          "last_name" => "Fy",
+          "password" => "SecureP@ssw0rd!",
+          "password_confirmation" => "SecureP@ssw0rd!"
+        }
+      }
+
+      conn = post(conn, "/#{organization.slug}/api/users", user_attrs)
+
+      assert %{"data" => %{"id" => user_id}} = json_response(conn, 201)
+      created_user = Authify.Accounts.get_user!(user_id)
+
+      # Creating a user triggers the email verification workflow
+      {event_tasks, _} =
+        Authify.Tasks.list_tasks(organization.id,
+          type: "event",
+          action: "email_verification_needed"
+        )
+
+      assert Enum.any?(event_tasks, &(&1.params["user_id"] == created_user.id))
+    end
+
     test "returns validation errors for invalid email", %{conn: conn, organization: organization} do
       invalid_attrs = %{
         "user" => %{

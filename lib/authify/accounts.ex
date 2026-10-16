@@ -283,15 +283,25 @@ defmodule Authify.Accounts do
         default_primary: true
       )
 
-    Repo.transaction(fn ->
-      with {:ok, organization} <- create_organization(org_attrs),
-           {:ok, {organization, user}} <-
-             create_admin_user_for_organization(organization, normalized_user_attrs) do
-        {organization, user}
-      else
-        {:error, changeset} -> Repo.rollback(changeset)
-      end
-    end)
+    case Repo.transaction(fn ->
+           with {:ok, organization} <- create_organization(org_attrs),
+                {:ok, {organization, user}} <-
+                  create_admin_user_for_organization(organization, normalized_user_attrs) do
+             {organization, user}
+           else
+             {:error, changeset} -> Repo.rollback(changeset)
+           end
+         end) do
+      {:ok, {organization, user}} ->
+        # The admin is created directly (not via invitation), so trigger the
+        # email verification workflow now that the transaction has committed.
+        user = Repo.preload(user, [:organization, :emails], force: true)
+        _ = send_email_verification(user, User.get_primary_email(user))
+        {:ok, {organization, user}}
+
+      {:error, changeset} ->
+        {:error, changeset}
+    end
   end
 
   defp create_admin_user_for_organization(organization, user_attrs) do
