@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- OIDC `email_verified` now reflects the actual verification state of the user's primary email in both the `/userinfo` response and the ID token, instead of being hardcoded to `true`
+
+### Security
+
+- The OIDC `email_verified` claim no longer tells clients to trust an unverified email address
+
 ## [0.24.1] - 2026-10-16
 
 ### Fixed

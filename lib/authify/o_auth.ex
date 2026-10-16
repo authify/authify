@@ -573,7 +573,7 @@ defmodule Authify.OAuth do
   defp add_scope_claims("email", claims, user) do
     Map.merge(claims, %{
       "email" => User.get_primary_email_value(user),
-      "email_verified" => true
+      "email_verified" => User.primary_email_verified?(user)
     })
   end
 

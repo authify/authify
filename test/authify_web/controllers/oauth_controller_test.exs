@@ -1587,6 +1587,8 @@ defmodule AuthifyWeb.OAuthControllerTest do
       user: user,
       organization: organization
     } do
+      {:ok, _email} = Authify.Accounts.verify_email(User.get_primary_email(user).id)
+
       {:ok, auth_code} =
         Authify.OAuth.create_authorization_code(
           application,
@@ -1608,14 +1610,108 @@ defmodule AuthifyWeb.OAuthControllerTest do
       # Check OIDC-compliant claims
       assert response["sub"] == to_string(user.id)
       assert response["email"] == User.get_primary_email_value(user)
-      # Should be present
-      assert response["email_verified"]
+      # Reflects the verified state of the primary email
+      assert response["email_verified"] == true
       # Should be present for profile scope
       assert response["name"]
       # Should map to first_name
       assert response["given_name"]
       # Should map to last_name
       assert response["family_name"]
+    end
+
+    test "userinfo endpoint reports email_verified false for an unverified email", %{
+      conn: conn,
+      application: application,
+      user: user,
+      organization: organization
+    } do
+      refute User.primary_email_verified?(user)
+
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "email"]
+        )
+
+      {:ok, result} = Authify.OAuth.exchange_authorization_code(auth_code, application)
+      access_token = result.access_token
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{access_token.token}")
+        |> get(~p"/#{organization.slug}/oauth/userinfo")
+
+      response = json_response(conn, 200)
+
+      assert response["email"] == User.get_primary_email_value(user)
+      assert response["email_verified"] == false
+    end
+
+    test "ID token reports email_verified false for an unverified email", %{
+      conn: conn,
+      application: application,
+      user: user,
+      organization: organization
+    } do
+      refute User.primary_email_verified?(user)
+
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "email"]
+        )
+
+      params = %{
+        "grant_type" => "authorization_code",
+        "client_id" => application.client_id,
+        "client_secret" => application.client_secret,
+        "code" => auth_code.code
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/token", params)
+      response = json_response(conn, 200)
+
+      claims = decode_id_token_claims(response["id_token"])
+
+      assert claims["email"] == User.get_primary_email_value(user)
+      assert claims["email_verified"] == false
+    end
+
+    test "ID token reports email_verified true for a verified email", %{
+      conn: conn,
+      application: application,
+      user: user,
+      organization: organization
+    } do
+      {:ok, _email} = Authify.Accounts.verify_email(User.get_primary_email(user).id)
+
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "email"]
+        )
+
+      params = %{
+        "grant_type" => "authorization_code",
+        "client_id" => application.client_id,
+        "client_secret" => application.client_secret,
+        "code" => auth_code.code
+      }
+
+      conn = post(conn, ~p"/#{organization.slug}/oauth/token", params)
+      response = json_response(conn, 200)
+
+      claims = decode_id_token_claims(response["id_token"])
+
+      assert claims["email"] == User.get_primary_email_value(user)
+      assert claims["email_verified"] == true
     end
 
     @tag :skip
@@ -2215,5 +2311,13 @@ defmodule AuthifyWeb.OAuthControllerTest do
       conn = get(conn, ~p"/#{organization.slug}/oauth/authorize", params)
       assert html_response(conn, 200) =~ "Authorize Application"
     end
+  end
+
+  defp decode_id_token_claims(id_token) do
+    [_header, payload, _signature] = String.split(id_token, ".")
+
+    payload
+    |> Base.url_decode64!(padding: false)
+    |> Jason.decode!()
   end
 end

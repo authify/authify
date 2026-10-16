@@ -886,7 +886,7 @@ defmodule AuthifyWeb.OAuthController do
     if "email" in scopes do
       Map.merge(claims, %{
         "email" => User.get_primary_email_value(user),
-        "email_verified" => true
+        "email_verified" => User.primary_email_verified?(user)
       })
     else
       claims
