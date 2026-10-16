@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-10-16
+
+### Fixed
+
+- The admin "Force Password Reset" action no longer silently does nothing. It sets a `password_reset_required` flag on the user (the attribute it previously tried to write did not exist on the schema and was dropped by `cast/3`), so the user is redirected to the password-change page after their next sign-in and must change their password before using the account. The flag is cleared automatically on the next successful password change, including token-based resets
+
+### Security
+
+- Forcing a password reset now immediately revokes the user's active sessions. Session tokens embed a per-user session version that is bumped on reset, so previously issued tokens stop working instead of remaining valid until expiry
+- Users with a pending password reset are confined to the password-change page (plus the emailed reset flow and logout); all other pages, including OAuth authorize and SAML SSO, redirect them back to the password form
+- Changing a password (self-service or via a reset token) now revokes the user's other active sessions
+
 ## [0.24.0] - 2026-10-03
 
 ### Added
@@ -865,7 +877,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.24.1...HEAD
+[0.24.1]: https://github.com/authify/authify/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/authify/authify/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/authify/authify/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/authify/authify/compare/v0.21.4...v0.22.0
