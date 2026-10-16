@@ -723,11 +723,29 @@ defmodule Authify.Accounts do
   Forces a user to change their password before continuing.
 
   Sets the `password_reset_required` flag so the user is redirected to the
-  password change page after their next successful sign-in. The flag is cleared
-  automatically the next time the user sets a password.
+  password change page after their next successful sign-in, and bumps the
+  session version so any sessions that are already active are revoked. The flag
+  is cleared automatically the next time the user sets a password.
   """
-  def force_password_reset(user) do
-    update_user(user, %{"password_reset_required" => true})
+  def force_password_reset(%User{} = user) do
+    user
+    |> Ecto.Changeset.change(%{
+      password_reset_required: true,
+      session_version: (user.session_version || 0) + 1
+    })
+    |> Repo.update()
+  end
+
+  @doc """
+  Revokes all of a user's active sessions.
+
+  Bumps the user's session version, which invalidates every session token that
+  was issued before this call. The user is not disabled and can sign in again.
+  """
+  def revoke_user_sessions(%User{} = user) do
+    user
+    |> Ecto.Changeset.change(session_version: (user.session_version || 0) + 1)
+    |> Repo.update()
   end
 
   @doc """

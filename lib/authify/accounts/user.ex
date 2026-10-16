@@ -22,6 +22,7 @@ defmodule Authify.Accounts.User do
              :groups,
              :emails,
              :hashed_password,
+             :session_version,
              :password_reset_token,
              :password_reset_expires_at,
              :password,
@@ -43,6 +44,7 @@ defmodule Authify.Accounts.User do
           role: String.t(),
           active: boolean(),
           password_reset_required: boolean(),
+          session_version: non_neg_integer(),
           organization: Organization.t(),
           emails: [UserEmail.t()],
           inserted_at: DateTime.t(),
@@ -57,6 +59,7 @@ defmodule Authify.Accounts.User do
     field :role, :string, default: "user"
     field :active, :boolean, default: true
     field :password_reset_required, :boolean, default: false
+    field :session_version, :integer, default: 0
     field :password_reset_token, :string
     field :plaintext_reset_token, :string, virtual: true
     field :password_reset_expires_at, :utc_datetime
@@ -412,9 +415,12 @@ defmodule Authify.Accounts.User do
   defp put_password_hash(changeset), do: changeset
 
   # A successful password change satisfies any outstanding "must change
-  # password" requirement.
+  # password" requirement and revokes tokens issued before the change (so any
+  # other active sessions are signed out).
   defp maybe_clear_password_reset_required(%Ecto.Changeset{changes: %{password: _}} = changeset) do
-    put_change(changeset, :password_reset_required, false)
+    changeset
+    |> put_change(:password_reset_required, false)
+    |> put_change(:session_version, (changeset.data.session_version || 0) + 1)
   end
 
   defp maybe_clear_password_reset_required(changeset), do: changeset

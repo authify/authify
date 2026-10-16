@@ -1102,6 +1102,31 @@ defmodule Authify.AccountsTest do
 
       refute reset_user.password_reset_required
     end
+
+    test "force_password_reset/1 revokes existing sessions", %{user: user} do
+      original_version = user.session_version
+
+      assert {:ok, updated_user} = Accounts.force_password_reset(user)
+      assert updated_user.session_version == original_version + 1
+    end
+
+    test "revoke_user_sessions/1 increments the session version", %{user: user} do
+      assert {:ok, updated_user} = Accounts.revoke_user_sessions(user)
+      assert updated_user.session_version == user.session_version + 1
+      assert Accounts.get_user!(user.id).session_version == user.session_version + 1
+    end
+
+    test "update_user_password/2 revokes other sessions", %{user: user} do
+      original_version = user.session_version
+
+      assert {:ok, updated_user} =
+               Accounts.update_user_password(user, %{
+                 "password" => "NewSecureP@ssw0rd!",
+                 "password_confirmation" => "NewSecureP@ssw0rd!"
+               })
+
+      assert updated_user.session_version == original_version + 1
+    end
   end
 
   describe "password reset utilities" do

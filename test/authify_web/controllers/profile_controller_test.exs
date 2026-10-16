@@ -162,7 +162,10 @@ defmodule AuthifyWeb.ProfileControllerTest do
       conn: conn,
       user: user
     } do
-      {:ok, _flagged_user} = Accounts.force_password_reset(user)
+      # Forcing a reset also revokes existing sessions, so sign in again the way
+      # a real user would after re-authenticating.
+      {:ok, flagged_user} = Accounts.force_password_reset(user)
+      conn = log_in_user(conn, Accounts.get_user!(flagged_user.id))
 
       conn =
         patch(conn, ~p"/#{user.organization.slug}/profile/password", %{
