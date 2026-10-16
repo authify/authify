@@ -283,15 +283,25 @@ defmodule Authify.Accounts do
         default_primary: true
       )
 
-    Repo.transaction(fn ->
-      with {:ok, organization} <- create_organization(org_attrs),
-           {:ok, {organization, user}} <-
-             create_admin_user_for_organization(organization, normalized_user_attrs) do
-        {organization, user}
-      else
-        {:error, changeset} -> Repo.rollback(changeset)
-      end
-    end)
+    case Repo.transaction(fn ->
+           with {:ok, organization} <- create_organization(org_attrs),
+                {:ok, {organization, user}} <-
+                  create_admin_user_for_organization(organization, normalized_user_attrs) do
+             {organization, user}
+           else
+             {:error, changeset} -> Repo.rollback(changeset)
+           end
+         end) do
+      {:ok, {organization, user}} ->
+        # The admin is created directly (not via invitation), so trigger the
+        # email verification workflow now that the transaction has committed.
+        user = Repo.preload(user, [:organization, :emails], force: true)
+        _ = send_email_verification(user, User.get_primary_email(user))
+        {:ok, {organization, user}}
+
+      {:error, changeset} ->
+        {:error, changeset}
+    end
   end
 
   defp create_admin_user_for_organization(organization, user_attrs) do
@@ -955,6 +965,38 @@ defmodule Authify.Accounts do
         email
         |> UserEmail.verify_changeset()
         |> Repo.update()
+    end
+  end
+
+  @doc """
+  Marks a user's primary email as verified.
+
+  This is an administrative override: it verifies the primary email without
+  going through the token email flow, for cases where ownership has been
+  confirmed out-of-band. No-op when the primary email is already verified.
+
+  ## Returns
+    * `{:ok, user}` - Updated user with emails preloaded
+    * `{:error, reason}` - Verification failed
+  """
+  def verify_primary_email(%User{} = user) do
+    user = Repo.preload(user, :emails, force: true)
+
+    if User.primary_email_verified?(user) do
+      {:ok, user}
+    else
+      primary_email = User.get_primary_email(user)
+
+      case verify_email(primary_email.id) do
+        {:ok, updated_email} ->
+          emails =
+            Enum.map(user.emails, &if(&1.id == updated_email.id, do: updated_email, else: &1))
+
+          {:ok, %{user | emails: emails}}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
     end
   end
 

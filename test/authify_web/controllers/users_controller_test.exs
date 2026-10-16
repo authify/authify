@@ -392,6 +392,42 @@ defmodule AuthifyWeb.UsersControllerTest do
       assert created_user.role == "user"
     end
 
+    test "created user is sent an email verification link", %{conn: conn} do
+      organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+
+      user_params = %{
+        "first_name" => "John",
+        "last_name" => "Doe",
+        "email" => "verify-me@example.com",
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!",
+        "role" => "user"
+      }
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      conn = post(conn, ~p"/#{organization.slug}/users", user: user_params)
+
+      assert %{id: id} = redirected_params(conn)
+      created_user = Accounts.get_user!(id)
+
+      # Creating a user triggers the email verification workflow
+      {event_tasks, _} =
+        Authify.Tasks.list_tasks(organization.id,
+          type: "event",
+          action: "email_verification_needed"
+        )
+
+      assert Enum.any?(event_tasks, &(&1.params["user_id"] == created_user.id))
+    end
+
     test "admin can create admin user", %{conn: conn} do
       organization = organization_fixture()
       admin_user = admin_user_fixture(organization)
@@ -589,7 +625,7 @@ defmodule AuthifyWeb.UsersControllerTest do
       assert body =~ "user_team"
     end
 
-    test "admin edit form shows the current primary email as read-only", %{conn: conn} do
+    test "admin edit form shows the current primary email and its status", %{conn: conn} do
       organization = organization_fixture()
       admin_user = admin_user_fixture(organization)
       regular_user = user_for_organization_fixture(organization)
@@ -605,12 +641,13 @@ defmodule AuthifyWeb.UsersControllerTest do
       conn = get(conn, ~p"/#{organization.slug}/users/#{regular_user.id}/edit")
 
       body = html_response(conn, 200)
-      # The email input pre-populates with the user's primary email...
+      # The primary email is displayed...
       assert body =~ User.get_primary_email_value(regular_user)
-      # ...is disabled (not submittable)...
-      assert body =~ "disabled"
-      # ...and is not a required field (the bug from #197)
+      # ...with its verification status...
+      assert body =~ "Unverified"
+      # ...but is never an editable field (the bug from #197)
       refute body =~ ~s{name="user[email]"}
+      refute body =~ ~s{id="user_email"}
     end
 
     test "admin can update a user without sending any email param", %{conn: conn} do
@@ -671,6 +708,107 @@ defmodule AuthifyWeb.UsersControllerTest do
 
       updated = Accounts.get_user!(regular_user.id) |> Authify.Repo.preload(:emails, force: true)
       assert User.get_primary_email_value(updated) == original_email
+    end
+
+    test "admin can manually mark an unverified primary email as verified", %{conn: conn} do
+      organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+      regular_user = user_for_organization_fixture(organization)
+
+      refute User.primary_email_verified?(regular_user)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      conn = post(conn, ~p"/#{organization.slug}/users/#{regular_user.id}/verify_email")
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/users/#{regular_user.id}/edit"
+
+      updated = Accounts.get_user!(regular_user.id) |> Authify.Repo.preload(:emails, force: true)
+      assert User.primary_email_verified?(updated)
+    end
+
+    test "manually verifying an already-verified primary email is a no-op", %{conn: conn} do
+      organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+      regular_user = user_for_organization_fixture(organization)
+
+      {:ok, verified_email} = Accounts.verify_email(User.get_primary_email(regular_user).id)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      conn = post(conn, ~p"/#{organization.slug}/users/#{regular_user.id}/verify_email")
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/users/#{regular_user.id}/edit"
+
+      updated = Accounts.get_user!(regular_user.id) |> Authify.Repo.preload(:emails, force: true)
+      assert User.primary_email_verified?(updated)
+      # Verification was not re-applied, so the timestamp is unchanged
+      assert User.get_primary_email(updated).verified_at == verified_email.verified_at
+    end
+
+    test "edit form only offers Mark Verified for an unverified email", %{conn: conn} do
+      organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+      regular_user = user_for_organization_fixture(organization)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      body =
+        html_response(get(conn, ~p"/#{organization.slug}/users/#{regular_user.id}/edit"), 200)
+
+      assert body =~ "Mark Verified"
+      assert body =~ ~p"/#{organization.slug}/users/#{regular_user.id}/verify_email"
+
+      # Once verified, the Mark Verified action disappears
+      {:ok, _} = Accounts.verify_email(User.get_primary_email(regular_user).id)
+
+      body =
+        html_response(get(conn, ~p"/#{organization.slug}/users/#{regular_user.id}/edit"), 200)
+
+      refute body =~ "Mark Verified"
+      assert body =~ "Verified"
+    end
+
+    test "admin cannot verify a user from another organization", %{conn: conn} do
+      organization = organization_fixture()
+      other_organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+      other_user = user_for_organization_fixture(other_organization)
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      conn = post(conn, ~p"/#{organization.slug}/users/#{other_user.id}/verify_email")
+
+      assert response(conn, 404)
+
+      updated =
+        Accounts.get_user!(other_user.id) |> Authify.Repo.preload(:emails, force: true)
+
+      refute User.primary_email_verified?(updated)
     end
   end
 

@@ -57,6 +57,15 @@ defmodule AuthifyWeb.OrganizationControllerTest do
       assert user.last_name == "Doe"
       assert user.role == "admin"
       assert user.organization_id == org.id
+
+      # Signup triggers the email verification workflow for the admin
+      {event_tasks, _} =
+        Authify.Tasks.list_tasks(org.id,
+          type: "event",
+          action: "email_verification_needed"
+        )
+
+      assert Enum.any?(event_tasks, &(&1.params["user_id"] == user.id))
     end
 
     test "shows errors with invalid organization data", %{conn: conn} do

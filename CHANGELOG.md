@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.2] - 2026-10-16
+
+### Added
+
+- Admins can manually mark an unverified primary email as verified from the user edit page. The action only appears for unverified emails and asks for confirmation, giving a way to set the state that OIDC `email_verified` now reports
+- Management API: `POST /{org_slug}/api/users/:id/verify_email` manually marks a user's primary email as verified. It requires the `users:write` scope and is documented in the OpenAPI specification
+
+### Fixed
+
+- OIDC `email_verified` now reflects the actual verification state of the user's primary email in both the `/userinfo` response and the ID token, instead of being hardcoded to `true`
+- New users created via organization signup, the admin user form, or the Management API now have the email verification workflow triggered on creation, so they receive a verification link (subject to SMTP being configured for the organization)
+
+### Security
+
+- The OIDC `email_verified` claim no longer tells clients to trust an unverified email address
+
 ## [0.24.1] - 2026-10-16
 
 ### Fixed
@@ -877,7 +893,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.24.1...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.24.2...HEAD
+[0.24.2]: https://github.com/authify/authify/compare/v0.24.1...v0.24.2
 [0.24.1]: https://github.com/authify/authify/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/authify/authify/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/authify/authify/compare/v0.22.0...v0.23.0
