@@ -285,4 +285,62 @@ defmodule Authify.SCIM.FilterParserTest do
                FilterParser.parse(~s(externalId eq "hr-12345"))
     end
   end
+
+  describe "parse_attribute_path/1" do
+    test "parses a simple attribute" do
+      assert {:ok, {:simple, "active"}} = FilterParser.parse_attribute_path("active")
+    end
+
+    test "parses a dotted attribute and downcases it" do
+      assert {:ok, {:simple, "name.givenname"}} =
+               FilterParser.parse_attribute_path("name.givenName")
+    end
+
+    test "parses a multi-valued attribute" do
+      assert {:ok, {:simple, "emails"}} = FilterParser.parse_attribute_path("emails")
+    end
+
+    test "parses a value selector with sub-attribute" do
+      assert {:ok, {:filtered, "emails", "value", {:eq, "type", "work"}}} =
+               FilterParser.parse_attribute_path(~s(emails[type eq "work"].value))
+    end
+
+    test "parses a value selector without sub-attribute" do
+      assert {:ok, {:filtered, "members", nil, {:eq, "value", "42"}}} =
+               FilterParser.parse_attribute_path(~s(members[value eq "42"]))
+    end
+
+    test "returns an error for an invalid embedded filter" do
+      assert {:error, _reason} = FilterParser.parse_attribute_path(~s(emails[type eq]))
+    end
+
+    test "returns an error for a non-string path" do
+      assert {:error, _reason} = FilterParser.parse_attribute_path(nil)
+    end
+  end
+
+  describe "matches?/2" do
+    test "matches equality case-insensitively" do
+      assert FilterParser.matches?(%{"type" => "Work"}, {:eq, "type", "work"})
+      refute FilterParser.matches?(%{"type" => "home"}, {:eq, "type", "work"})
+    end
+
+    test "matches boolean values" do
+      assert FilterParser.matches?(%{"primary" => true}, {:eq, "primary", true})
+      refute FilterParser.matches?(%{"primary" => false}, {:eq, "primary", true})
+    end
+
+    test "supports present and logical operators" do
+      entry = %{"type" => "work", "value" => "a@example.com"}
+
+      assert FilterParser.matches?(entry, {:and, {:eq, "type", "work"}, {:pr, "value"}})
+      assert FilterParser.matches?(entry, {:or, {:eq, "type", "home"}, {:eq, "type", "work"}})
+      assert FilterParser.matches?(entry, {:not, {:eq, "type", "home"}})
+    end
+
+    test "treats absent attributes as non-matching for eq" do
+      refute FilterParser.matches?(%{"type" => "work"}, {:eq, "display", "x"})
+      assert FilterParser.matches?(%{"type" => "work"}, {:ne, "display", "x"})
+    end
+  end
 end
