@@ -72,38 +72,48 @@ jobs:
           fetch-depth: 0
 
       - name: Generate changelog
-        id: changelog
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.version }}
         run: |
           # Get the previous tag
-          PREV_TAG=$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1) 2>/dev/null || echo "")
+          PREV_TAG=$(git describe --abbrev=0 --tags "$(git rev-list --tags --skip=1 --max-count=1)" 2>/dev/null || echo "")
 
-          # Generate changelog
+          # Determine the commit range to summarize
           if [ -z "$PREV_TAG" ]; then
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" ${{ github.ref_name }})
+            RANGE="$REF_NAME"
           else
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" $PREV_TAG..${{ github.ref_name }})
+            RANGE="$PREV_TAG..$REF_NAME"
           fi
 
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGELOG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Write the notes to a file rather than inlining them into a shell
+          # string: commit subjects can contain quotes or other shell
+          # metacharacters that would otherwise break argument parsing.
+          {
+            echo "## Changes"
+            echo
+            git log --pretty=format:"- %s (%h)" "$RANGE"
+            echo
+            echo
+            echo "## Docker Image"
+            echo
+            echo '```bash'
+            echo "docker pull $IMAGE_REF"
+            echo '```'
+            echo
+            echo "## Installation"
+            echo
+            echo "See the [documentation](https://github.com/authify/authify/wiki) for installation instructions."
+          } > release-notes.md
+
+          echo "----- release-notes.md -----"
+          cat release-notes.md
 
       - name: Create Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          gh release create ${{ github.ref_name }} \
-            --title "Release ${{ github.ref_name }}" \
-            --notes "## Changes
-
-          ${{ steps.changelog.outputs.changelog }}
-
-          ## Docker Image
-
-          \`\`\`bash
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.version }}
-          \`\`\`
-
-          ## Installation
-
-          See the [documentation](https://github.com/authify/authify/wiki) for installation instructions."
+          gh release create "$REF_NAME" \
+            --title "Release $REF_NAME" \
+            --notes-file release-notes.md
