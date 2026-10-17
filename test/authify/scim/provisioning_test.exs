@@ -3,8 +3,9 @@ defmodule Authify.SCIM.ProvisioningTest do
 
   import Authify.AccountsFixtures
 
-  alias Authify.Accounts.User
+  alias Authify.Accounts.{User, UserEmail}
   alias Authify.Groups
+  alias Authify.Repo
   alias Authify.SCIM.Provisioning
 
   describe "list_users_scim/2 and count_users_scim/2" do
@@ -229,6 +230,64 @@ defmodule Authify.SCIM.ProvisioningTest do
 
     test "returns nil for nil arguments" do
       assert Provisioning.get_group_by_external_id(nil, nil) == nil
+    end
+  end
+
+  describe "update_user_emails_scim/2" do
+    setup do
+      organization = organization_fixture()
+
+      {:ok, user} =
+        Provisioning.create_user_scim(
+          scim_user_attrs(%{
+            emails: [
+              %{"value" => "work@example.com", "type" => "work", "primary" => true},
+              %{"value" => "home@example.com", "type" => "home"}
+            ]
+          }),
+          organization.id
+        )
+
+      %{user: Repo.preload(user, :emails, force: true)}
+    end
+
+    test "replaces the collection, removing extras and forcing a single primary", %{user: user} do
+      assert {:ok, updated} =
+               Provisioning.update_user_emails_scim(user, [
+                 %{"value" => "new-work@example.com", "type" => "work"},
+                 %{"value" => "home@example.com", "type" => "home", "primary" => true}
+               ])
+
+      values = updated.emails |> Enum.map(& &1.value) |> Enum.sort()
+      assert values == ["home@example.com", "new-work@example.com"]
+      assert Enum.count(updated.emails, & &1.primary) == 1
+      assert Enum.find(updated.emails, & &1.primary).value == "home@example.com"
+      assert updated.scim_updated_at
+    end
+
+    test "preserves verification state for unchanged values", %{user: user} do
+      work_email = Enum.find(user.emails, &(&1.value == "work@example.com"))
+      {:ok, _} = work_email |> UserEmail.verify_changeset() |> Repo.update()
+
+      assert {:ok, updated} =
+               Provisioning.update_user_emails_scim(user, [
+                 %{"value" => "work@example.com", "type" => "work", "primary" => true},
+                 %{"value" => "extra@example.com", "type" => "home"}
+               ])
+
+      assert Enum.find(updated.emails, &(&1.value == "work@example.com")).verified_at
+    end
+
+    test "returns an error when the desired collection is empty", %{user: user} do
+      assert {:error, reason} = Provisioning.update_user_emails_scim(user, [])
+      assert reason =~ "at least one email"
+    end
+
+    test "returns an error when an entry has no value", %{user: user} do
+      assert {:error, reason} =
+               Provisioning.update_user_emails_scim(user, [%{"type" => "work"}])
+
+      assert reason =~ "must include a value"
     end
   end
 

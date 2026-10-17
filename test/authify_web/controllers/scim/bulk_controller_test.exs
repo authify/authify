@@ -478,6 +478,46 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
       assert updated_user.first_name == "Alicia"
     end
 
+    test "supports add PATCH operations for users", %{conn: conn, organization: organization} do
+      existing_user =
+        user_fixture(organization: organization, first_name: "Alice", last_name: "Smith")
+
+      bulk_request = %{
+        "schemas" => ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+        "Operations" => [
+          %{
+            "method" => "PATCH",
+            "path" => "/Users/#{existing_user.id}",
+            "data" => %{
+              "Operations" => [
+                %{
+                  "op" => "add",
+                  "path" => "name.givenName",
+                  "value" => "Alicia"
+                },
+                %{
+                  "op" => "remove",
+                  "path" => "name.familyName"
+                }
+              ]
+            }
+          }
+        ]
+      }
+
+      conn = post(conn, "/#{organization.slug}/scim/v2/Bulk", bulk_request)
+
+      assert conn.status == 200
+      response = json_response(conn, 200)
+
+      assert length(response["Operations"]) == 1
+      assert Enum.at(response["Operations"], 0)["status"] == "200"
+
+      updated_user = Authify.Accounts.get_user(existing_user.id)
+      assert updated_user.first_name == "Alicia"
+      assert updated_user.last_name == nil
+    end
+
     test "supports PATCH operations for groups", %{conn: conn, organization: organization} do
       # Create a group first
       {:ok, group} =

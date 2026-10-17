@@ -263,4 +263,138 @@ defmodule Authify.SCIM.FilterParser do
 
   def parse(nil), do: {:ok, nil}
   def parse(_), do: {:error, "Filter must be a string"}
+
+  @doc """
+  Parses a SCIM PATCH attribute path into a normalized form.
+
+  In addition to simple (possibly dotted) attribute paths, this understands
+  multi-valued attributes with value selectors as described in RFC 7644
+  Section 3.5.2, including an optional sub-attribute after the selector:
+
+      "name.givenName"
+      "emails"
+      "emails.value"
+      ~s(emails[type eq "work"].value)
+      ~s(members[value eq "42"])
+
+  Attribute names are downcased so callers can match them case-insensitively.
+  The embedded filter expression is parsed with `parse/1`.
+
+  ## Returns
+
+    * `{:ok, {:simple, path}}` - a simple (possibly dotted) attribute path
+    * `{:ok, {:filtered, attribute, sub_attribute, ast}}` - an attribute with a
+      value selector; `sub_attribute` is `nil` when no sub-attribute follows the
+      bracket
+    * `{:error, reason}` - the path or embedded filter could not be parsed
+
+  ## Examples
+
+      iex> parse_attribute_path("name.givenName")
+      {:ok, {:simple, "name.givenname"}}
+
+      iex> parse_attribute_path("emails")
+      {:ok, {:simple, "emails"}}
+
+      iex> parse_attribute_path(~s(emails[type eq "work"].value))
+      {:ok, {:filtered, "emails", "value", {:eq, "type", "work"}}}
+
+      iex> parse_attribute_path(~s(members[value eq "42"]))
+      {:ok, {:filtered, "members", nil, {:eq, "value", "42"}}}
+  """
+  def parse_attribute_path(path) when is_binary(path) do
+    case Regex.run(~r/^([^\[\]]+?)\s*\[([^\]]+)\](.*)$/, String.trim(path)) do
+      [_, attribute, filter_string, rest] ->
+        with {:ok, ast} <- parse(filter_string) do
+          {:ok, {:filtered, normalize_attribute(attribute), normalize_sub_attribute(rest), ast}}
+        end
+
+      nil ->
+        {:ok, {:simple, normalize_attribute(path)}}
+    end
+  end
+
+  def parse_attribute_path(_path), do: {:error, "Path must be a string"}
+
+  @doc """
+  Evaluates a parsed filter AST against an in-memory attribute map.
+
+  Intended for matching value-selector filters (e.g. `emails[type eq "work"]`)
+  against SCIM multi-valued attribute entries. Attribute names and string
+  values are compared case-insensitively.
+
+  ## Examples
+
+      iex> matches?(%{"type" => "work"}, {:eq, "type", "work"})
+      true
+
+      iex> matches?(%{"type" => "home"}, {:eq, "type", "work"})
+      false
+  """
+  def matches?(attributes, ast) when is_map(attributes) do
+    do_match(attributes, ast)
+  end
+
+  def matches?(_attributes, _ast), do: false
+
+  defp do_match(_attributes, nil), do: true
+
+  defp do_match(attributes, {:and, left, right}),
+    do: do_match(attributes, left) and do_match(attributes, right)
+
+  defp do_match(attributes, {:or, left, right}),
+    do: do_match(attributes, left) or do_match(attributes, right)
+
+  defp do_match(attributes, {:not, expr}), do: not do_match(attributes, expr)
+  defp do_match(attributes, {:pr, attribute}), do: present?(attributes, attribute)
+
+  defp do_match(attributes, {op, attribute, value}) when op in [:eq, :ne, :co, :sw, :ew] do
+    case fetch_attribute(attributes, attribute) do
+      nil -> op == :ne
+      actual -> compare_values(op, normalize_value(actual), normalize_value(value))
+    end
+  end
+
+  defp do_match(_attributes, _ast), do: false
+
+  defp present?(attributes, attribute) do
+    case fetch_attribute(attributes, attribute) do
+      nil -> false
+      "" -> false
+      _ -> true
+    end
+  end
+
+  defp compare_values(:eq, actual, expected), do: actual == expected
+  defp compare_values(:ne, actual, expected), do: actual != expected
+  defp compare_values(:co, actual, expected), do: String.contains?(actual, expected)
+  defp compare_values(:sw, actual, expected), do: String.starts_with?(actual, expected)
+  defp compare_values(:ew, actual, expected), do: String.ends_with?(actual, expected)
+
+  defp fetch_attribute(attributes, attribute) do
+    key =
+      Enum.find(Map.keys(attributes), fn key ->
+        String.downcase(to_string(key)) == String.downcase(attribute)
+      end)
+
+    case key do
+      nil -> nil
+      key -> Map.get(attributes, key)
+    end
+  end
+
+  defp normalize_value(value) when is_binary(value), do: String.downcase(value)
+  defp normalize_value(value) when is_boolean(value), do: to_string(value)
+  defp normalize_value(value), do: value |> to_string() |> String.downcase()
+
+  defp normalize_attribute(attribute) do
+    attribute |> String.trim() |> String.downcase()
+  end
+
+  defp normalize_sub_attribute(rest) do
+    case rest |> String.trim() |> String.trim_leading(".") |> String.trim() do
+      "" -> nil
+      sub_attribute -> String.downcase(sub_attribute)
+    end
+  end
 end

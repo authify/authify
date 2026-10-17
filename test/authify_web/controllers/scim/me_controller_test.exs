@@ -334,6 +334,30 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
 
       assert conn.status == 400
     end
+
+    test "supports add and remove operations", %{
+      conn: conn,
+      organization: organization,
+      user: user
+    } do
+      patch_params = %{
+        "schemas" => ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+        "Operations" => [
+          %{"op" => "add", "path" => "name.givenName", "value" => "Added"},
+          %{"op" => "remove", "path" => "name.familyName"}
+        ]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Me", patch_params)
+
+      assert conn.status == 200
+      response = json_response(conn, 200)
+      assert response["name"]["givenName"] == "Added"
+
+      updated_user = Accounts.get_user(user.id)
+      assert updated_user.first_name == "Added"
+      assert updated_user.last_name == nil
+    end
   end
 
   describe "scope hierarchy" do

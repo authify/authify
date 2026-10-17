@@ -11,7 +11,7 @@ defmodule Authify.SCIM.Provisioning do
 
   import Ecto.Query, warn: false
 
-  alias Authify.Accounts.{Group, User}
+  alias Authify.Accounts.{Group, User, UserEmail}
   alias Authify.Repo
   alias Authify.SCIM.{AttributeMapper, FilterParser, QueryFilter}
 
@@ -297,6 +297,48 @@ defmodule Authify.SCIM.Provisioning do
   end
 
   @doc """
+  Replaces a user's SCIM-managed email collection.
+
+  `emails` is the desired final collection. Entries may be maps with string or
+  atom keys (`value`, `type`, `primary`, `display`) or bare email strings.
+  Existing emails are matched by value, updated in place (preserving
+  verification state), removed when no longer desired, and new values are
+  inserted. Exactly one entry is forced to be primary and at least one email is
+  required.
+
+  Updates `scim_updated_at` and broadcasts an `:updated` resource event.
+
+  Returns `{:ok, user}` or `{:error, reason}` (reason may be an
+  `Ecto.Changeset`).
+  """
+  def update_user_emails_scim(%User{} = user, emails) when is_list(emails) do
+    desired = normalize_email_entries(emails)
+
+    cond do
+      desired == [] ->
+        {:error, "must have at least one email address"}
+
+      Enum.any?(desired, &blank_email_value?/1) ->
+        {:error, "email entries must include a value"}
+
+      true ->
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
+        desired = ensure_single_primary(desired)
+        user = Repo.preload(user, :emails, force: true)
+
+        case Repo.transaction(fn -> sync_email_collection(user, desired, now) end) do
+          {:ok, updated_user} ->
+            updated_user = Repo.preload(updated_user, :emails, force: true)
+            broadcast_resource_event(updated_user, :updated, :user)
+            {:ok, updated_user}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+    end
+  end
+
+  @doc """
   Creates a group via SCIM provisioning.
   """
   def create_group_scim(attrs, organization_id) do
@@ -394,6 +436,88 @@ defmodule Authify.SCIM.Provisioning do
   defp generate_random_password(policy) do
     Authify.PasswordPolicy.generate(policy)
   end
+
+  # --- Email collection sync (SCIM PATCH) ---
+
+  defp sync_email_collection(user, desired, now) do
+    existing_by_value = Map.new(user.emails, &{normalize_email_value(&1.value), &1})
+    desired_values = MapSet.new(desired, &normalize_email_value(&1["value"]))
+
+    # Remove emails that are no longer part of the desired collection first, so
+    # value changes (including swaps) don't collide on the unique index.
+    delete_stale_emails(user.emails, desired_values)
+    upsert_desired_emails(user, desired, existing_by_value)
+
+    user
+    |> Ecto.Changeset.change(scim_updated_at: now)
+    |> Repo.update()
+    |> rollback_on_error()
+  end
+
+  defp delete_stale_emails(emails, desired_values) do
+    Enum.each(emails, fn email ->
+      unless MapSet.member?(desired_values, normalize_email_value(email.value)) do
+        email |> Repo.delete() |> rollback_on_error()
+      end
+    end)
+  end
+
+  defp upsert_desired_emails(user, desired, existing_by_value) do
+    Enum.each(desired, fn entry ->
+      user |> upsert_email(existing_by_value, entry) |> rollback_on_error()
+    end)
+  end
+
+  defp rollback_on_error({:ok, value}), do: value
+  defp rollback_on_error({:error, reason}), do: Repo.rollback(reason)
+
+  defp upsert_email(user, existing_by_value, entry) do
+    case Map.get(existing_by_value, normalize_email_value(entry["value"])) do
+      nil ->
+        %UserEmail{user_id: user.id}
+        |> UserEmail.changeset(entry)
+        |> Repo.insert()
+
+      email ->
+        email
+        |> UserEmail.changeset(Map.take(entry, ["type", "primary", "display"]))
+        |> Repo.update()
+    end
+  end
+
+  defp normalize_email_entries(emails) do
+    Enum.map(emails, fn
+      %{} = entry ->
+        %{
+          "value" => entry["value"] || entry[:value],
+          "type" => entry["type"] || entry[:type] || "work",
+          "primary" => entry["primary"] || entry[:primary] || false,
+          "display" => entry["display"] || entry[:display]
+        }
+
+      value when is_binary(value) ->
+        %{"value" => value, "type" => "work", "primary" => false, "display" => nil}
+
+      _other ->
+        %{"value" => nil, "type" => "work", "primary" => false, "display" => nil}
+    end)
+  end
+
+  defp ensure_single_primary(entries) do
+    primary_index = Enum.find_index(entries, &(&1["primary"] == true)) || 0
+
+    entries
+    |> Enum.with_index()
+    |> Enum.map(fn {entry, index} -> Map.put(entry, "primary", index == primary_index) end)
+  end
+
+  defp blank_email_value?(entry), do: is_nil(entry["value"]) or entry["value"] == ""
+
+  defp normalize_email_value(value) when is_binary(value) do
+    value |> String.trim() |> String.downcase()
+  end
+
+  defp normalize_email_value(value), do: value
 
   @doc """
   Broadcasts a SCIM resource lifecycle event via Phoenix.PubSub.

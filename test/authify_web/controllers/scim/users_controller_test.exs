@@ -672,7 +672,7 @@ defmodule AuthifyWeb.SCIM.UsersControllerTest do
       params = %{
         "schemas" => ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
         "Operations" => [
-          %{"op" => "add", "path" => "emails", "value" => "new@example.com"}
+          %{"op" => "move", "path" => "name.givenName", "value" => "New"}
         ]
       }
 
@@ -709,6 +709,262 @@ defmodule AuthifyWeb.SCIM.UsersControllerTest do
       conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
 
       assert conn.status == 403
+    end
+  end
+
+  describe "PATCH /scim/v2/Users/:id add/remove operations" do
+    test "applies add to a scalar attribute as an upsert", %{
+      conn: conn,
+      organization: organization
+    } do
+      user = user_fixture(organization: organization, first_name: "John")
+
+      params = %{
+        "Operations" => [
+          %{"op" => "add", "path" => "name.givenName", "value" => "Jane"}
+        ]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 200
+      assert json_response(conn, 200)["name"]["givenName"] == "Jane"
+      assert Accounts.get_user(user.id).first_name == "Jane"
+    end
+
+    test "coerces string boolean values for active (Entra style)", %{
+      conn: conn,
+      organization: organization
+    } do
+      user = user_fixture(organization: organization, active: true)
+
+      params = %{
+        "Operations" => [
+          %{"op" => "replace", "path" => "active", "value" => "False"}
+        ]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 200
+      assert json_response(conn, 200)["active"] == false
+      assert Accounts.get_user(user.id).active == false
+    end
+
+    test "returns error for non-boolean active value", %{conn: conn, organization: organization} do
+      user = user_fixture(organization: organization)
+
+      params = %{
+        "Operations" => [%{"op" => "replace", "path" => "active", "value" => "maybe"}]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 400
+      assert json_response(conn, 400)["scimType"] == "invalidValue"
+    end
+
+    test "adds a new email value to the collection", %{conn: conn, organization: organization} do
+      user = user_fixture(organization: organization, email: "primary@example.com")
+
+      params = %{
+        "Operations" => [
+          %{
+            "op" => "add",
+            "path" => "emails",
+            "value" => [%{"value" => "secondary@example.com", "type" => "home"}]
+          }
+        ]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 200
+      emails = json_response(conn, 200)["emails"]
+
+      assert emails |> Enum.map(& &1["value"]) |> Enum.sort() ==
+               ["primary@example.com", "secondary@example.com"]
+
+      # Existing primary is preserved when adding an entry without one.
+      assert Enum.find(emails, & &1["primary"])["value"] == "primary@example.com"
+    end
+
+    test "replaces the entire email collection", %{conn: conn, organization: organization} do
+      user = user_fixture(organization: organization, email: "old@example.com")
+
+      params = %{
+        "Operations" => [
+          %{
+            "op" => "replace",
+            "path" => "emails",
+            "value" => [%{"value" => "new@example.com", "type" => "work"}]
+          }
+        ]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 200
+      emails = json_response(conn, 200)["emails"]
+
+      assert length(emails) == 1
+      assert hd(emails)["value"] == "new@example.com"
+      # A primary is forced when the value list omits one.
+      assert hd(emails)["primary"] == true
+    end
+
+    test "updates a selected email value", %{conn: conn, organization: organization} do
+      user =
+        user_fixture(
+          organization: organization,
+          emails: [
+            %{"value" => "work@example.com", "type" => "work", "primary" => true},
+            %{"value" => "home@example.com", "type" => "home"}
+          ]
+        )
+
+      params = %{
+        "Operations" => [
+          %{
+            "op" => "add",
+            "path" => ~s(emails[type eq "work"].value),
+            "value" => "newwork@example.com"
+          }
+        ]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 200
+      values = json_response(conn, 200)["emails"] |> Enum.map(& &1["value"]) |> Enum.sort()
+      assert values == ["home@example.com", "newwork@example.com"]
+
+      updated = Authify.Repo.preload(Accounts.get_user(user.id), :emails)
+      assert Enum.any?(updated.emails, &(&1.value == "newwork@example.com" and &1.type == "work"))
+    end
+
+    test "creates a selected email when none matches", %{conn: conn, organization: organization} do
+      user = user_fixture(organization: organization, email: "work@example.com")
+
+      params = %{
+        "Operations" => [
+          %{
+            "op" => "add",
+            "path" => ~s(emails[type eq "home"].value),
+            "value" => "home@example.com"
+          }
+        ]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 200
+      emails = json_response(conn, 200)["emails"]
+
+      home = Enum.find(emails, &(&1["value"] == "home@example.com"))
+      assert home["type"] == "home"
+    end
+
+    test "removes a selected email", %{conn: conn, organization: organization} do
+      user =
+        user_fixture(
+          organization: organization,
+          emails: [
+            %{"value" => "work@example.com", "type" => "work", "primary" => true},
+            %{"value" => "home@example.com", "type" => "home"}
+          ]
+        )
+
+      params = %{
+        "Operations" => [
+          %{"op" => "remove", "path" => ~s(emails[type eq "home"])}
+        ]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 200
+      values = json_response(conn, 200)["emails"] |> Enum.map(& &1["value"])
+      assert values == ["work@example.com"]
+    end
+
+    test "ignores remove of a non-matching email selector", %{
+      conn: conn,
+      organization: organization
+    } do
+      user = user_fixture(organization: organization, email: "work@example.com")
+
+      params = %{
+        "Operations" => [%{"op" => "remove", "path" => ~s(emails[type eq "other"])}]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 200
+      assert length(json_response(conn, 200)["emails"]) == 1
+    end
+
+    test "rejects removing the only email", %{conn: conn, organization: organization} do
+      user = user_fixture(organization: organization, email: "work@example.com")
+
+      params = %{
+        "Operations" => [%{"op" => "remove", "path" => ~s(emails[type eq "work"])}]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 400
+      assert json_response(conn, 400)["detail"] =~ "Cannot remove all email"
+    end
+
+    test "clears an optional scalar attribute with remove", %{
+      conn: conn,
+      organization: organization
+    } do
+      user = user_fixture(organization: organization, first_name: "John")
+
+      params = %{
+        "Operations" => [%{"op" => "remove", "path" => "name.givenName"}]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 200
+      assert Accounts.get_user(user.id).first_name == nil
+    end
+
+    test "rejects removing a required attribute", %{conn: conn, organization: organization} do
+      user = user_fixture(organization: organization)
+
+      params = %{
+        "Operations" => [%{"op" => "remove", "path" => "userName"}]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 400
+      assert json_response(conn, 400)["detail"] =~ "Cannot remove required attribute"
+    end
+
+    test "applies mixed add and remove operations in sequence", %{
+      conn: conn,
+      organization: organization
+    } do
+      user = user_fixture(organization: organization, first_name: "John", last_name: "Doe")
+
+      params = %{
+        "Operations" => [
+          %{"op" => "add", "path" => "name.givenName", "value" => "Jane"},
+          %{"op" => "remove", "path" => "name.familyName"}
+        ]
+      }
+
+      conn = patch(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 200
+      updated = Accounts.get_user(user.id)
+      assert updated.first_name == "Jane"
+      assert updated.last_name == nil
     end
   end
 

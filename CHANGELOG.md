@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- SCIM 2.0 `PATCH` for users (also via `/Me` and bulk operations) now supports the `add` and `remove` operations in addition to `replace`. `add` on a single-valued attribute acts as an upsert, matching the behavior of Microsoft Entra ID. The multi-valued `emails` attribute can be added, replaced, or removed, including value-selector paths such as `emails[type eq "work"].value`. `remove` clears optional scalar attributes and is rejected for required attributes such as `userName` and the last remaining email
+
+### Fixed
+
+- SCIM 2.0 `PATCH` now coerces string boolean values for `active` (for example `"True"`/`"False"`, as sent by Microsoft Entra ID). Previously the changeset silently dropped these values, so the account state was not changed
+
 ## [0.24.2] - 2026-10-16
 
 ### Added
