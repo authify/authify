@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-17
+
 ### Added
 
 - SCIM 2.0 `PATCH` for users (also via `/Me` and bulk operations) now supports the `add` and `remove` operations in addition to `replace`. `add` on a single-valued attribute acts as an upsert, matching the behavior of Microsoft Entra ID. The multi-valued `emails` attribute can be added, replaced, or removed, including value-selector paths such as `emails[type eq "work"].value`. `remove` clears optional scalar attributes and is rejected for required attributes such as `userName` and the last remaining email
+- Per-organization SCIM email verification policy. Organizations can choose to treat email addresses provided via SCIM provisioning as unverified (`false`, the default), always verified (`true`), or verified only when they match a configurable regular expression (`regex`). This controls the `email_verified` claim advertised to OIDC clients for SCIM-provisioned users, and is configurable from the organization configuration page and the Management API
 
 ### Fixed
 
 - SCIM 2.0 `PATCH` now coerces string boolean values for `active` (for example `"True"`/`"False"`, as sent by Microsoft Entra ID). Previously the changeset silently dropped these values, so the account state was not changed
+- SCIM 2.0 `PUT` for users (also via `/Me` and bulk operations) now persists the `emails` collection instead of silently discarding it. Provided attributes replace existing values while omitted attributes are left as-is, and an email-like `userName` updates the primary email address. An explicit empty `emails` array is rejected because a user must keep at least one address
 
 ## [0.24.2] - 2026-10-16
 
@@ -901,7 +905,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.24.2...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/authify/authify/compare/v0.24.2...v0.25.0
 [0.24.2]: https://github.com/authify/authify/compare/v0.24.1...v0.24.2
 [0.24.1]: https://github.com/authify/authify/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/authify/authify/compare/v0.23.0...v0.24.0

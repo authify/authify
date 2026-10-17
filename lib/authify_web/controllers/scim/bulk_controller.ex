@@ -12,7 +12,7 @@ defmodule AuthifyWeb.SCIM.BulkController do
   alias Authify.Groups
   alias Authify.SCIM.{Provisioning, ResourceFormatter}
   alias AuthifyWeb.Helpers.AuditHelper
-  alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
+  alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations, UserUpdates}
 
   @bulk_request_schema "urn:ietf:params:scim:api:messages:2.0:BulkRequest"
   @bulk_response_schema "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
@@ -256,21 +256,24 @@ defmodule AuthifyWeb.SCIM.BulkController do
           :ok ->
             attrs = Mappers.map_user_attrs(data)
 
-            case Provisioning.update_user_scim(user, attrs) do
-              {:ok, _updated_user} ->
-                response = %{
-                  method: "PUT",
-                  bulkId: bulk_id,
-                  status: "200"
-                }
+            with {:ok, scalar_updated_user} <- Provisioning.update_user_scim(user, attrs),
+                 {:ok, _updated_user} <-
+                   UserUpdates.apply_scim_emails(scalar_updated_user, data, attrs) do
+              response = %{
+                method: "PUT",
+                bulkId: bulk_id,
+                status: "200"
+              }
 
-                {:ok, response, %{}}
-
-              {:error, changeset} ->
-                detail = Helpers.format_changeset_errors(changeset)
-
+              {:ok, response, %{}}
+            else
+              {:error, reason} ->
                 {:error, 400,
-                 build_error_response(%{"method" => "PUT", "bulkId" => bulk_id}, 400, detail)}
+                 build_error_response(
+                   %{"method" => "PUT", "bulkId" => bulk_id},
+                   400,
+                   bulk_error_detail(reason)
+                 )}
             end
 
           {:error, :not_found} ->
@@ -521,6 +524,14 @@ defmodule AuthifyWeb.SCIM.BulkController do
       }
     }
   end
+
+  # Normalizes an error reason (changeset or string) into a detail message
+  defp bulk_error_detail(%Ecto.Changeset{} = changeset) do
+    Helpers.format_changeset_errors(changeset)
+  end
+
+  defp bulk_error_detail(reason) when is_binary(reason), do: reason
+  defp bulk_error_detail(reason), do: inspect(reason)
 
   # Renders the bulk response
   defp render_bulk_response(conn, responses) do

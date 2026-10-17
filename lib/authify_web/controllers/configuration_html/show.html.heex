@@ -288,6 +288,55 @@
                 </div>
 
                 <div class="mb-4">
+                  <label for="scim_email_verification" class="form-label">
+                    <strong>SCIM Email Verification</strong>
+                  </label>
+                  <select
+                    class="form-select"
+                    id="scim_email_verification"
+                    name="settings[scim_email_verification]"
+                  >
+                    <option
+                      value="false"
+                      selected={@settings[:scim_email_verification] in [nil, "false"]}
+                    >
+                      Do not verify SCIM-provided emails
+                    </option>
+                    <option value="true" selected={@settings[:scim_email_verification] == "true"}>
+                      Mark all SCIM-provided emails as verified
+                    </option>
+                    <option
+                      value="regex"
+                      selected={@settings[:scim_email_verification] == "regex"}
+                    >
+                      Mark SCIM-provided emails as verified when they match a regular expression
+                    </option>
+                  </select>
+                  <small class="text-muted">
+                    Whether email addresses provisioned via SCIM are treated as verified. Verified
+                    addresses are advertised as <code>email_verified=true</code> to OIDC clients.
+                  </small>
+                </div>
+
+                <div class="mb-4">
+                  <label for="scim_email_verification_regex" class="form-label">
+                    <strong>SCIM Email Verification Regex</strong>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="scim_email_verification_regex"
+                    name="settings[scim_email_verification_regex]"
+                    value={@settings[:scim_email_verification_regex]}
+                    placeholder="@example\\.com$"
+                  />
+                  <small class="text-muted">
+                    Only used when the verification mode is "regex". Addresses matching this
+                    regular expression are treated as verified; others remain unverified.
+                  </small>
+                </div>
+
+                <div class="mb-4">
                   <div class="form-check form-switch">
                     <input
                       class="form-check-input"

@@ -251,6 +251,7 @@ defmodule Authify.SCIM.Provisioning do
       |> Map.put(:scim_updated_at, now)
       |> Map.put(:password, password)
       |> Map.put(:password_confirmation, password)
+      |> apply_scim_email_verification(organization_id, now)
 
     result =
       %User{}
@@ -335,6 +336,36 @@ defmodule Authify.SCIM.Provisioning do
           {:error, reason} ->
             {:error, reason}
         end
+    end
+  end
+
+  @doc """
+  Updates the value of a user's primary email address.
+
+  Used by SCIM `PUT` when `userName` is an email address but no `emails`
+  collection is supplied (matching how user creation maps an email-like
+  `userName`). Other email addresses are left intact.
+
+  Returns `{:ok, user}` or `{:error, reason}` (reason may be an
+  `Ecto.Changeset`).
+  """
+  def update_primary_email_scim(%User{} = user, value) when is_binary(value) do
+    user = Repo.preload(user, :emails, force: true)
+
+    if Enum.any?(user.emails, & &1.primary) do
+      emails =
+        Enum.map(user.emails, fn email ->
+          %{
+            "value" => if(email.primary, do: value, else: email.value),
+            "type" => email.type,
+            "primary" => email.primary,
+            "display" => email.display
+          }
+        end)
+
+      update_user_emails_scim(user, emails)
+    else
+      {:error, "must have a primary email address"}
     end
   end
 
@@ -474,14 +505,54 @@ defmodule Authify.SCIM.Provisioning do
   defp upsert_email(user, existing_by_value, entry) do
     case Map.get(existing_by_value, normalize_email_value(entry["value"])) do
       nil ->
+        entry = put_scim_verified_at(entry, user.organization_id, nil)
+
         %UserEmail{user_id: user.id}
         |> UserEmail.changeset(entry)
         |> Repo.insert()
 
       email ->
+        entry = put_scim_verified_at(entry, user.organization_id, email.verified_at)
+
         email
-        |> UserEmail.changeset(Map.take(entry, ["type", "primary", "display"]))
+        |> UserEmail.changeset(Map.take(entry, ["type", "primary", "display", "verified_at"]))
         |> Repo.update()
+    end
+  end
+
+  # Marks a desired email as verified when the organization's SCIM email
+  # verification setting applies. Existing verification is always preserved.
+  defp put_scim_verified_at(entry, organization_id, existing_verified_at) do
+    cond do
+      existing_verified_at ->
+        entry
+
+      Authify.Configurations.scim_email_verified?(organization_id, entry["value"]) ->
+        Map.put(entry, "verified_at", DateTime.utc_now() |> DateTime.truncate(:second))
+
+      true ->
+        entry
+    end
+  end
+
+  # Applies SCIM email verification to the provisioned emails on creation.
+  defp apply_scim_email_verification(attrs, organization_id, now) do
+    case Map.get(attrs, :emails) do
+      emails when is_list(emails) ->
+        Map.put(attrs, :emails, Enum.map(emails, &verify_scim_email(&1, organization_id, now)))
+
+      _ ->
+        attrs
+    end
+  end
+
+  defp verify_scim_email(email, organization_id, now) do
+    value = email["value"] || email[:value]
+
+    if Authify.Configurations.scim_email_verified?(organization_id, value) do
+      Map.put(email, "verified_at", now)
+    else
+      email
     end
   end
 

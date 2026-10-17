@@ -128,6 +128,28 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
       updated_user = Accounts.get_user(user.id)
       assert updated_user.first_name == "Updated"
       assert updated_user.last_name == "Name"
+
+      # Emails are now persisted (previously silently dropped)
+      updated_user = Authify.Repo.preload(updated_user, :emails)
+      assert Enum.map(updated_user.emails, & &1.value) == ["updated@example.com"]
+    end
+
+    test "updates the primary email when userName is an email address", %{
+      conn: conn,
+      organization: organization,
+      user: user
+    } do
+      update_params = %{
+        "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        "userName" => "newme@example.com"
+      }
+
+      conn = put(conn, "/#{organization.slug}/scim/v2/Me", update_params)
+
+      assert conn.status == 200
+
+      updated_user = Authify.Repo.preload(Accounts.get_user(user.id), :emails)
+      assert Enum.find(updated_user.emails, & &1.primary).value == "newme@example.com"
     end
 
     test "requires scim:me:write scope", %{conn: conn, organization: organization, user: user} do

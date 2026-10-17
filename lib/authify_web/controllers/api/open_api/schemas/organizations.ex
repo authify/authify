@@ -194,6 +194,19 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Organizations do
                   description:
                     "When true, each new audit event is signed with the organization's audit_signing certificate using RSA-SHA256. Signatures are included in API responses and can be verified offline using the linked public certificate PEM.",
                   default: false
+                },
+                scim_email_verification: %{
+                  type: "string",
+                  enum: ["false", "true", "regex"],
+                  default: "false",
+                  description:
+                    ~s|Whether email addresses provided via SCIM provisioning are treated as verified: "false" (never), "true" (all), or "regex" (only addresses matching scim_email_verification_regex). Verified addresses are advertised as email_verified=true to OIDC clients.|
+                },
+                scim_email_verification_regex: %{
+                  type: "string",
+                  nullable: true,
+                  description:
+                    ~s|Regular expression used to decide which SCIM-provided email addresses are verified when scim_email_verification is "regex". Ignored otherwise.|
                 }
               }
             }

@@ -142,6 +142,36 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
       assert Enum.at(response["Operations"], 2)["status"] == "204"
     end
 
+    test "supports PUT operations that update user emails", %{
+      conn: conn,
+      organization: organization
+    } do
+      existing_user = user_fixture(organization: organization, email: "before@example.com")
+
+      bulk_request = %{
+        "schemas" => ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+        "Operations" => [
+          %{
+            "method" => "PUT",
+            "path" => "/Users/#{existing_user.id}",
+            "data" => %{
+              "userName" => "after@example.com",
+              "emails" => [%{"value" => "after@example.com", "primary" => true}]
+            }
+          }
+        ]
+      }
+
+      conn = post(conn, "/#{organization.slug}/scim/v2/Bulk", bulk_request)
+
+      assert conn.status == 200
+      response = json_response(conn, 200)
+      assert Enum.at(response["Operations"], 0)["status"] == "200"
+
+      updated_user = Authify.Repo.preload(Authify.Accounts.get_user(existing_user.id), :emails)
+      assert Enum.map(updated_user.emails, & &1.value) == ["after@example.com"]
+    end
+
     test "supports bulkId references in paths", %{conn: conn, organization: organization} do
       bulk_request = %{
         "schemas" => ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],

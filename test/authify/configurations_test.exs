@@ -178,6 +178,91 @@ defmodule Authify.ConfigurationsTest do
     end
   end
 
+  describe "SCIM email verification setting" do
+    setup do
+      org = organization_fixture()
+      Configurations.get_or_create_configuration("Organization", org.id, "organization")
+      %{org: org}
+    end
+
+    test "defaults to not verifying SCIM-provided emails", %{org: org} do
+      assert Configurations.get_organization_setting(org, :scim_email_verification) == "false"
+      assert Configurations.scim_email_verification_mode(org) == :none
+      refute Configurations.scim_email_verified?(org, "user@example.com")
+    end
+
+    test "accepts only false, true, or regex", %{org: org} do
+      assert {:ok, _} =
+               Configurations.set_organization_setting(org, :scim_email_verification, "true")
+
+      assert {:ok, _} =
+               Configurations.set_organization_setting(org, :scim_email_verification, "regex")
+
+      assert {:ok, _} =
+               Configurations.set_organization_setting(org, :scim_email_verification, "false")
+
+      assert {:error, message} =
+               Configurations.set_organization_setting(org, :scim_email_verification, "sometimes")
+
+      assert message =~ "false"
+    end
+
+    test "mode true verifies every address", %{org: org} do
+      assert {:ok, _} =
+               Configurations.set_organization_setting(org, :scim_email_verification, "true")
+
+      assert Configurations.scim_email_verification_mode(org) == :all
+      assert Configurations.scim_email_verified?(org, "anyone@example.com")
+    end
+
+    test "mode regex verifies only matching addresses", %{org: org} do
+      assert {:ok, _} =
+               Configurations.set_organization_setting(org, :scim_email_verification, "regex")
+
+      assert {:ok, _} =
+               Configurations.set_organization_setting(
+                 org,
+                 :scim_email_verification_regex,
+                 "@corp\\.example\\.com$"
+               )
+
+      assert Configurations.scim_email_verification_mode(org) == :regex
+      assert Configurations.scim_email_verified?(org, "alice@corp.example.com")
+      refute Configurations.scim_email_verified?(org, "bob@other.com")
+    end
+
+    test "the regex setting is ignored outside regex mode", %{org: org} do
+      assert {:ok, _} =
+               Configurations.set_organization_setting(org, :scim_email_verification, "false")
+
+      assert {:ok, _} =
+               Configurations.set_organization_setting(org, :scim_email_verification_regex, ".*")
+
+      refute Configurations.scim_email_verified?(org, "alice@corp.example.com")
+    end
+
+    test "empty regex never matches", %{org: org} do
+      assert {:ok, _} =
+               Configurations.set_organization_setting(org, :scim_email_verification, "regex")
+
+      assert {:ok, _} =
+               Configurations.set_organization_setting(org, :scim_email_verification_regex, "")
+
+      refute Configurations.scim_email_verified?(org, "alice@corp.example.com")
+    end
+
+    test "rejects an invalid regular expression", %{org: org} do
+      assert {:error, message} =
+               Configurations.set_organization_setting(
+                 org,
+                 :scim_email_verification_regex,
+                 "[unclosed"
+               )
+
+      assert message =~ "regular expression"
+    end
+  end
+
   describe "rate limit quota validation" do
     alias Authify.Configurations.Schemas.Organization
 

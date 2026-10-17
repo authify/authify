@@ -107,6 +107,24 @@ defmodule Authify.Configurations.Schemas.Organization do
         required: false,
         validation_fn: &validate_scim_request_delay/1
       },
+      %{
+        name: :scim_email_verification,
+        description:
+          ~s|Whether email addresses provided via SCIM provisioning are treated as verified. "false" (default) never auto-verifies, "true" marks every provisioned address as verified, and "regex" marks an address as verified only when it matches scim_email_verification_regex. Verified addresses are advertised as email_verified=true to OIDC clients.|,
+        value_type: :string,
+        default_value: "false",
+        required: false,
+        validation_fn: &validate_scim_email_verification/1
+      },
+      %{
+        name: :scim_email_verification_regex,
+        description:
+          ~s|Regular expression used to decide which SCIM-provided email addresses are marked as verified when scim_email_verification is "regex". Ignored for any other mode.|,
+        value_type: :string,
+        default_value: nil,
+        required: false,
+        validation_fn: &validate_scim_email_verification_regex/1
+      },
       # MFA (Multi-Factor Authentication) settings
       %{
         name: :require_mfa,
@@ -650,6 +668,37 @@ defmodule Authify.Configurations.Schemas.Organization do
   end
 
   defp validate_scim_request_delay(_), do: {:error, "Must be an integer"}
+
+  defp validate_scim_email_verification(nil), do: {:ok, "false"}
+  defp validate_scim_email_verification(true), do: {:ok, "true"}
+  defp validate_scim_email_verification(false), do: {:ok, "false"}
+
+  defp validate_scim_email_verification(value) when is_binary(value) do
+    case value |> String.trim() |> String.downcase() do
+      "false" -> {:ok, "false"}
+      "true" -> {:ok, "true"}
+      "regex" -> {:ok, "regex"}
+      _ -> {:error, ~s(Must be one of: "false", "true", "regex")}
+    end
+  end
+
+  defp validate_scim_email_verification(_),
+    do: {:error, ~s(Must be one of: "false", "true", "regex")}
+
+  defp validate_scim_email_verification_regex(nil), do: {:ok, nil}
+  defp validate_scim_email_verification_regex(""), do: {:ok, nil}
+
+  defp validate_scim_email_verification_regex(value) when is_binary(value) do
+    case Regex.compile(value) do
+      {:ok, _regex} ->
+        {:ok, value}
+
+      {:error, {reason, position}} ->
+        {:error, "Must be a valid regular expression (#{reason} at position #{position})"}
+    end
+  end
+
+  defp validate_scim_email_verification_regex(_), do: {:error, "Must be a string"}
 
   defp validate_password_min_length(nil), do: {:ok, nil}
 
