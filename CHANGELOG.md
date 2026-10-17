@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - SCIM 2.0 `PATCH` for users (also via `/Me` and bulk operations) now supports the `add` and `remove` operations in addition to `replace`. `add` on a single-valued attribute acts as an upsert, matching the behavior of Microsoft Entra ID. The multi-valued `emails` attribute can be added, replaced, or removed, including value-selector paths such as `emails[type eq "work"].value`. `remove` clears optional scalar attributes and is rejected for required attributes such as `userName` and the last remaining email
+- Per-organization SCIM email verification policy. Organizations can choose to treat email addresses provided via SCIM provisioning as unverified (`false`, the default), always verified (`true`), or verified only when they match a configurable regular expression (`regex`). This controls the `email_verified` claim advertised to OIDC clients for SCIM-provisioned users, and is configurable from the organization configuration page and the Management API
 
 ### Fixed
 

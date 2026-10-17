@@ -51,6 +51,22 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
       assert response =~ "scim_inbound_provisioning_enabled"
       assert response =~ "Allow external identity providers"
     end
+
+    test "shows SCIM email verification settings", %{conn: conn} do
+      organization = organization_fixture()
+      admin = user_fixture(%{organization: organization, role: "admin"})
+
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> get(~p"/#{organization.slug}/settings/configuration")
+
+      response = html_response(conn, 200)
+      assert response =~ "SCIM Email Verification"
+      assert response =~ "scim_email_verification"
+      assert response =~ "scim_email_verification_regex"
+      assert response =~ "Do not verify SCIM-provided emails"
+    end
   end
 
   describe "update" do
@@ -180,6 +196,34 @@ defmodule AuthifyWeb.ConfigurationControllerTest do
       assert Enum.any?(event.metadata["changes"], fn change ->
                change["field"] == "allow_oauth" and change["new"] == false
              end)
+    end
+
+    test "updates SCIM email verification settings", %{conn: conn} do
+      organization = organization_fixture()
+      admin = user_fixture(%{organization: organization, role: "admin"})
+
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> patch(~p"/#{organization.slug}/settings/configuration", %{
+          "settings" => %{
+            "scim_email_verification" => "regex",
+            "scim_email_verification_regex" => "@corp\\.example\\.com$"
+          }
+        })
+
+      assert redirected_to(conn) == ~p"/#{organization.slug}/settings/configuration"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) == "Configuration updated successfully."
+
+      assert Authify.Configurations.get_organization_setting(
+               organization,
+               :scim_email_verification
+             ) == "regex"
+
+      assert Authify.Configurations.get_organization_setting(
+               organization,
+               :scim_email_verification_regex
+             ) == "@corp\\.example\\.com$"
     end
 
     test "unchecking boolean settings sets them to false (organization)", %{conn: conn} do

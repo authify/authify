@@ -259,13 +259,64 @@ defmodule Authify.Configurations do
 
   @doc """
   Gets an organization-specific setting value.
-  """
-  def get_organization_setting(org, setting_name) do
-    # Ensure configuration exists
-    get_or_create_configuration("Organization", org.id, "organization")
 
-    get_setting("Organization", org.id, setting_name)
+  Accepts either an organization struct or an organization id.
+  """
+  def get_organization_setting(org_or_id, setting_name) do
+    org_id = organization_id(org_or_id)
+
+    # Ensure configuration exists
+    get_or_create_configuration("Organization", org_id, "organization")
+
+    get_setting("Organization", org_id, setting_name)
   end
+
+  @doc """
+  Returns how SCIM-provisioned email addresses should be treated for verification.
+
+  One of `:none`, `:all`, or `:regex`, derived from the `:scim_email_verification`
+  organization setting (`"false"` -> `:none`, `"true"` -> `:all`, `"regex"` -> `:regex`).
+  """
+  def scim_email_verification_mode(org_or_id) do
+    case get_organization_setting(org_or_id, :scim_email_verification) do
+      "true" -> :all
+      true -> :all
+      "regex" -> :regex
+      _ -> :none
+    end
+  end
+
+  @doc """
+  Returns true when SCIM provisioning should mark `email` as verified for the
+  given organization (struct or id).
+
+  With the `:regex` mode an empty or invalid pattern never matches.
+  """
+  def scim_email_verified?(org_or_id, email) when is_binary(email) do
+    case scim_email_verification_mode(org_or_id) do
+      :all -> true
+      :regex -> scim_email_matches_verification_regex?(org_or_id, email)
+      :none -> false
+    end
+  end
+
+  def scim_email_verified?(_org_or_id, _email), do: false
+
+  defp scim_email_matches_verification_regex?(org_or_id, email) do
+    case get_organization_setting(org_or_id, :scim_email_verification_regex) do
+      pattern when is_binary(pattern) ->
+        case Regex.compile(pattern) do
+          {:ok, regex} -> Regex.match?(regex, email)
+          {:error, _reason} -> false
+        end
+
+      _ ->
+        false
+    end
+  end
+
+  defp organization_id(%{id: id}), do: id
+  defp organization_id(id) when is_integer(id), do: id
 
   @doc """
   Sets an organization-specific setting value.
