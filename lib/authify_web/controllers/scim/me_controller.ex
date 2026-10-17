@@ -14,7 +14,7 @@ defmodule AuthifyWeb.SCIM.MeController do
   use AuthifyWeb.SCIM.BaseController
 
   alias Authify.SCIM.{Provisioning, ResourceFormatter}
-  alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
+  alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations, UserUpdates}
 
   @doc """
   GET /scim/v2/Me
@@ -71,13 +71,14 @@ defmodule AuthifyWeb.SCIM.MeController do
                  "externalId"
                ) do
             :ok ->
-              case Provisioning.update_user_scim(user, attrs) do
-                {:ok, updated_user} ->
-                  updated_user = Authify.Repo.preload(updated_user, :groups)
-                  base_url = Helpers.build_base_url(conn)
-                  resource = ResourceFormatter.format_user(updated_user, base_url)
-                  render_scim_resource(conn, resource, resource_struct: updated_user)
-
+              with {:ok, scalar_updated_user} <- Provisioning.update_user_scim(user, attrs),
+                   {:ok, updated_user} <-
+                     UserUpdates.apply_scim_emails(scalar_updated_user, params, attrs) do
+                updated_user = Authify.Repo.preload(updated_user, :groups)
+                base_url = Helpers.build_base_url(conn)
+                resource = ResourceFormatter.format_user(updated_user, base_url)
+                render_scim_resource(conn, resource, resource_struct: updated_user)
+              else
                 {:error, %Ecto.Changeset{} = changeset} ->
                   detail = Helpers.format_changeset_errors(changeset)
                   render_scim_error(conn, 400, :invalid_value, detail)

@@ -10,7 +10,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
   alias Authify.Accounts
   alias Authify.SCIM.{Provisioning, ResourceFormatter}
   alias AuthifyWeb.Helpers.AuditHelper
-  alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations}
+  alias AuthifyWeb.SCIM.{Helpers, Mappers, PatchOperations, UserUpdates}
 
   @doc """
   GET /scim/v2/Users
@@ -290,30 +290,25 @@ defmodule AuthifyWeb.SCIM.UsersController do
              ) do
           :ok ->
             case Provisioning.update_user_scim(user, attrs) do
-              {:ok, updated_user} ->
-                AuditHelper.log_event_async(
-                  conn,
-                  :scim_user_updated,
-                  "user",
-                  updated_user.id,
-                  "success",
-                  %{
-                    "user_id" => updated_user.id,
-                    "username" => updated_user.username,
-                    "external_id" => updated_user.external_id,
-                    "organization_slug" => organization.slug,
-                    "operation" => "update"
-                  }
-                )
+              {:ok, scalar_updated_user} ->
+                case UserUpdates.apply_scim_emails(scalar_updated_user, params, attrs) do
+                  {:ok, updated_user} ->
+                    render_updated_user(conn, updated_user, organization)
 
-                updated_user = Authify.Repo.preload(updated_user, :groups)
-                base_url = Helpers.build_base_url(conn)
-                resource = ResourceFormatter.format_user(updated_user, base_url)
-                render_scim_resource(conn, resource, resource_struct: updated_user)
+                  {:error, %Ecto.Changeset{} = changeset} ->
+                    render_invalid_value(conn, changeset)
+
+                  {:error, reason} ->
+                    render_scim_error(
+                      conn,
+                      400,
+                      :invalid_value,
+                      "Failed to update user: #{reason}"
+                    )
+                end
 
               {:error, %Ecto.Changeset{} = changeset} ->
-                detail = Helpers.format_changeset_errors(changeset)
-                render_scim_error(conn, 400, :invalid_value, detail)
+                render_invalid_value(conn, changeset)
 
               {:error, reason} ->
                 render_scim_error(conn, 400, :invalid_value, "Failed to update user: #{reason}")
@@ -326,6 +321,33 @@ defmodule AuthifyWeb.SCIM.UsersController do
       {:error, :not_found} ->
         render_scim_error(conn, 404, :no_target, "User not found")
     end
+  end
+
+  defp render_updated_user(conn, updated_user, organization) do
+    AuditHelper.log_event_async(
+      conn,
+      :scim_user_updated,
+      "user",
+      updated_user.id,
+      "success",
+      %{
+        "user_id" => updated_user.id,
+        "username" => updated_user.username,
+        "external_id" => updated_user.external_id,
+        "organization_slug" => organization.slug,
+        "operation" => "update"
+      }
+    )
+
+    updated_user = Authify.Repo.preload(updated_user, :groups)
+    base_url = Helpers.build_base_url(conn)
+    resource = ResourceFormatter.format_user(updated_user, base_url)
+    render_scim_resource(conn, resource, resource_struct: updated_user)
+  end
+
+  defp render_invalid_value(conn, changeset) do
+    detail = Helpers.format_changeset_errors(changeset)
+    render_scim_error(conn, 400, :invalid_value, detail)
   end
 
   @doc """

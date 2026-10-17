@@ -339,6 +339,36 @@ defmodule Authify.SCIM.Provisioning do
   end
 
   @doc """
+  Updates the value of a user's primary email address.
+
+  Used by SCIM `PUT` when `userName` is an email address but no `emails`
+  collection is supplied (matching how user creation maps an email-like
+  `userName`). Other email addresses are left intact.
+
+  Returns `{:ok, user}` or `{:error, reason}` (reason may be an
+  `Ecto.Changeset`).
+  """
+  def update_primary_email_scim(%User{} = user, value) when is_binary(value) do
+    user = Repo.preload(user, :emails, force: true)
+
+    if Enum.any?(user.emails, & &1.primary) do
+      emails =
+        Enum.map(user.emails, fn email ->
+          %{
+            "value" => if(email.primary, do: value, else: email.value),
+            "type" => email.type,
+            "primary" => email.primary,
+            "display" => email.display
+          }
+        end)
+
+      update_user_emails_scim(user, emails)
+    else
+      {:error, "must have a primary email address"}
+    end
+  end
+
+  @doc """
   Creates a group via SCIM provisioning.
   """
   def create_group_scim(attrs, organization_id) do

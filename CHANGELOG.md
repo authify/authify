@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - SCIM 2.0 `PATCH` now coerces string boolean values for `active` (for example `"True"`/`"False"`, as sent by Microsoft Entra ID). Previously the changeset silently dropped these values, so the account state was not changed
+- SCIM 2.0 `PUT` for users (also via `/Me` and bulk operations) now persists the `emails` collection instead of silently discarding it. Provided attributes replace existing values while omitted attributes are left as-is, and an email-like `userName` updates the primary email address. An explicit empty `emails` array is rejected because a user must keep at least one address
 
 ## [0.24.2] - 2026-10-16
 

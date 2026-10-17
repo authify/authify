@@ -468,6 +468,77 @@ defmodule AuthifyWeb.SCIM.UsersControllerTest do
       updated_user = Accounts.get_user(user.id)
       assert updated_user.first_name == "New"
       assert updated_user.active == false
+
+      # Emails are now persisted (previously silently dropped)
+      updated_user = Authify.Repo.preload(updated_user, :emails)
+      assert Enum.map(updated_user.emails, & &1.value) == ["newname@example.com"]
+    end
+
+    test "leaves emails untouched when omitted from a PUT", %{
+      conn: conn,
+      organization: organization
+    } do
+      user = user_fixture(organization: organization, email: "keep@example.com")
+
+      params = %{
+        "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        "userName" => "renamed",
+        "name" => %{"givenName" => "Renamed"}
+      }
+
+      conn = put(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 200
+
+      updated_user = Authify.Repo.preload(Accounts.get_user(user.id), :emails)
+      assert Enum.map(updated_user.emails, & &1.value) == ["keep@example.com"]
+    end
+
+    test "rejects an empty emails collection", %{conn: conn, organization: organization} do
+      user = user_fixture(organization: organization, email: "keep@example.com")
+
+      params = %{
+        "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        "userName" => "renamed",
+        "emails" => []
+      }
+
+      conn = put(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 400
+      assert json_response(conn, 400)["scimType"] == "invalidValue"
+
+      # Existing email is preserved
+      updated_user = Authify.Repo.preload(Accounts.get_user(user.id), :emails)
+      assert Enum.map(updated_user.emails, & &1.value) == ["keep@example.com"]
+    end
+
+    test "updates the primary email when userName is an email address", %{
+      conn: conn,
+      organization: organization
+    } do
+      user =
+        user_fixture(
+          organization: organization,
+          emails: [
+            %{"value" => "work@example.com", "type" => "work", "primary" => true},
+            %{"value" => "home@example.com", "type" => "home"}
+          ]
+        )
+
+      params = %{
+        "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        "userName" => "new-work@example.com"
+      }
+
+      conn = put(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}", params)
+
+      assert conn.status == 200
+
+      updated_user = Authify.Repo.preload(Accounts.get_user(user.id), :emails)
+      values = updated_user.emails |> Enum.map(& &1.value) |> Enum.sort()
+      assert values == ["home@example.com", "new-work@example.com"]
+      assert Enum.find(updated_user.emails, & &1.primary).value == "new-work@example.com"
     end
 
     test "prevents modification of immutable externalId", %{
