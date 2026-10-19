@@ -34,14 +34,19 @@ defmodule Authify.MFA.Flow do
   end
 
   @doc """
-  Generates a QR code as PNG data URI from the otpauth:// URI.
+  Generates a QR code as a base64-encoded PNG from the otpauth:// URI.
+
+  Returns `nil` when the input is not a binary. Callers that render the value
+  are expected to prefix it with `data:image/png;base64,`.
   """
-  def generate_qr_code(uri) do
+  def generate_qr_code(uri) when is_binary(uri) do
     uri
     |> EQRCode.encode()
     |> EQRCode.png()
     |> Base.encode64()
   end
+
+  def generate_qr_code(_uri), do: nil
 
   @doc """
   Formats binary secret as base32 groups of 4 for manual entry.
