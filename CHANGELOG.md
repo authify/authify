@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-10-18
+
 ### Fixed
 
 - Audit Logs event-type badges for OAuth, SCIM, and SAML events rendered as white text on a transparent background because their `bg-purple`, `bg-cyan`, and `bg-indigo` CSS classes were never defined. Added the missing utilities with contrast-safe text colors, and improved contrast for yellow `bg-warning` badges
@@ -909,7 +911,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.25.1...HEAD
+[0.25.1]: https://github.com/authify/authify/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/authify/authify/compare/v0.24.2...v0.25.0
 [0.24.2]: https://github.com/authify/authify/compare/v0.24.1...v0.24.2
 [0.24.1]: https://github.com/authify/authify/compare/v0.24.0...v0.24.1
