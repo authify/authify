@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Audit Logs event-type badges for OAuth, SCIM, and SAML events rendered as white text on a transparent background because their `bg-purple`, `bg-cyan`, and `bg-indigo` CSS classes were never defined. Added the missing utilities with contrast-safe text colors, and improved contrast for yellow `bg-warning` badges
+
 ## [0.25.0] - 2026-10-17
 
 ### Added
