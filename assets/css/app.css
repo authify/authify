@@ -1,0 +1,30 @@
+/*
+ * Application styles.
+ *
+ * Bootstrap ships `--bs-purple`, `--bs-cyan`, and `--bs-indigo` as CSS
+ * variables but does not provide matching `bg-*` utilities. Audit log event
+ * badges use those class names, so define them here (with contrast-safe text
+ * colours) to keep the badges legible.
+ */
+
+.bg-purple {
+  background-color: var(--bs-purple) !important;
+}
+
+.bg-indigo {
+  background-color: var(--bs-indigo) !important;
+}
+
+/* Bright cyan is only legible with dark text. */
+.bg-cyan {
+  background-color: var(--bs-cyan) !important;
+  color: #000 !important;
+}
+
+/*
+ * Yellow warning badges otherwise inherit the badge's white text, which fails
+ * contrast. This also fixes the existing `bg-warning` badges used elsewhere.
+ */
+.badge.bg-warning {
+  color: #212529 !important;
+}

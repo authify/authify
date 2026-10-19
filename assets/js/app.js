@@ -22,6 +22,9 @@ import "bootstrap/dist/css/bootstrap.min.css"
 import "bootstrap-icons/font/bootstrap-icons.min.css"
 import "bootstrap/dist/js/bootstrap.bundle.min.js"
 
+// Import application-specific styles and utilities
+import "../css/app.css"
+
 // Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
 import "phoenix_html"
 // Establish Phoenix Socket and LiveView configuration.
