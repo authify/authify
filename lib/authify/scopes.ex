@@ -23,6 +23,9 @@ defmodule Authify.Scopes do
     # User management
     "users:read",
     "users:write",
+    # Group management
+    "groups:read",
+    "groups:write",
     # Invitation management
     "invitations:read",
     "invitations:write",
@@ -141,6 +144,10 @@ defmodule Authify.Scopes do
       "Applications" => [
         {"applications:read", "Read OAuth applications in organization"},
         {"applications:write", "Manage OAuth applications in organization"}
+      ],
+      "Groups" => [
+        {"groups:read", "Read groups and memberships in organization"},
+        {"groups:write", "Manage groups and memberships in organization"}
       ],
       "Application Groups" => [
         {"application_groups:read", "Read application groups in organization"},

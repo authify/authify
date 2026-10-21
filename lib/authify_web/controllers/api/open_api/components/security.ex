@@ -64,6 +64,12 @@ defmodule AuthifyWeb.API.OpenAPI.Components.Security do
       # Management API Scopes - Certificates
       "certificates:read" => "Read certificates",
       "certificates:write" => "Manage certificates",
+      # Management API Scopes - SCIM clients
+      "scim_clients:read" => "Read SCIM client configurations",
+      "scim_clients:write" => "Manage SCIM client configurations",
+      # Management API Scopes - Tasks
+      "tasks:read" => "Read background tasks",
+      "tasks:write" => "Manage background tasks",
       # Management API Scopes - Organization
       "organizations:read" => "Read organization configuration and settings",
       "organizations:write" => "Manage organization configuration and settings",

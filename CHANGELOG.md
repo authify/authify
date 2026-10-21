@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Management API: personal access token lifecycle endpoints. `GET /{org_slug}/api/pats` lists your tokens, `POST /{org_slug}/api/pats` creates one and returns the plaintext value exactly once, and `DELETE /{org_slug}/api/pats/{id}` revokes one. Organization administrators can manage tokens for other users in their organization. Self-service operations require `profile:read`/`profile:write`; admin-for-user operations require `users:read`/`users:write`. PAT-authenticated callers cannot mint tokens with scopes they do not hold themselves. Documented in the OpenAPI specification
 
+### Fixed
+
+- Scope definitions now include `groups:read` and `groups:write`, matching the Management API controllers and the OpenAPI specification. Personal access tokens and OAuth applications can now be granted group management scopes
+- Session and Guardian JWT authentication now derive their API scopes from `Authify.Scopes` instead of a stale hard-coded list, so newer scopes such as profile, audit log, task, SCIM client, and group scopes are recognized
+- OpenAPI profile paths now reference the existing `BadRequest`, `Unauthorized`, and `Forbidden` response components instead of nonexistent `*Error` names
+- The OpenAPI security scheme now documents the `scim_clients:*` and `tasks:*` scopes
+
 ## [0.25.1] - 2026-10-18
 
 ### Fixed
