@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.26.0] - 2026-10-20
+## [0.26.0] - 2026-10-21
 
 ### Added
 
@@ -926,7 +926,7 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Prometheus metrics with telemetry
 - Bandit web server
 [Unreleased]: https://github.com/authify/authify/compare/v0.26.0...HEAD
-[0.26.0]: https://github.com/authify/authify/compare/v0.25.1...v0.26.0
+[0.26.0]: https://github.com/authify/authify/compare/v0.25.0...v0.26.0
 [0.25.1]: https://github.com/authify/authify/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/authify/authify/compare/v0.24.2...v0.25.0
 [0.24.2]: https://github.com/authify/authify/compare/v0.24.1...v0.24.2
