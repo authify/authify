@@ -31,6 +31,22 @@ defmodule AuthifyWeb.API.PatsControllerTest do
     Authify.Repo.preload(token, :scopes)
   end
 
+  defp authenticate_as_application(conn, organization, scopes) do
+    conn
+    |> put_req_header("accept", "application/vnd.authify.v1+json")
+    |> put_req_header("content-type", "application/vnd.authify.v1+json")
+    |> assign(:api_authenticated, true)
+    |> assign(:current_user, %{
+      id: nil,
+      email: "automation@example.com",
+      service_account: true
+    })
+    |> assign(:current_organization, organization)
+    |> assign(:current_scopes, scopes)
+    |> assign(:actor_type, :application)
+    |> assign(:current_application, %{id: 1, name: "Automation App"})
+  end
+
   defp future_timestamp do
     DateTime.utc_now()
     |> DateTime.add(30, :day)
@@ -181,76 +197,79 @@ defmodule AuthifyWeb.API.PatsControllerTest do
       assert response["error"]["type"] == "invalid_request"
     end
 
-    test "an admin can create a token for another user in the organization", %{conn: conn} do
+    test "an admin cannot create a token for another user", %{conn: conn} do
       organization = organization_fixture()
       admin = user_fixture(organization: organization, role: "admin")
       target = user_fixture(organization: organization)
-      conn = authenticate_with_pat(conn, admin, ["users:read", "users:write"])
+
+      # Even with both the self-service and admin scopes, create is self-only.
+      conn =
+        authenticate_with_pat(conn, admin, [
+          "profile:read",
+          "profile:write",
+          "users:read",
+          "users:write"
+        ])
 
       response =
         conn
         |> post("/#{organization.slug}/api/pats", %{
           "personal_access_token" => %{
-            "name" => "Provisioned Admin Token",
+            "name" => "Admin Minted Token",
             "scopes" => ["profile:read", "profile:write"],
-            "user_id" => target.id
-          }
-        })
-        |> json_response(201)
-
-      attributes = response["data"]["attributes"]
-      assert attributes["user_id"] == target.id
-      assert String.starts_with?(attributes["token"], "authify_pat_")
-
-      [event] =
-        AuditLog.list_events(
-          organization_id: organization.id,
-          event_type: "personal_access_token_created"
-        )
-
-      assert event.metadata["admin_managed"] == true
-      assert event.metadata["user_id"] == target.id
-    end
-
-    test "a non-admin cannot create a token for another user", %{conn: conn} do
-      organization = organization_fixture()
-      actor = user_fixture(organization: organization, role: "user")
-      target = user_fixture(organization: organization)
-      conn = authenticate_with_pat(conn, actor, ["users:read", "users:write"])
-
-      response =
-        conn
-        |> post("/#{organization.slug}/api/pats", %{
-          "personal_access_token" => %{
-            "name" => "Not Allowed",
-            "scopes" => ["profile:read"],
             "user_id" => target.id
           }
         })
         |> json_response(403)
 
       assert response["error"]["type"] == "insufficient_permissions"
+      assert response["error"]["message"] =~ "authenticated user"
+
+      assert PersonalAccessTokens.list_personal_access_tokens(target) == []
     end
 
-    test "returns 404 for a target user in another organization", %{conn: conn} do
+    test "application credentials cannot create personal access tokens", %{conn: conn} do
       organization = organization_fixture()
-      admin = user_fixture(organization: organization, role: "admin")
-      other_organization = organization_fixture()
-      target = user_fixture(organization: other_organization)
-      conn = authenticate_with_pat(conn, admin, ["users:read", "users:write"])
+
+      conn =
+        authenticate_as_application(conn, organization, [
+          "profile:read",
+          "profile:write",
+          "users:read",
+          "users:write"
+        ])
 
       response =
         conn
         |> post("/#{organization.slug}/api/pats", %{
           "personal_access_token" => %{
-            "name" => "Cross Org",
-            "scopes" => ["profile:read"],
-            "user_id" => target.id
+            "name" => "Application Token",
+            "scopes" => ["profile:read"]
           }
         })
-        |> json_response(404)
+        |> json_response(403)
 
-      assert response["error"]["type"] == "resource_not_found"
+      assert response["error"]["type"] == "insufficient_permissions"
+      assert response["error"]["message"] =~ "Application credentials"
+    end
+
+    test "rejects user_id even when it matches the authenticated user", %{conn: conn} do
+      user = user_fixture()
+      organization = user.organization
+      conn = authenticate_with_pat(conn, user, ["profile:write"])
+
+      response =
+        conn
+        |> post("/#{organization.slug}/api/pats", %{
+          "personal_access_token" => %{
+            "name" => "Self With user_id",
+            "scopes" => ["profile:read"],
+            "user_id" => user.id
+          }
+        })
+        |> json_response(403)
+
+      assert response["error"]["type"] == "insufficient_permissions"
     end
   end
 
@@ -297,6 +316,7 @@ defmodule AuthifyWeb.API.PatsControllerTest do
       assert [token] = response["data"]
       assert token["id"] == to_string(target_token.id)
       assert token["attributes"]["user_id"] == target.id
+      refute Map.has_key?(token["attributes"], "token")
     end
 
     test "a non-admin cannot list another user's tokens", %{conn: conn} do
@@ -352,6 +372,7 @@ defmodule AuthifyWeb.API.PatsControllerTest do
 
       assert event.metadata["source"] == "api"
       assert event.metadata["personal_access_token_id"] == token.id
+      refute Map.has_key?(event.metadata, "admin_managed")
     end
 
     test "a user cannot revoke another user's token without admin permissions", %{conn: conn} do
@@ -388,6 +409,15 @@ defmodule AuthifyWeb.API.PatsControllerTest do
                token.id,
                organization
              )
+
+      [event] =
+        AuditLog.list_events(
+          organization_id: organization.id,
+          event_type: "personal_access_token_deleted"
+        )
+
+      assert event.metadata["admin_managed"] == true
+      assert event.metadata["user_id"] == target.id
     end
 
     test "returns 404 for a token outside the organization", %{conn: conn} do

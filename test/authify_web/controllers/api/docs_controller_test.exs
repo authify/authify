@@ -19,6 +19,21 @@ defmodule AuthifyWeb.API.DocsControllerTest do
 
       assert spec["components"]["schemas"]["PersonalAccessTokenAttributes"]
       assert spec["components"]["schemas"]["PersonalAccessTokenCreateRequest"]
+
+      create_properties =
+        spec["components"]["schemas"]["PersonalAccessTokenCreateRequest"]["properties"][
+          "personal_access_token"
+        ]["properties"]
+
+      refute Map.has_key?(create_properties, "user_id")
+
+      refute Enum.any?(
+               spec["paths"]["/{org_slug}/api/pats"]["post"]["security"],
+               fn requirement ->
+                 Map.has_key?(requirement, "OAuth2")
+               end
+             )
+
       assert Enum.any?(spec["tags"], &(&1["name"] == "Personal Access Tokens"))
     end
   end

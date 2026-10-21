@@ -97,7 +97,7 @@ defmodule AuthifyWeb.Auth.APIAuth do
         user = Guardian.Plug.current_resource(conn)
         organization = url_organization
 
-        if user && organization do
+        if user && organization && user.organization_id == organization.id do
           # Session authentication grants every management API, PAT, and SCIM scope.
           all_scopes = default_api_scopes()
 

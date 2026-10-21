@@ -95,7 +95,7 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Pats do
           type: "string",
           nullable: true,
           description:
-            "Plaintext token value. Returned exactly once, in the create response. Never present in list responses."
+            "Plaintext token value. Returned exactly once to the owner in the create response. Never present in list responses."
         },
         inserted_at: %{type: "string", format: "date-time", description: "Creation timestamp"},
         updated_at: %{type: "string", format: "date-time", description: "Last update timestamp"}
@@ -177,12 +177,6 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Pats do
               nullable: true,
               description:
                 "Expiration timestamp. Defaults to one year from creation when omitted."
-            },
-            user_id: %{
-              type: "integer",
-              nullable: true,
-              description:
-                "Target user ID. Only organization administrators may create tokens for another user."
             }
           },
           required: ["name", "scopes"]

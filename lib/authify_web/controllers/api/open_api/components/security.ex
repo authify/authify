@@ -11,7 +11,7 @@ defmodule AuthifyWeb.API.OpenAPI.Components.Security do
       "BearerAuth" => %{
         type: "http",
         scheme: "bearer",
-        bearerFormat: "JWT",
+        bearerFormat: "JWT or PAT",
         description:
           "OAuth2 Bearer token or Personal Access Token authentication. Include token in Authorization header as 'Bearer <token>'."
       },

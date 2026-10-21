@@ -29,13 +29,15 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Pats do
 
         Organization administrators may pass the `user_id` query parameter to
         list another user's tokens. Token values are never returned by this
-        endpoint; the plaintext value is only available in the create response.
+        endpoint; the plaintext value is only available to the owner in the
+        create response.
 
-        **Requires:** `profile:read`, or `users:read` when listing another user's tokens.
+        **Requires:** `profile:read`. Listing another user's tokens requires
+        `users:read` and the organization administrator role.
         """,
         operationId: "listPersonalAccessTokens",
         security: [
-          %{"OAuth2" => ["profile:read"]},
+          %{"OAuth2" => ["users:read"]},
           %{"BearerAuth" => []},
           %{"SessionAuth" => []}
         ],
@@ -70,8 +72,9 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Pats do
         description: """
         Create a personal access token for the authenticated user.
 
-        Organization administrators may include `user_id` in the request body
-        to create a token for another user in the same organization.
+        Personal access tokens are self-sovereign credentials: only the owner
+        may create one. Requests that include `user_id` are rejected with 403,
+        and application (client_credentials) credentials cannot mint tokens.
 
         The plaintext token value is returned exactly once, in the create
         response, under `data.attributes.token`. Store it immediately; it
@@ -80,11 +83,10 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Pats do
         When authenticated with a personal access token, the new token's scopes
         must be a subset of the authenticating token's scopes.
 
-        **Requires:** `profile:write`, or `users:write` when creating a token for another user.
+        **Requires:** `profile:write`.
         """,
         operationId: "createPersonalAccessToken",
         security: [
-          %{"OAuth2" => ["profile:write"]},
           %{"BearerAuth" => []},
           %{"SessionAuth" => []}
         ],
@@ -139,11 +141,12 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Pats do
         Users may revoke their own tokens. Organization administrators may
         revoke tokens belonging to other users in the same organization.
 
-        **Requires:** `profile:write`, or `users:write` when revoking another user's token.
+        **Requires:** `profile:write`. Revoking another user's token requires
+        `users:write` and the organization administrator role.
         """,
         operationId: "revokePersonalAccessToken",
         security: [
-          %{"OAuth2" => ["profile:write"]},
+          %{"OAuth2" => ["users:write"]},
           %{"BearerAuth" => []},
           %{"SessionAuth" => []}
         ],

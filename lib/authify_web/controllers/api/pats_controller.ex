@@ -2,9 +2,10 @@ defmodule AuthifyWeb.API.PatsController do
   @moduledoc """
   Management API endpoints for personal access token lifecycle management.
 
-  Users can manage their own tokens with the `profile:read` and `profile:write`
-  scopes. Organization administrators can manage tokens for other users in
-  their organization with the `users:read` and `users:write` scopes.
+  Personal access tokens are self-sovereign credentials: only the owner can
+  create one, using the `profile:write` scope. Organization administrators may
+  list (metadata only) and revoke other users' tokens in their organization
+  with the `users:read` and `users:write` scopes.
 
   Token values are only returned once, in the create response.
   """
@@ -48,20 +49,21 @@ defmodule AuthifyWeb.API.PatsController do
   @doc """
   POST /{org_slug}/api/pats
 
-  Creates a personal access token for the current user, or another user in the
-  organization when `user_id` is provided and the caller is an administrator.
+  Creates a personal access token for the authenticated user. Only the token
+  owner may create a token; administrators and application credentials cannot
+  create tokens for other users.
   """
   def create(conn, %{"personal_access_token" => params}) do
     organization = conn.assigns.current_organization
     current_user = conn.assigns[:current_user]
     scopes = requested_scopes(params)
 
-    with {:ok, target_user, mode} <-
-           resolve_target_user(conn, organization, current_user, params["user_id"]),
-         :ok <- authorize_create(conn, target_user, mode, scopes),
+    with :ok <- ensure_self_service_identity(conn, current_user, params["user_id"]),
+         :ok <- ensure_scope(conn, "profile:write"),
+         :ok <- ensure_scope_subset(conn, scopes),
          {:ok, pat} <-
            PersonalAccessTokens.create_personal_access_token(
-             target_user,
+             current_user,
              organization,
              build_attrs(params)
            ) do
@@ -71,7 +73,7 @@ defmodule AuthifyWeb.API.PatsController do
         conn,
         :personal_access_token_created,
         pat,
-        extra_metadata: audit_metadata(mode)
+        extra_metadata: %{"source" => "api"}
       )
 
       render_api_response(conn, token_resource(pat, include_token: true),
@@ -123,9 +125,9 @@ defmodule AuthifyWeb.API.PatsController do
         )
 
       token ->
-        if current_user && token.user_id == current_user.id do
+        if current_user && token.user_id == Map.get(current_user, :id) do
           case ensure_scope(conn, "profile:write") do
-            :ok -> delete_token(conn, token)
+            :ok -> delete_token(conn, token, :self)
             {:error, response} -> response
           end
         else
@@ -133,7 +135,7 @@ defmodule AuthifyWeb.API.PatsController do
                {:ok, target_user} <-
                  fetch_user_in_organization(conn, organization, token.user_id),
                :ok <- ensure_admin_actor(conn, target_user) do
-            delete_token(conn, token)
+            delete_token(conn, token, :admin)
           else
             {:error, response} -> response
           end
@@ -163,7 +165,7 @@ defmodule AuthifyWeb.API.PatsController do
   end
 
   defp list_user_tokens(conn, organization, current_user, user_id) do
-    if current_user && current_user.id == user_id do
+    if current_user && Map.get(current_user, :id) == user_id do
       list_own_tokens(conn, current_user)
     else
       with :ok <- ensure_scope(conn, "users:read"),
@@ -186,14 +188,14 @@ defmodule AuthifyWeb.API.PatsController do
     )
   end
 
-  defp delete_token(conn, token) do
+  defp delete_token(conn, token, mode) do
     case PersonalAccessTokens.delete_personal_access_token(token) do
       {:ok, _deleted_token} ->
         AuditHelper.log_personal_access_token_event(
           conn,
           :personal_access_token_deleted,
           token,
-          extra_metadata: %{"source" => "api"}
+          extra_metadata: audit_metadata(mode)
         )
 
         conn
@@ -205,69 +207,37 @@ defmodule AuthifyWeb.API.PatsController do
     end
   end
 
-  defp resolve_target_user(conn, organization, current_user, user_id_param) do
-    case parse_user_id(user_id_param) do
-      nil ->
-        case current_user do
-          %{id: nil} ->
-            {:error,
-             render_error_response(
-               conn,
-               :bad_request,
-               "invalid_request",
-               "user_id is required when authenticating as an application"
-             )}
-
-          %{id: _id} ->
-            {:ok, current_user, :self}
-
-          _ ->
-            {:error,
-             render_error_response(
-               conn,
-               :unprocessable_entity,
-               "invalid_request",
-               "Unable to determine the target user"
-             )}
-        end
-
-      {:ok, user_id} ->
-        case current_user do
-          %{id: ^user_id} ->
-            {:ok, current_user, :self}
-
-          _ ->
-            with {:ok, target_user} <-
-                   fetch_user_in_organization(conn, organization, user_id) do
-              {:ok, target_user, :admin}
-            end
-        end
-
-      :error ->
+  # PATs are self-sovereign: only the owner may create one. The endpoint does
+  # not accept a target user, and application credentials have no user identity
+  # that could own a token.
+  defp ensure_self_service_identity(conn, current_user, user_id_param) do
+    cond do
+      user_id_param not in [nil, ""] ->
         {:error,
          render_error_response(
            conn,
-           :bad_request,
-           "invalid_request",
-           "user_id must be an integer"
+           :forbidden,
+           "insufficient_permissions",
+           "Personal access tokens can only be created for the authenticated user"
          )}
+
+      is_nil(current_user) or is_nil(Map.get(current_user, :id)) ->
+        {:error,
+         render_error_response(
+           conn,
+           :forbidden,
+           "insufficient_permissions",
+           "Application credentials cannot create personal access tokens"
+         )}
+
+      true ->
+        :ok
     end
   end
 
-  defp authorize_create(conn, _target_user, :self, scopes) do
-    with :ok <- ensure_scope(conn, "profile:write") do
-      ensure_scope_subset(conn, scopes)
-    end
-  end
-
-  defp authorize_create(conn, target_user, :admin, _scopes) do
-    with :ok <- ensure_scope(conn, "users:write") do
-      ensure_admin_actor(conn, target_user)
-    end
-  end
-
-  # A personal access token may only mint tokens with scopes it already holds.
-  # Otherwise a narrowly scoped token could escalate its own privileges.
+  # A caller may only mint tokens with scopes it already holds. Otherwise a
+  # narrowly scoped token could escalate its own privileges. Session and JWT
+  # callers hold every API scope, so this is effectively a PAT constraint.
   #
   # Invalid scope names are left to the changeset so the caller receives a
   # standard 422 validation response instead of a scope error.
@@ -275,7 +245,7 @@ defmodule AuthifyWeb.API.PatsController do
     valid_scopes = PersonalAccessToken.valid_scopes()
     invalid_scopes = Enum.reject(requested_scopes, &(&1 in valid_scopes))
 
-    if invalid_scopes == [] and conn.assigns[:token_type] == :personal_access_token do
+    if invalid_scopes == [] do
       provided_scopes = conn.assigns[:current_scopes] || []
       unauthorized = Enum.reject(requested_scopes, &scope_covered_by?(&1, provided_scopes))
 
