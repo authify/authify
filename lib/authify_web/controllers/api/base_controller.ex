@@ -259,6 +259,7 @@ defmodule AuthifyWeb.API.BaseController do
   defp pluralize_resource_type("service_provider"), do: "saml-providers"
   defp pluralize_resource_type("certificate"), do: "certificates"
   defp pluralize_resource_type("invitation"), do: "invitations"
+  defp pluralize_resource_type("personal_access_token"), do: "pats"
   defp pluralize_resource_type("audit_log"), do: "audit-logs"
   defp pluralize_resource_type(type), do: "#{type}s"
 

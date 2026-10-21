@@ -38,6 +38,12 @@ defmodule Authify.ScopesTest do
       assert "audit_logs:read" in Scopes.management_api_scopes()
     end
 
+    test "includes group management scopes" do
+      scopes = Scopes.management_api_scopes()
+      assert "groups:read" in scopes
+      assert "groups:write" in scopes
+    end
+
     test "does not include OAuth/OIDC scopes" do
       scopes = Scopes.management_api_scopes()
       refute "openid" in scopes
@@ -219,6 +225,7 @@ defmodule Authify.ScopesTest do
       categories = Map.keys(Scopes.scopes_by_category())
       assert "OAuth/OIDC" in categories
       assert "User Management" in categories
+      assert "Groups" in categories
       assert "SCIM 2.0 Provisioning" in categories
       assert "Profile" in categories
     end

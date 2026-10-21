@@ -97,26 +97,9 @@ defmodule AuthifyWeb.Auth.APIAuth do
         user = Guardian.Plug.current_resource(conn)
         organization = url_organization
 
-        if user && organization do
-          # Session authentication grants all management API scopes
-          all_scopes = [
-            "management_app:read",
-            "management_app:write",
-            "users:read",
-            "users:write",
-            "invitations:read",
-            "invitations:write",
-            "applications:read",
-            "applications:write",
-            "application_groups:read",
-            "application_groups:write",
-            "saml:read",
-            "saml:write",
-            "certificates:read",
-            "certificates:write",
-            "organizations:read",
-            "organizations:write"
-          ]
+        if user && organization && user.organization_id == organization.id do
+          # Session authentication grants every management API, PAT, and SCIM scope.
+          all_scopes = default_api_scopes()
 
           actor_info = %{type: :user, user: user}
           {:ok, user, organization, all_scopes, actor_info}
@@ -167,25 +150,8 @@ defmodule AuthifyWeb.Auth.APIAuth do
               user = Authify.Accounts.get_user!(user_id)
               organization = Authify.Accounts.get_organization!(org_id)
 
-              # Guardian JWT gets all management API scopes
-              all_scopes = [
-                "management_app:read",
-                "management_app:write",
-                "users:read",
-                "users:write",
-                "invitations:read",
-                "invitations:write",
-                "applications:read",
-                "applications:write",
-                "application_groups:read",
-                "application_groups:write",
-                "saml:read",
-                "saml:write",
-                "certificates:read",
-                "certificates:write",
-                "organizations:read",
-                "organizations:write"
-              ]
+              # Guardian JWT gets every management API, PAT, and SCIM scope
+              all_scopes = default_api_scopes()
 
               actor_info = %{type: :user, user: user, token: token, token_type: :guardian_jwt}
               {:ok, user, organization, all_scopes, actor_info}
@@ -202,6 +168,14 @@ defmodule AuthifyWeb.Auth.APIAuth do
 
   defp authenticate_personal_access_token(token) do
     Authify.PersonalAccessTokens.authenticate_personal_access_token(token)
+  end
+
+  # Session and Guardian JWT authentication are trusted first-party credentials,
+  # so they receive the full set of API scopes rather than a stale hard-coded list.
+  defp default_api_scopes do
+    Authify.Scopes.management_api_scopes() ++
+      Authify.Scopes.pat_only_scopes() ++
+      Authify.Scopes.scim_scopes()
   end
 
   defp validate_oauth_access_token(token) do

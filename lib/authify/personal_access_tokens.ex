@@ -34,6 +34,29 @@ defmodule Authify.PersonalAccessTokens do
   end
 
   @doc """
+  Lists personal access tokens for an organization.
+
+  Pass `user_id: id` to restrict the results to a single user's tokens.
+  """
+  def list_personal_access_tokens_in_organization(organization, opts \\ []) do
+    query =
+      from(p in PersonalAccessToken,
+        where: p.organization_id == ^organization.id,
+        order_by: [desc: p.inserted_at]
+      )
+
+    query =
+      case Keyword.get(opts, :user_id) do
+        nil -> query
+        user_id -> from(p in query, where: p.user_id == ^user_id)
+      end
+
+    query
+    |> Repo.all()
+    |> Repo.preload(:scopes)
+  end
+
+  @doc """
   Gets a personal access token for a user.
   """
   def get_personal_access_token!(id, user) do
@@ -41,6 +64,19 @@ defmodule Authify.PersonalAccessTokens do
       where: p.id == ^id and p.user_id == ^user.id
     )
     |> Repo.one!()
+  end
+
+  @doc """
+  Gets a personal access token by ID, scoped to an organization.
+
+  Returns `nil` when the token does not exist in the organization.
+  """
+  def get_personal_access_token_in_organization(id, organization) do
+    from(p in PersonalAccessToken,
+      where: p.id == ^id and p.organization_id == ^organization.id,
+      preload: [:scopes]
+    )
+    |> Repo.one()
   end
 
   @doc """

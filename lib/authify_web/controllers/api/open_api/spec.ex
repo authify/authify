@@ -84,6 +84,10 @@ defmodule AuthifyWeb.API.OpenAPI.Spec do
         description: "Current user's profile management and preferences"
       },
       %{
+        name: "Personal Access Tokens",
+        description: "Personal access token lifecycle management"
+      },
+      %{
         name: "Invitations",
         description: "User invitation management"
       },

@@ -44,8 +44,8 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Profile do
                 }
               }
             },
-            "401" => %{"$ref" => "#/components/responses/UnauthorizedError"},
-            "403" => %{"$ref" => "#/components/responses/ForbiddenError"}
+            "401" => %{"$ref" => "#/components/responses/Unauthorized"},
+            "403" => %{"$ref" => "#/components/responses/Forbidden"}
           }
         },
         "put" => %{
@@ -102,9 +102,9 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Profile do
                 }
               }
             },
-            "400" => %{"$ref" => "#/components/responses/BadRequestError"},
-            "401" => %{"$ref" => "#/components/responses/UnauthorizedError"},
-            "403" => %{"$ref" => "#/components/responses/ForbiddenError"},
+            "400" => %{"$ref" => "#/components/responses/BadRequest"},
+            "401" => %{"$ref" => "#/components/responses/Unauthorized"},
+            "403" => %{"$ref" => "#/components/responses/Forbidden"},
             "422" => %{"$ref" => "#/components/responses/ValidationError"}
           }
         }
