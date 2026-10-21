@@ -422,6 +422,11 @@ defmodule AuthifyWeb.Router do
     get "/profile", ProfileController, :show
     put "/profile", ProfileController, :update
 
+    # Personal Access Token lifecycle
+    get "/pats", PatsController, :index
+    post "/pats", PatsController, :create
+    delete "/pats/:id", PatsController, :delete
+
     # Audit Logs (read-only)
     get "/audit-logs", AuditLogsController, :index
     get "/audit-logs/:id", AuditLogsController, :show

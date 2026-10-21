@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Management API: personal access token lifecycle endpoints. `GET /{org_slug}/api/pats` lists your tokens, `POST /{org_slug}/api/pats` creates one and returns the plaintext value exactly once, and `DELETE /{org_slug}/api/pats/{id}` revokes one. Organization administrators can manage tokens for other users in their organization. Self-service operations require `profile:read`/`profile:write`; admin-for-user operations require `users:read`/`users:write`. PAT-authenticated callers cannot mint tokens with scopes they do not hold themselves. Documented in the OpenAPI specification
+
 ## [0.25.1] - 2026-10-18
 
 ### Fixed
