@@ -158,7 +158,7 @@ This affects absolute URLs such as the OIDC discovery endpoints and the ID token
 **OAuth 2.0 / OIDC:**
 ```bash
 # Discovery endpoint
-curl https://auth.yourcompany.com/your-org/.well-known/openid_configuration
+curl https://auth.yourcompany.com/your-org/.well-known/openid-configuration
 
 # Authorization flow
 https://auth.yourcompany.com/your-org/oauth/authorize?
