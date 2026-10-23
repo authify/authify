@@ -38,6 +38,7 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Users do
             ],
             first_name: "John",
             last_name: "Doe",
+            username: "john",
             active: true,
             inserted_at: "2024-01-01T00:00:00Z",
             updated_at: "2024-01-01T00:00:00Z"
@@ -87,6 +88,12 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Users do
         },
         first_name: %{type: "string", nullable: true, description: "User first name"},
         last_name: %{type: "string", nullable: true, description: "User last name"},
+        username: %{
+          type: "string",
+          description:
+            "Unique within the organization. Always present on existing users; when the create " <>
+              "request omitted one, the username generated from the primary email is returned"
+        },
         active: %{type: "boolean", description: "Whether the user is active"},
         avatar_url: %{
           type: "string",
@@ -174,6 +181,18 @@ defmodule AuthifyWeb.API.OpenAPI.Schemas.Users do
             },
             first_name: %{type: "string"},
             last_name: %{type: "string"},
+            username: %{
+              type: "string",
+              minLength: 3,
+              maxLength: 50,
+              pattern: "^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$",
+              description:
+                "Optional. A supplied username is preserved as-is and must be 3-50 characters, " <>
+                  "start and end with alphanumeric characters (dots, hyphens, and underscores " <>
+                  "are allowed in the middle), and be unique within the organization; invalid " <>
+                  "or duplicate values are rejected with 422. When omitted or blank, a " <>
+                  "username is generated from the primary email's local part."
+            },
             password: %{
               type: "string",
               minLength: 8,
