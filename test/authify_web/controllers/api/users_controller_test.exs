@@ -176,6 +176,86 @@ defmodule AuthifyWeb.API.UsersControllerTest do
       assert attributes["last_name"] == "User"
     end
 
+    test "creates user without a username by generating one", %{
+      conn: conn,
+      organization: organization
+    } do
+      user_attrs = %{
+        "user" => %{
+          "emails" => [
+            %{"value" => "nousername@example.com", "primary" => true, "type" => "work"}
+          ],
+          "first_name" => "No",
+          "last_name" => "Username",
+          "password" => "SecureP@ssw0rd!",
+          "password_confirmation" => "SecureP@ssw0rd!"
+        }
+      }
+
+      conn = post(conn, "/#{organization.slug}/api/users", user_attrs)
+
+      assert %{"data" => %{"id" => user_id, "attributes" => attributes}} =
+               json_response(conn, 201)
+
+      assert is_binary(attributes["username"])
+      refute attributes["username"] == ""
+
+      created_user = Authify.Accounts.get_user!(user_id)
+      assert created_user.username == attributes["username"]
+      refute String.contains?(attributes["username"], "@")
+    end
+
+    test "creates user preserving a supplied username", %{conn: conn, organization: organization} do
+      supplied = "apiuser-#{System.unique_integer([:positive])}"
+
+      user_attrs = %{
+        "user" => %{
+          "emails" => [
+            %{"value" => "suppliedname@example.com", "primary" => true, "type" => "work"}
+          ],
+          "first_name" => "Sup",
+          "last_name" => "Named",
+          "username" => supplied,
+          "password" => "SecureP@ssw0rd!",
+          "password_confirmation" => "SecureP@ssw0rd!"
+        }
+      }
+
+      conn = post(conn, "/#{organization.slug}/api/users", user_attrs)
+
+      assert %{"data" => %{"attributes" => attributes}} = json_response(conn, 201)
+      assert attributes["username"] == supplied
+    end
+
+    test "rejects user creation with an invalid username", %{
+      conn: conn,
+      organization: organization
+    } do
+      user_attrs = %{
+        "user" => %{
+          "emails" => [
+            %{"value" => "badname@example.com", "primary" => true, "type" => "work"}
+          ],
+          "first_name" => "Bad",
+          "last_name" => "Name",
+          "username" => "bad name!",
+          "password" => "SecureP@ssw0rd!",
+          "password_confirmation" => "SecureP@ssw0rd!"
+        }
+      }
+
+      conn = post(conn, "/#{organization.slug}/api/users", user_attrs)
+
+      assert %{
+               "error" => %{
+                 "type" => "validation_failed",
+                 "details" => details
+               }
+             } = json_response(conn, 422)
+
+      assert details["username"]
+    end
+
     test "created user is sent an email verification link", %{
       conn: conn,
       organization: organization

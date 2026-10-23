@@ -180,7 +180,7 @@ defmodule AuthifyWeb.SCIM.UsersController do
           "User with email '#{email_value}' already exists"
         )
 
-      Map.has_key?(errors, :username) ->
+      Map.has_key?(errors, :username) and username_uniqueness_error?(changeset) ->
         render_scim_error(
           conn,
           409,
@@ -188,10 +188,38 @@ defmodule AuthifyWeb.SCIM.UsersController do
           "User with userName '#{attrs[:username]}' already exists"
         )
 
+      Map.has_key?(errors, :username) ->
+        render_scim_error(
+          conn,
+          400,
+          :invalid_value,
+          "Invalid userName '#{attrs[:username]}': #{format_username_error(changeset)}"
+        )
+
       true ->
         detail = Helpers.format_changeset_errors(changeset)
         render_scim_error(conn, 400, :invalid_value, detail)
     end
+  end
+
+  # A duplicate username surfaces as a unique constraint violation; format and
+  # length problems are ordinary validation errors.
+  defp username_uniqueness_error?(changeset) do
+    case changeset.errors[:username] do
+      {_message, opts} when is_list(opts) ->
+        Keyword.get(opts, :constraint) == :unique
+
+      _ ->
+        false
+    end
+  end
+
+  defp format_username_error(changeset) do
+    changeset
+    |> Ecto.Changeset.traverse_errors(& &1)
+    |> Map.get(:username, [])
+    |> List.wrap()
+    |> Enum.join(", ")
   end
 
   @doc """

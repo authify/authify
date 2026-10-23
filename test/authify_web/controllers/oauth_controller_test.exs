@@ -1360,6 +1360,48 @@ defmodule AuthifyWeb.OAuthControllerTest do
       assert payload_json["iat"]
     end
 
+    test "ID token and userinfo report the username as preferred_username", %{
+      conn: conn,
+      application: application,
+      user: user,
+      organization: organization
+    } do
+      {:ok, auth_code} =
+        Authify.OAuth.create_authorization_code(
+          application,
+          user,
+          "https://example.com/callback",
+          ["openid", "profile", "email"]
+        )
+
+      params = %{
+        "grant_type" => "authorization_code",
+        "client_id" => application.client_id,
+        "client_secret" => application.client_secret,
+        "code" => auth_code.code
+      }
+
+      token_conn = post(conn, ~p"/#{organization.slug}/oauth/token", params)
+      response = json_response(token_conn, 200)
+
+      # ID token: preferred_username must be the username, not an email address
+      [_header, payload, _signature] = String.split(response["id_token"], ".")
+
+      claims = payload |> Base.url_decode64!(padding: false) |> Jason.decode!()
+
+      assert claims["preferred_username"] == user.username
+      refute String.contains?(claims["preferred_username"], "@")
+
+      # UserInfo endpoint: same claim source
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{response["access_token"]}")
+        |> get(~p"/#{organization.slug}/oauth/userinfo")
+
+      userinfo = json_response(conn, 200)
+      assert userinfo["preferred_username"] == user.username
+    end
+
     test "ID token is RS256-signed with three segments", %{
       conn: conn,
       application: application,

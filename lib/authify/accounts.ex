@@ -258,6 +258,10 @@ defmodule Authify.Accounts do
 
   @doc """
   Creates a user.
+
+  When no username is supplied, one is generated (sanitized and unique within
+  the organization). A supplied username is preserved as-is and validated
+  normally; invalid or duplicate values are rejected.
   """
   def create_user(attrs \\ %{}) do
     normalized_attrs =
@@ -266,11 +270,32 @@ defmodule Authify.Accounts do
         default_primary: true
       )
 
+    normalized_attrs =
+      User.ensure_username(normalized_attrs, organization_id_from_attrs(normalized_attrs), Repo)
+
     policy = resolve_password_policy_from_attrs(normalized_attrs)
 
     %User{}
     |> User.registration_changeset(normalized_attrs, policy)
     |> Repo.insert()
+  end
+
+  defp organization_id_from_attrs(attrs) do
+    organization_id = Map.get(attrs, "organization_id") || Map.get(attrs, :organization_id)
+
+    case organization_id do
+      id when is_integer(id) ->
+        id
+
+      id when is_binary(id) ->
+        case Integer.parse(id) do
+          {parsed, ""} -> parsed
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
   end
 
   @doc """
@@ -305,10 +330,7 @@ defmodule Authify.Accounts do
   end
 
   defp create_admin_user_for_organization(organization, user_attrs) do
-    # Generate unique username based on preferred username
-    preferred_username = Map.get(user_attrs, "username", "admin")
-    unique_username = User.generate_unique_username(preferred_username, organization.id, Repo)
-
+    # Username is generated/validated by create_user/1 (via ensure_username)
     normalized_user_attrs =
       normalize_user_email_attrs(user_attrs, Map.get(user_attrs, "email"),
         default_type: "work",
@@ -319,7 +341,6 @@ defmodule Authify.Accounts do
       normalized_user_attrs
       |> Map.put("organization_id", organization.id)
       |> Map.put("role", "admin")
-      |> Map.put("username", unique_username)
 
     case create_user(user_attrs_with_org) do
       {:ok, user} -> {:ok, {organization, user}}
@@ -468,17 +489,15 @@ defmodule Authify.Accounts do
 
   @doc """
   Creates a user with a specific role in an organization.
+
+  A missing or blank username is generated (see `User.ensure_username/3`); a
+  supplied username is preserved and validated normally.
   """
   def create_user_with_role(user_attrs, organization_id, role) do
-    # Generate unique username based on preferred username
-    preferred_username = Map.get(user_attrs, "username", "user")
-    unique_username = User.generate_unique_username(preferred_username, organization_id, Repo)
-
     user_attrs_with_org =
       user_attrs
       |> Map.put("organization_id", organization_id)
       |> Map.put("role", role)
-      |> Map.put("username", unique_username)
 
     user_attrs_with_emails =
       normalize_user_email_attrs(user_attrs_with_org, Map.get(user_attrs, "email"),
@@ -497,6 +516,48 @@ defmodule Authify.Accounts do
   """
   def create_user_with_role(user_attrs, organization_id) do
     create_user_with_role(user_attrs, organization_id, "user")
+  end
+
+  @doc """
+  Assigns a username to every user that is missing one.
+
+  Users created before usernames became mandatory may still have a `nil`
+  username. This assigns each such user a sanitized, per-organization-unique
+  username, seeded from the user's primary email (see
+  `User.username_seed_from_email/1`), using the same uniqueness semantics as
+  `User.generate_unique_username/3`.
+
+  Used by the `backfill_user_usernames` data migration and safe to run
+  repeatedly. Returns `{:ok, updated_count}`. The queryable may be overridden
+  (it must select `%{id, organization_id, email}`) so the row logic can be
+  exercised in tests against existing users.
+  """
+  def backfill_missing_usernames(queryable \\ missing_usernames_query()) do
+    missing = Repo.all(queryable)
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    updated =
+      Enum.count(missing, fn %{id: id, organization_id: organization_id, email: email} ->
+        seed = User.username_seed_from_email(email)
+        username = User.generate_unique_username(seed, organization_id, Repo)
+
+        from(u in User, where: u.id == ^id)
+        |> Repo.update_all(set: [username: username, updated_at: now])
+
+        true
+      end)
+
+    {:ok, updated}
+  end
+
+  defp missing_usernames_query do
+    from(u in User,
+      left_join: e in UserEmail,
+      on: e.user_id == u.id and e.primary == true,
+      where: is_nil(u.username),
+      select: %{id: u.id, organization_id: u.organization_id, email: e.value},
+      order_by: u.id
+    )
   end
 
   defp normalize_user_email_attrs(attrs, fallback_email, opts) do

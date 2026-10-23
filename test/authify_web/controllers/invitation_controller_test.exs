@@ -330,6 +330,10 @@ defmodule AuthifyWeb.InvitationControllerTest do
       assert user.first_name == "John"
       assert user.last_name == "Doe"
 
+      # A username was generated (never email-shaped)
+      assert is_binary(user.username)
+      refute String.contains?(user.username, "@")
+
       # Check user has correct role in organization
       user_org = Accounts.get_user_organization(user.id, organization.id)
       assert user_org != nil
@@ -390,6 +394,42 @@ defmodule AuthifyWeb.InvitationControllerTest do
 
       assert html_response(conn, 200) =~ "Accept Invitation"
       # Invitation should not be marked as accepted
+      unchanged_invitation = Invitations.get_invitation!(invitation.id)
+      assert is_nil(unchanged_invitation.accepted_at)
+    end
+
+    test "rejects a duplicate supplied username", %{conn: conn} do
+      organization = organization_fixture()
+      admin = admin_user_fixture(organization)
+      invitation = invitation_for_organization_fixture(organization, admin)
+
+      {:ok, existing} =
+        Accounts.create_user_with_role(
+          %{
+            "emails" => [
+              %{"value" => unique_user_email(), "type" => "work", "primary" => true}
+            ],
+            "first_name" => "Taken",
+            "last_name" => "Name",
+            "password" => "SecureP@ssw0rd!",
+            "password_confirmation" => "SecureP@ssw0rd!"
+          },
+          organization.id
+        )
+
+      user_params = %{
+        "first_name" => "John",
+        "last_name" => "Dupe",
+        "username" => existing.username,
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+
+      conn = post(conn, ~p"/invite/#{invitation.token}/accept", user: user_params)
+
+      assert html_response(conn, 200) =~ "Accept Invitation"
+
+      # The invitation remains pending since account creation failed
       unchanged_invitation = Invitations.get_invitation!(invitation.id)
       assert is_nil(unchanged_invitation.accepted_at)
     end

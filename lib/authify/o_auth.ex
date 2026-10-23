@@ -550,7 +550,7 @@ defmodule Authify.OAuth do
       "name" => full_name,
       "given_name" => user.first_name,
       "family_name" => user.last_name,
-      "preferred_username" => User.get_primary_email_value(user),
+      "preferred_username" => user.username,
       "updated_at" => DateTime.to_unix(user.updated_at),
       "picture" => User.avatar_url(user),
       "locale" => user.locale,
