@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-10-23
+
+### Added
+
+- Every user is now guaranteed a username-shaped account name. Usernames are generated from the primary email's local part whenever a user is created without one — including blank or otherwise unusable seeds — and uniquified per organization, while a username supplied at creation is preserved exactly as given. Existing users without a username are backfilled by a data migration, and the column is now `NOT NULL` so the guarantee cannot regress
+- Management API user creation accepts an optional `username` (3-50 characters, pattern-validated). Supplied values are preserved as provided; invalid or duplicate values are rejected with `422`, while omitted or blank values generate a username from the primary email. Documented in the OpenAPI specification
+
+### Changed
+
+- SCIM 2.0 user creation now distinguishes an invalid `userName` from a duplicate one. Previously any username error on create — a value failing length or format validation as much as a genuine duplicate — returned `409 Conflict` with `scimType: uniqueness` ("User with userName '<value>' already exists"), misreporting unusable values as conflicts. Duplicates still return `409`, while values that fail length or format validation now return `400` with `scimType: invalidValue` and the reason
+
+### Fixed
+
+- OIDC `/oauth/userinfo` and ID-token profile claims now emit the user's real username for `preferred_username` instead of the primary email, which broke OIDC clients that require a username-shaped account name (such as Forgejo performing first-time OAuth sign-up). A user without a usable username omits the claim rather than falling back to the email
+- The username generator falls back to the default seed when a provided seed sanitizes to empty, so a blank username can never escape generation
+- Documentation and UI copy referenced the OIDC discovery endpoint as `/.well-known/openid_configuration` instead of the correct path `/.well-known/openid-configuration`
+
 ## [0.26.0] - 2026-10-21
 
 ### Added
@@ -925,7 +942,8 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.27.0...HEAD
+[0.27.0]: https://github.com/authify/authify/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/authify/authify/compare/v0.25.0...v0.26.0
 [0.25.1]: https://github.com/authify/authify/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/authify/authify/compare/v0.24.2...v0.25.0
