@@ -782,7 +782,7 @@ Initial release of Authify - Multi-tenant Identity Provider
 - OAuth application registration and management
 - Consent screen with scope selection
 - JWT access token and ID token generation
-- OIDC discovery endpoint (`/.well-known/openid_configuration`)
+- OIDC discovery endpoint (`/.well-known/openid-configuration`)
 - JWKS endpoint for public key distribution
 - Userinfo endpoint with claims mapping
 - Organization-scoped OAuth client management
