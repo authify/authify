@@ -330,6 +330,28 @@ defmodule Authify.OAuthTest do
       assert claims["picture"] == "https://cdn.example.com/avatar.jpg"
     end
 
+    test "profile scope emits the username as preferred_username", %{user: user} do
+      claims = OAuth.generate_userinfo_claims(user, ["profile"])
+
+      assert claims["preferred_username"] == user.username
+      refute String.contains?(claims["preferred_username"], "@")
+    end
+
+    test "profile scope omits preferred_username when username is absent" do
+      sparse_user = %Authify.Accounts.User{
+        id: 987_654,
+        username: nil,
+        first_name: "Sparse",
+        last_name: "User",
+        emails: [%Authify.Accounts.UserEmail{value: "sparse@example.com", primary: true}],
+        updated_at: ~U[2026-01-01 00:00:00Z]
+      }
+
+      claims = OAuth.generate_userinfo_claims(sparse_user, ["profile"])
+
+      refute Map.has_key?(claims, "preferred_username")
+    end
+
     test "phone scope includes phone_number and phone_number_verified", %{user: user} do
       claims = OAuth.generate_userinfo_claims(user, ["phone"])
 

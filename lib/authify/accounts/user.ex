@@ -295,6 +295,7 @@ defmodule Authify.Accounts.User do
 
   defp validate_username(changeset) do
     changeset
+    |> validate_required([:username])
     |> validate_length(:username, min: 3, max: 50)
     |> validate_format(:username, ~r/^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$/,
       message:
@@ -575,11 +576,95 @@ defmodule Authify.Accounts.User do
     user.organization_id == organization_id
   end
 
+  @default_username_seed "user"
+
+  @doc """
+  Ensures user creation attributes contain a username.
+
+  When `attrs` already carries a non-blank `username` (string or atom key), the
+  supplied value is preserved and normal changeset validation applies (format,
+  length, per-organization uniqueness — duplicates and invalid values are
+  rejected rather than silently rewritten). When `username` is absent or blank,
+  a sanitized, per-organization-unique username is generated with
+  `generate_unique_username/3`, seeded from the primary email's local part when
+  the attributes include emails.
+
+  Uses the given repo for uniqueness checks so it can run inside transactions
+  and data migrations.
+  """
+  def ensure_username(attrs, organization_id, repo) when is_map(attrs) do
+    supplied = Map.get(attrs, "username") || Map.get(attrs, :username)
+
+    if is_binary(supplied) and String.trim(supplied) != "" do
+      attrs
+    else
+      generated = generate_unique_username(username_seed(attrs), organization_id, repo)
+      put_username(attrs, generated)
+    end
+  end
+
+  # Keep the map's key style: Ecto casting rejects maps mixing atom and string
+  # keys, so an all-atom map (e.g. SCIM provisioning attributes) gets the
+  # generated username under an atom key.
+  defp put_username(attrs, username) do
+    cond do
+      Map.has_key?(attrs, :username) ->
+        Map.put(attrs, :username, username)
+
+      Enum.any?(Map.keys(attrs), &is_atom/1) ->
+        Map.put(attrs, :username, username)
+
+      true ->
+        Map.put(attrs, "username", username)
+    end
+  end
+
+  @doc """
+  Derives a sanitized username seed from an email address (its local part).
+
+  Returns `@default_username_seed` when the local part is unusable, such as
+  when it sanitizes to an empty string or is shorter than the minimum username
+  length, so callers can rely on the result being a usable seed.
+  """
+  def username_seed_from_email(email) when is_binary(email) do
+    local_part = email |> String.split("@") |> List.first()
+    seed = clean_username(local_part)
+
+    if String.length(seed) >= 3, do: seed, else: @default_username_seed
+  end
+
+  def username_seed_from_email(_email), do: @default_username_seed
+
+  defp username_seed(attrs) do
+    emails = Map.get(attrs, "emails") || Map.get(attrs, :emails) || []
+
+    emails
+    |> Enum.find(&primary_email_entry?/1)
+    |> email_entry_value()
+    |> username_seed_from_email()
+  end
+
+  defp primary_email_entry?(%{"primary" => primary}), do: primary == true
+  defp primary_email_entry?(%{primary: primary}), do: primary == true
+  defp primary_email_entry?(_entry), do: false
+
+  defp email_entry_value(%{"value" => value}) when is_binary(value), do: value
+  defp email_entry_value(%{value: value}) when is_binary(value), do: value
+  defp email_entry_value(_entry), do: nil
+
   @doc """
   Generates a unique username based on preferred username within an organization.
+
+  Seeds that are not binaries, or that sanitize to an empty string (e.g. "!!!"),
+  fall back to `@default_username_seed` so the result is always a usable
+  username.
   """
   def generate_unique_username(preferred_username, organization_id, repo) do
     base_username = clean_username(preferred_username)
+
+    # A seed that sanitizes to nothing would otherwise produce a blank username;
+    # fall back to the default seed.
+    base_username = if base_username == "", do: @default_username_seed, else: base_username
 
     if username_available?(base_username, organization_id, repo) do
       base_username
@@ -588,21 +673,35 @@ defmodule Authify.Accounts.User do
     end
   end
 
-  defp clean_username(preferred_username) do
+  defp clean_username(preferred_username) when is_binary(preferred_username) do
     preferred_username
     |> String.downcase()
-    |> String.replace(~r/[^a-zA-Z0-9._-]/, "")
+    |> String.replace(~r/[^a-z0-9._-]/, "")
+    # Leading/trailing separators are invalid in usernames (the format requires
+    # alphanumeric boundaries), so trim them from generated values.
+    |> String.trim("._-")
     # Limit length for suffix space
     |> String.slice(0, 30)
+    |> String.trim("._-")
   end
+
+  defp clean_username(_preferred_username), do: ""
 
   defp username_available?(username, organization_id, repo) do
     query =
-      from(u in __MODULE__,
-        where: u.username == ^username and u.organization_id == ^organization_id
-      )
+      if organization_id do
+        from(u in __MODULE__,
+          where: u.username == ^username and u.organization_id == ^organization_id
+        )
+      else
+        from(u in __MODULE__,
+          where: u.username == ^username and is_nil(u.organization_id)
+        )
+      end
 
-    repo.one(query) == nil
+    # exists?/2 guards against multiple matching rows (possible among legacy
+    # organization-less users) where one/1 would raise.
+    not repo.exists?(query)
   end
 
   defp find_available_username(base_username, organization_id, repo, attempt)

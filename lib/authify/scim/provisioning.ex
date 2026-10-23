@@ -252,6 +252,9 @@ defmodule Authify.SCIM.Provisioning do
       |> Map.put(:password, password)
       |> Map.put(:password_confirmation, password)
       |> apply_scim_email_verification(organization_id, now)
+      # Generate a username when none was supplied (e.g. when userName is an
+      # email address); a supplied username is preserved and validated.
+      |> User.ensure_username(organization_id, Repo)
 
     result =
       %User{}

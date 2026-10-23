@@ -2118,4 +2118,183 @@ defmodule Authify.AccountsTest do
       assert result.saml_service_providers == []
     end
   end
+
+  describe "username generation on user creation" do
+    defp password_only_attrs(email) do
+      %{
+        "emails" => [%{"value" => email, "type" => "work", "primary" => true}],
+        "first_name" => "User",
+        "last_name" => "NoName",
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!"
+      }
+    end
+
+    test "create_user/1 generates a username when none is supplied" do
+      n = System.unique_integer([:positive])
+      org = organization_fixture()
+
+      attrs =
+        password_only_attrs("alice.no-name-#{n}@example.com")
+        |> Map.put("organization_id", org.id)
+
+      assert {:ok, %User{} = user} = Accounts.create_user(attrs)
+
+      assert is_binary(user.username)
+      refute String.contains?(user.username, "@")
+      # Seeded from the primary email's local part
+      assert user.username == "alice.no-name-#{n}"
+    end
+
+    test "create_user/1 generates a username when a blank one is supplied" do
+      n = System.unique_integer([:positive])
+      org = organization_fixture()
+
+      attrs =
+        password_only_attrs("blank-#{n}@example.com")
+        |> Map.put("organization_id", org.id)
+        |> Map.put("username", "   ")
+
+      assert {:ok, %User{} = user} = Accounts.create_user(attrs)
+
+      assert is_binary(user.username)
+      refute String.contains?(user.username, "@")
+    end
+
+    test "create_user/1 preserves a supplied valid username" do
+      n = System.unique_integer([:positive])
+      org = organization_fixture()
+
+      attrs =
+        password_only_attrs("preserve-#{n}@example.com")
+        |> Map.put("organization_id", org.id)
+        |> Map.put("username", "Preserved.Name-#{rem(n, 10_000)}")
+
+      assert {:ok, %User{} = user} = Accounts.create_user(attrs)
+
+      assert user.username == "Preserved.Name-#{rem(n, 10_000)}"
+    end
+
+    test "create_user/1 rejects an invalid supplied username" do
+      n = System.unique_integer([:positive])
+      org = organization_fixture()
+
+      attrs =
+        password_only_attrs("invalid-name-#{n}@example.com")
+        |> Map.put("organization_id", org.id)
+        |> Map.put("username", "bad name!")
+
+      assert {:error, %Ecto.Changeset{} = changeset} = Accounts.create_user(attrs)
+      assert %{username: [_ | _]} = errors_on(changeset)
+    end
+
+    test "create_user/1 rejects a duplicate supplied username" do
+      n = System.unique_integer([:positive])
+      org = organization_fixture()
+
+      {:ok, _first} =
+        Accounts.create_user(
+          password_only_attrs("first-#{n}@example.com")
+          |> Map.put("organization_id", org.id)
+          |> Map.put("username", "dupeuser#{rem(n, 10_000)}")
+        )
+
+      {:error, %Ecto.Changeset{} = changeset} =
+        Accounts.create_user(
+          password_only_attrs("second-#{n}@example.com")
+          |> Map.put("organization_id", org.id)
+          |> Map.put("username", "dupeuser#{rem(n, 10_000)}")
+        )
+
+      assert %{username: [_ | _]} = errors_on(changeset)
+    end
+
+    test "create_organization_with_admin/2 creates an admin without a username" do
+      n = System.unique_integer([:positive])
+
+      org_attrs = %{name: "Gen Admin Org #{n}", slug: "gen-admin-#{n}"}
+      user_attrs = password_only_attrs("org.admin-#{n}@example.com")
+
+      assert {:ok, {%Organization{} = _org, %User{} = admin}} =
+               Accounts.create_organization_with_admin(org_attrs, user_attrs)
+
+      assert is_binary(admin.username)
+      refute String.contains?(admin.username, "@")
+      assert User.admin?(admin, admin.organization_id)
+    end
+
+    test "create_organization_with_admin/2 preserves a supplied username" do
+      n = System.unique_integer([:positive])
+
+      org_attrs = %{name: "Supplied Admin Org #{n}", slug: "supplied-admin-#{n}"}
+      user_attrs = password_only_attrs("org.admin2-#{n}@example.com")
+      user_attrs = Map.put(user_attrs, "username", "chosen-admin-#{rem(n, 10_000)}")
+
+      assert {:ok, {_org, %User{} = admin}} =
+               Accounts.create_organization_with_admin(org_attrs, user_attrs)
+
+      assert admin.username == "chosen-admin-#{rem(n, 10_000)}"
+    end
+
+    test "create_user_with_role/3 creates a user without a username and preserves a supplied one" do
+      n = System.unique_integer([:positive])
+      org = organization_fixture()
+
+      {:ok, generated} =
+        Accounts.create_user_with_role(password_only_attrs("role.gen-#{n}@example.com"), org.id)
+
+      assert is_binary(generated.username)
+      refute String.contains?(generated.username, "@")
+
+      {:ok, preserved} =
+        Accounts.create_user_with_role(
+          password_only_attrs("role.kept-#{n}@example.com")
+          |> Map.put("username", "keptuser#{rem(n, 10_000)}"),
+          org.id
+        )
+
+      assert preserved.username == "keptuser#{rem(n, 10_000)}"
+    end
+
+    @tag :capture_log
+    test "accept_invitation/2 generates a username when none is supplied" do
+      org = organization_fixture()
+      admin = admin_user_fixture(org)
+      invitation = invitation_for_organization_fixture(org, admin)
+
+      {:ok, %User{} = user} =
+        Invitations.accept_invitation(invitation, %{
+          "first_name" => "Invited",
+          "last_name" => "NoName",
+          "password" => "SecureP@ssw0rd!",
+          "password_confirmation" => "SecureP@ssw0rd!"
+        })
+
+      assert is_binary(user.username)
+      refute String.contains?(user.username, "@")
+      # Seeded from the invitation email's local part
+      [local_part, _] = String.split(invitation.email, "@")
+      assert user.username == local_part
+    end
+
+    @tag :capture_log
+    test "accept_invitation/2 preserves a supplied username" do
+      org = organization_fixture()
+      admin = admin_user_fixture(org)
+      invitation = invitation_for_organization_fixture(org, admin)
+      supplied_username = "invitee-#{System.unique_integer([:positive])}"
+
+      {:ok, %User{} = user} =
+        Invitations.accept_invitation(invitation, %{
+          "first_name" => "Invited",
+          "last_name" => "Named",
+          "username" => supplied_username,
+          "password" => "SecureP@ssw0rd!",
+          "password_confirmation" => "SecureP@ssw0rd!"
+        })
+
+      assert user.username == supplied_username
+      refute String.contains?(user.username, "@")
+    end
+  end
 end

@@ -873,14 +873,22 @@ defmodule AuthifyWeb.OAuthController do
 
   defp maybe_add_profile_claims(claims, user, scopes) do
     if "profile" in scopes do
-      Map.merge(claims, %{
-        "name" => Accounts.User.full_name(user),
-        "preferred_username" => User.get_primary_email_value(user)
-      })
+      claims
+      |> Map.put("name", Accounts.User.full_name(user))
+      |> maybe_put_preferred_username(user)
     else
       claims
     end
   end
+
+  # Omit the claim entirely rather than emitting an email-derived fallback;
+  # after the username backfill and generation this should never apply.
+  defp maybe_put_preferred_username(claims, %Authify.Accounts.User{username: username})
+       when is_binary(username) and username != "" do
+    Map.put(claims, "preferred_username", username)
+  end
+
+  defp maybe_put_preferred_username(claims, _user), do: claims
 
   defp maybe_add_email_claims(claims, user, scopes) do
     if "email" in scopes do

@@ -60,10 +60,12 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
         assert op["response"]["userName"]
       end)
 
-      # Verify the userNames in the response
+      # Verify the userNames in the response: users provisioned with an
+      # email-shaped userName receive a generated username (seeded from the
+      # email's local part) and the response reports that canonical username.
       usernames = Enum.map(response["Operations"], fn op -> op["response"]["userName"] end)
-      assert "alice@example.com" in usernames
-      assert "bob@example.com" in usernames
+      assert "alice" in usernames
+      assert "bob" in usernames
     end
 
     test "creates multiple groups in a single request", %{conn: conn, organization: organization} do

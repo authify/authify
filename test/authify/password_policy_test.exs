@@ -129,7 +129,11 @@ defmodule Authify.PasswordPolicyTest do
       changeset =
         User.changeset(
           %User{},
-          %{"password" => "password", "password_confirmation" => "password"},
+          %{
+            "username" => "policytestuser",
+            "password" => "password",
+            "password_confirmation" => "password"
+          },
           policy
         )
 
@@ -151,7 +155,11 @@ defmodule Authify.PasswordPolicyTest do
       changeset =
         User.changeset(
           %User{},
-          %{"password" => "simple", "password_confirmation" => "simple"},
+          %{
+            "username" => "policytestuser",
+            "password" => "simple",
+            "password_confirmation" => "simple"
+          },
           policy
         )
 

@@ -5,7 +5,7 @@ defmodule Authify.Invitations do
 
   import Ecto.Query, warn: false
 
-  alias Authify.Accounts.{Invitation, User}
+  alias Authify.Accounts.Invitation
   alias Authify.Repo
 
   @doc """
@@ -40,15 +40,11 @@ defmodule Authify.Invitations do
           Invitation.accept_changeset(invitation, %{accepted_at: accepted_at})
 
         with {:ok, _accepted_invitation} <- Repo.update(invitation_changeset),
-             # Generate unique username based on preferred username
-             preferred_username = Map.get(user_attrs, "username", "user"),
-             unique_username =
-               User.generate_unique_username(preferred_username, invitation.organization_id, Repo),
+             # Username is generated/validated by Accounts.create_user/1
              user_attrs_with_org =
                user_attrs
                |> Map.put("organization_id", invitation.organization_id)
                |> Map.put("role", invitation.role)
-               |> Map.put("username", unique_username)
                |> normalize_user_email_attrs(invitation.email,
                  default_type: "work",
                  default_primary: true,

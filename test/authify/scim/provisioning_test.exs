@@ -177,6 +177,52 @@ defmodule Authify.SCIM.ProvisioningTest do
       assert user.scim_created_at
     end
 
+    test "create_user_scim generates a username when userName is an email address", %{
+      organization: organization
+    } do
+      # SCIM clients often send an email-shaped userName, which is mapped to the
+      # email addresses only — no username — so one must be generated.
+      n = rem(System.unique_integer([:positive]), 100_000)
+
+      attrs =
+        AuthifyWeb.SCIM.Mappers.map_user_attrs(%{
+          "userName" => "scimalice#{n}@example.com",
+          "name" => %{"givenName" => "Scim", "familyName" => "Alice"},
+          "active" => true
+        })
+
+      assert {:ok, user} = Provisioning.create_user_scim(attrs, organization.id)
+
+      assert user.username == "scimalice#{n}"
+      refute String.contains?(user.username, "@")
+    end
+
+    test "create_user_scim preserves a supplied username", %{organization: organization} do
+      {:ok, user} =
+        Provisioning.create_user_scim(
+          scim_user_attrs(%{username: "Supplied-Username-1"}),
+          organization.id
+        )
+
+      assert user.username == "Supplied-Username-1"
+    end
+
+    test "create_user_scim rejects a duplicate supplied username", %{organization: organization} do
+      {:ok, _user} =
+        Provisioning.create_user_scim(
+          scim_user_attrs(%{username: "scim-dupe-one"}),
+          organization.id
+        )
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Provisioning.create_user_scim(
+                 scim_user_attrs(%{username: "scim-dupe-one", email: "other@example.com"}),
+                 organization.id
+               )
+
+      assert %{username: [_ | _]} = errors_on(changeset)
+    end
+
     test "update_user_scim updates timestamp", %{organization: organization} do
       {:ok, user} = Provisioning.create_user_scim(scim_user_attrs(%{}), organization.id)
       original_updated_at = user.scim_updated_at

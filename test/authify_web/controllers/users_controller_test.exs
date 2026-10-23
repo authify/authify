@@ -484,6 +484,75 @@ defmodule AuthifyWeb.UsersControllerTest do
       # Should show validation errors
     end
 
+    test "creates user without a username by generating one", %{conn: conn} do
+      organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+
+      user_params = %{
+        "first_name" => "Web",
+        "last_name" => "NoName",
+        "email" => "web.no-name@example.com",
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!",
+        "role" => "user"
+      }
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      conn = post(conn, ~p"/#{organization.slug}/users", user: user_params)
+
+      assert %{id: id} = redirected_params(conn)
+
+      created_user = Accounts.get_user!(id)
+      assert is_binary(created_user.username)
+      refute String.contains?(created_user.username, "@")
+    end
+
+    test "rejects user creation with a duplicate username", %{conn: conn} do
+      organization = organization_fixture()
+      admin_user = admin_user_fixture(organization)
+
+      {:ok, existing} =
+        Accounts.create_user_with_role(
+          %{
+            "emails" => [%{"value" => "taken@example.com", "type" => "work", "primary" => true}],
+            "first_name" => "Taken",
+            "last_name" => "Name",
+            "password" => "SecureP@ssw0rd!",
+            "password_confirmation" => "SecureP@ssw0rd!"
+          },
+          organization.id
+        )
+
+      user_params = %{
+        "first_name" => "Web",
+        "last_name" => "Dupe",
+        "email" => "web.dupe@example.com",
+        "username" => existing.username,
+        "password" => "SecureP@ssw0rd!",
+        "password_confirmation" => "SecureP@ssw0rd!",
+        "role" => "user"
+      }
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{})
+        |> Guardian.Plug.sign_in(admin_user)
+        |> put_session(:current_organization_id, organization.id)
+        |> assign(:current_organization, organization)
+        |> assign(:current_user, admin_user)
+
+      conn = post(conn, ~p"/#{organization.slug}/users", user: user_params)
+
+      assert html_response(conn, 200) =~ "Create User"
+    end
+
     test "non-admin cannot create users", %{conn: conn} do
       organization = organization_fixture()
       _admin_user = admin_user_fixture(organization)
