@@ -654,9 +654,17 @@ defmodule Authify.Accounts.User do
 
   @doc """
   Generates a unique username based on preferred username within an organization.
+
+  Seeds that are not binaries, or that sanitize to an empty string (e.g. "!!!"),
+  fall back to `@default_username_seed` so the result is always a usable
+  username.
   """
   def generate_unique_username(preferred_username, organization_id, repo) do
     base_username = clean_username(preferred_username)
+
+    # A seed that sanitizes to nothing would otherwise produce a blank username;
+    # fall back to the default seed.
+    base_username = if base_username == "", do: @default_username_seed, else: base_username
 
     if username_available?(base_username, organization_id, repo) do
       base_username
