@@ -47,6 +47,31 @@ defmodule AuthifyWeb.API.PatsControllerTest do
     |> assign(:current_application, %{id: 1, name: "Automation App"})
   end
 
+  # Authenticates a request with a token the caller already made, so the test
+  # can use that exact token.
+  defp authenticate_with_named_pat(conn, token) do
+    conn
+    |> put_req_header("accept", "application/vnd.authify.v1+json")
+    |> put_req_header("authorization", "Bearer #{token.plaintext_token}")
+  end
+
+  # Simulates a non-PAT caller, such as a web session or a JWT, matching how the
+  # other API controller tests authenticate a user. APIAuth short-circuits on
+  # :api_authenticated in test, and the caller carries no :current_pat_id, so
+  # the self-revocation guard must not block it.
+  defp authenticate_as_non_pat(conn, user, scopes) do
+    organization = user.organization
+
+    conn
+    |> put_req_header("accept", "application/vnd.authify.v1+json")
+    |> put_req_header("content-type", "application/vnd.authify.v1+json")
+    |> log_in_user(user)
+    |> assign(:current_user, user)
+    |> assign(:current_organization, organization)
+    |> assign(:api_authenticated, true)
+    |> assign(:current_scopes, scopes)
+  end
+
   defp future_timestamp do
     DateTime.utc_now()
     |> DateTime.add(30, :day)
@@ -434,6 +459,94 @@ defmodule AuthifyWeb.API.PatsControllerTest do
         |> json_response(404)
 
       assert response["error"]["type"] == "resource_not_found"
+    end
+
+    test "a personal access token cannot revoke itself", %{conn: conn} do
+      user = user_fixture()
+      organization = user.organization
+      token = create_token(user, ["profile:write"], "Active Token")
+
+      response =
+        authenticate_with_named_pat(conn, token)
+        |> delete("/#{organization.slug}/api/pats/#{token.id}")
+        |> json_response(409)
+
+      assert response["error"]["type"] == "invalid_operation"
+      assert response["error"]["message"] =~ "cannot revoke itself"
+
+      # The active token is still present and usable for future requests.
+      remaining =
+        PersonalAccessTokens.get_personal_access_token_in_organization(
+          token.id,
+          organization
+        )
+
+      assert remaining
+      assert remaining.is_active
+    end
+
+    test "a personal access token can revoke another of its owners tokens", %{conn: conn} do
+      user = user_fixture()
+      organization = user.organization
+      authenticating = create_token(user, ["profile:write"], "Keep Me")
+      target = create_token(user, ["profile:read"], "Take Me Out")
+
+      conn =
+        authenticate_with_named_pat(conn, authenticating)
+        |> delete("/#{organization.slug}/api/pats/#{target.id}")
+
+      assert response(conn, 204)
+
+      refute PersonalAccessTokens.get_personal_access_token_in_organization(
+               target.id,
+               organization
+             )
+
+      # The credential that made the request is still active.
+      assert PersonalAccessTokens.get_personal_access_token_in_organization(
+               authenticating.id,
+               organization
+             )
+    end
+
+    test "a session or JWT authed user can revoke their own token", %{conn: conn} do
+      user = user_fixture()
+      organization = user.organization
+      token = create_token(user, ["profile:write"], "Session Revoke")
+
+      conn =
+        authenticate_as_non_pat(conn, user, ["profile:write"])
+        |> delete("/#{organization.slug}/api/pats/#{token.id}")
+
+      assert response(conn, 204)
+
+      refute PersonalAccessTokens.get_personal_access_token_in_organization(
+               token.id,
+               organization
+             )
+    end
+
+    test "an administrator acting by PAT cannot revoke that same PAT", %{conn: conn} do
+      organization = organization_fixture()
+      admin = user_fixture(organization: organization, role: "admin")
+
+      {:ok, token} =
+        PersonalAccessTokens.create_personal_access_token(admin, organization, %{
+          "name" => "Admin Active Token",
+          "scopes" => ["profile:write", "users:write"]
+        })
+
+      response =
+        authenticate_with_named_pat(conn, token)
+        |> delete("/#{organization.slug}/api/pats/#{token.id}")
+        |> json_response(409)
+
+      assert response["error"]["type"] == "invalid_operation"
+
+      assert PersonalAccessTokens.get_personal_access_token_in_organization(
+               token.id,
+               organization
+             )
     end
   end
 end

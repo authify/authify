@@ -125,20 +125,26 @@ defmodule AuthifyWeb.API.PatsController do
         )
 
       token ->
-        if current_user && token.user_id == Map.get(current_user, :id) do
-          case ensure_scope(conn, "profile:write") do
-            :ok -> delete_token(conn, token, :self)
-            {:error, response} -> response
-          end
-        else
-          with :ok <- ensure_scope(conn, "users:write"),
-               {:ok, target_user} <-
-                 fetch_user_in_organization(conn, organization, token.user_id),
-               :ok <- ensure_admin_actor(conn, target_user) do
-            delete_token(conn, token, :admin)
-          else
-            {:error, response} -> response
-          end
+        case ensure_not_self_revocation(conn, token) do
+          :ok ->
+            if current_user && token.user_id == Map.get(current_user, :id) do
+              case ensure_scope(conn, "profile:write") do
+                :ok -> delete_token(conn, token, :self)
+                {:error, response} -> response
+              end
+            else
+              with :ok <- ensure_scope(conn, "users:write"),
+                   {:ok, target_user} <-
+                     fetch_user_in_organization(conn, organization, token.user_id),
+                   :ok <- ensure_admin_actor(conn, target_user) do
+                delete_token(conn, token, :admin)
+              else
+                {:error, response} -> response
+              end
+            end
+
+          {:error, response} ->
+            response
         end
     end
   end
@@ -204,6 +210,30 @@ defmodule AuthifyWeb.API.PatsController do
 
       {:error, %Ecto.Changeset{} = changeset} ->
         render_validation_errors(conn, changeset)
+    end
+  end
+
+  # A personal access token cannot revoke itself. The request is already
+  # authenticated by the active token, so a self-revocation would invalidate a
+  # credential before its caller can make or verify a replacement. This also
+  # blocks an administrator from revoking their own active PAT while acting
+  # through it.
+  #
+  # The check uses the :current_pat_id that APIAuth sets for PAT requests.
+  # Session and Guardian JWT actors never set it, so their revocations always
+  # pass. We compare the active token's ID, never the plaintext secret.
+  defp ensure_not_self_revocation(conn, token) do
+    if conn.assigns[:token_type] == :personal_access_token &&
+         conn.assigns[:current_pat_id] == token.id do
+      {:error,
+       render_error_response(
+         conn,
+         :conflict,
+         "invalid_operation",
+         "The active personal access token cannot revoke itself"
+       )}
+    else
+      :ok
     end
   end
 

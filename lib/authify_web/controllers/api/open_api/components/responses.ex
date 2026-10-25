@@ -76,6 +76,23 @@ defmodule AuthifyWeb.API.OpenAPI.Components.Responses do
           }
         }
       },
+      "Conflict" => %{
+        description: "Conflict - the active personal access token cannot revoke itself",
+        content: %{
+          "application/vnd.authify.v1+json" => %{
+            schema: %{"$ref" => "#/components/schemas/ErrorResponse"},
+            example: %{
+              error: %{
+                type: "invalid_operation",
+                message: "The active personal access token cannot revoke itself"
+              },
+              links: %{
+                documentation: "#{base_url}/developers/errors"
+              }
+            }
+          }
+        }
+      },
       "ValidationError" => %{
         description: "Validation error - request data failed validation",
         content: %{
