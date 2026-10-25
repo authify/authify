@@ -13,9 +13,9 @@ defmodule AuthifyWeb.API.DocsControllerTest do
                "post" => %{"operationId" => "createPersonalAccessToken"}
              } = spec["paths"]["/{org_slug}/api/pats"]
 
-      assert %{
-               "delete" => %{"operationId" => "revokePersonalAccessToken"}
-             } = spec["paths"]["/{org_slug}/api/pats/{id}"]
+      delete = spec["paths"]["/{org_slug}/api/pats/{id}"]["delete"]
+      assert delete["operationId"] == "revokePersonalAccessToken"
+      assert "409" in Map.keys(delete["responses"])
 
       assert spec["components"]["schemas"]["PersonalAccessTokenAttributes"]
       assert spec["components"]["schemas"]["PersonalAccessTokenCreateRequest"]

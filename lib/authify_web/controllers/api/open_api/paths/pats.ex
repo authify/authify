@@ -141,6 +141,11 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Pats do
         Users may revoke their own tokens. Organization administrators may
         revoke tokens belonging to other users in the same organization.
 
+        A personal access token cannot revoke the token it is using to make the
+        request. Such a request returns `409 Conflict` with error type
+        `invalid_operation`. Session and other credential types may revoke any
+        token in the organization.
+
         **Requires:** `profile:write`. Revoking another user's token requires
         `users:write` and the organization administrator role.
         """,
@@ -163,7 +168,8 @@ defmodule AuthifyWeb.API.OpenAPI.Paths.Pats do
           "204" => %{description: "Personal access token revoked successfully"},
           "401" => %{"$ref" => "#/components/responses/Unauthorized"},
           "403" => %{"$ref" => "#/components/responses/Forbidden"},
-          "404" => %{"$ref" => "#/components/responses/NotFound"}
+          "404" => %{"$ref" => "#/components/responses/NotFound"},
+          "409" => %{"$ref" => "#/components/responses/Conflict"}
         }
       }
     }

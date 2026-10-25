@@ -128,7 +128,11 @@ defmodule AuthifyWeb.Auth.APIAuth do
             type: :user,
             user: pat.user,
             token: token,
-            token_type: :personal_access_token
+            token_type: :personal_access_token,
+            # The ID of the authenticated PAT. Controllers use it to tell a
+            # PAT apart from a token it is acting on, without re-hashing the
+            # bearer value.
+            pat_id: pat.id
           }
 
           {:ok, pat.user, pat.organization, Authify.Accounts.PersonalAccessToken.scopes_list(pat),
@@ -262,11 +266,16 @@ defmodule AuthifyWeb.Auth.APIAuth do
   end
 
   defp assign_actor_info(conn, %{type: :user} = actor_info) do
-    # For user actors, keep backwards compatibility
+    # For user actors, keep backwards compatibility.
+    #
+    # :current_pat_id is nil for session and Guardian JWT actors, whose
+    # actor_info has no :pat_id. Only a PAT request carries it, so a controller
+    # can flag a token that acts on itself.
     conn
     |> assign(:actor_type, :user)
     |> assign(:current_token, actor_info[:token])
     |> assign(:token_type, actor_info[:token_type])
+    |> assign(:current_pat_id, actor_info[:pat_id])
   end
 
   defp assign_actor_info(conn, %{type: :application} = actor_info) do
