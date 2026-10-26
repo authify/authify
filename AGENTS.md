@@ -24,6 +24,17 @@ This is a web application written using the Phoenix web framework.
 - If you override the default input classes (`<.input class="myclass px-2 py-1 rounded-lg">)`) class with your own values, no default classes are inherited, so your
 custom classes must fully style the input
 
+## Known dependency advisories (accepted)
+
+`mix hex.audit` reports EEF-CVE-2026-43966 (MEDIUM) for `cowlib 2.21.0`
+(HTTP Response Splitting via Non-VCHAR Bytes in `cow_http_struct_hd:escape_string/2`).
+No fixed cowlib release exists — the fix lives on an unreleased upstream commit
+and 2.21.0 *is* the latest release. cowlib is reachable only via
+`plug_cowboy` → `cowboy`, which enters the tree as an optional dependency of
+`phoenix` and friends; the app serves HTTP through Bandit
+(`Bandit.PhoenixAdapter`), so cowlib is not in the request path. Accepted;
+re-evaluate when a patched cowlib is published.
+
 
 <!-- usage-rules-start -->
 
