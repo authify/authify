@@ -45,7 +45,7 @@ defmodule Authify.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:bandit, "~> 1.5"},
+      {:bandit, "~> 1.14"},
       {:bcrypt_elixir, "~> 3.0"},
       {:dns_cluster, "~> 0.3.0"},
       {:libcluster, "~> 3.4"},
