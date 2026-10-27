@@ -8,15 +8,25 @@ defmodule Authify.AccountsFixtures do
   alias Authify.Groups
   alias Authify.Invitations
 
+  # Random key material scatters concurrent fixture inserts across the unique
+  # indexes. System.unique_integer/0 is monotonic, so parallel sandbox
+  # transactions generate adjacent organization keys and maximize InnoDB
+  # insert-intention lock collisions. Eight random bytes encode to 13 Base32
+  # characters, which stay within the slug's [a-z0-9-] format.
+  defp unique_suffix do
+    :crypto.strong_rand_bytes(8)
+    |> Base.encode32(case: :lower, padding: false)
+  end
+
   @doc """
   Generate a unique organization name.
   """
-  def unique_organization_name, do: "Test Organization #{System.unique_integer()}"
+  def unique_organization_name, do: "Test Organization #{unique_suffix()}"
 
   @doc """
   Generate a unique organization slug.
   """
-  def unique_organization_slug, do: "test-org-#{System.unique_integer()}"
+  def unique_organization_slug, do: "test-org-#{unique_suffix()}"
 
   @doc """
   Generate a unique user email.
@@ -28,7 +38,7 @@ defmodule Authify.AccountsFixtures do
   @doc """
   Generate a unique organization domain.
   """
-  def unique_organization_domain, do: "example#{System.unique_integer()}.com"
+  def unique_organization_domain, do: "example#{unique_suffix()}.com"
 
   @doc """
   Generate an organization.
