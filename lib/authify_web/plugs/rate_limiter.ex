@@ -255,16 +255,28 @@ defmodule AuthifyWeb.Plugs.RateLimiter do
       scale_ms = Keyword.get(opts, :scale_ms, default_scale_ms)
       {limit, scale_ms}
     else
+      # Environment-level window override, keyed by scope. Unset by default, so
+      # production behavior is unchanged; the test environment widens windows
+      # so count-based assertions cannot straddle a fixed-window boundary.
+      scale_ms = configured_scale_ms(scope, default_scale_ms)
+
       # Get from organization configuration
       case get_organization(conn) do
         nil ->
           # No organization context, use defaults
-          {default_limit, default_scale_ms}
+          {default_limit, scale_ms}
 
         org ->
-          # Use configured limits
-          Authify.RateLimit.Config.get_limit(org, scope)
+          # Use configured limits (the organization controls the count, not the window)
+          {limit, _configured_scale_ms} = Authify.RateLimit.Config.get_limit(org, scope)
+          {limit, scale_ms}
       end
     end
+  end
+
+  defp configured_scale_ms(scope, default_scale_ms) do
+    :authify
+    |> Application.get_env(:rate_limit_scale_ms, %{})
+    |> Map.get(scope, default_scale_ms)
   end
 end
