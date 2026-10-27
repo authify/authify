@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-10-27
+
+### Security
+
+- Bump `bandit` from 1.13.1 to 1.14.0, clearing all eleven open advisories — EEF-CVE-2026-108525, -109584, -108529, -111103, -113436, -114216, -115269, -110499 (HIGH), -110314, -111101 (MEDIUM), and -114213 (HIGH). The constraint tightens `~> 1.5` to `~> 1.14` so dependency resolution can never fall back to a vulnerable 1.13.x
+- Bump `plug_crypto` from 2.2.0 to 2.2.1, clearing EEF-CVE-2026-105963 (wrong-typed `Plug.Crypto` arguments exposed the secret key base in stack traces and `crash_reason` metadata)
+- Record the accepted `cowlib` advisory (EEF-CVE-2026-43966) in AGENTS.md: no patched cowlib release exists; it enters the tree only via optional `plug_cowboy`/`cowboy` dependencies and is not in the request path (the app serves through Bandit)
+
+### Fixed
+
+- A personal access token can no longer revoke itself
+
+### Changed
+
+- Bump `phoenix_live_view` from 1.2.12 to 1.2.13
+
 ## [0.27.0] - 2026-10-23
 
 ### Added
