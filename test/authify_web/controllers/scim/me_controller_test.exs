@@ -172,7 +172,7 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
         |> put("/#{organization.slug}/scim/v2/Me", %{
           "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
           "userName" => user.username,
-          "emails" => [%{"value" => "test@example.com", "primary" => true}],
+          "emails" => [%{"value" => unique_user_email(), "primary" => true}],
           "active" => true
         })
 
@@ -186,7 +186,7 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
         |> put("/#{organization.slug}/scim/v2/Me", %{
           "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
           "userName" => user.username,
-          "emails" => [%{"value" => "test@example.com", "primary" => true}],
+          "emails" => [%{"value" => unique_user_email(), "primary" => true}],
           "active" => true
         })
 
@@ -205,7 +205,7 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
         "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
         "userName" => user.username,
         "externalId" => "changed456",
-        "emails" => [%{"value" => "test@example.com", "primary" => true}],
+        "emails" => [%{"value" => unique_user_email(), "primary" => true}],
         "active" => true
       }
 
@@ -244,7 +244,7 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
         |> put("/#{organization.slug}/scim/v2/Me", %{
           "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
           "userName" => "updated_username",
-          "emails" => [%{"value" => "test@example.com", "primary" => true}],
+          "emails" => [%{"value" => unique_user_email(), "primary" => true}],
           "active" => true
         })
 
@@ -260,7 +260,7 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
         |> put("/#{organization.slug}/scim/v2/Me", %{
           "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
           "userName" => user.username,
-          "emails" => [%{"value" => "test@example.com", "primary" => true}],
+          "emails" => [%{"value" => unique_user_email(), "primary" => true}],
           "active" => true
         })
 
@@ -422,7 +422,7 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
         |> put("/#{organization.slug}/scim/v2/Me", %{
           "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
           "userName" => user.username,
-          "emails" => [%{"value" => "test@example.com", "primary" => true}],
+          "emails" => [%{"value" => unique_user_email(), "primary" => true}],
           "active" => true
         })
 
@@ -449,7 +449,7 @@ defmodule AuthifyWeb.SCIM.MeControllerTest do
         |> put("/#{organization.slug}/scim/v2/Me", %{
           "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
           "userName" => user.username,
-          "emails" => [%{"value" => "test@example.com", "primary" => true}],
+          "emails" => [%{"value" => unique_user_email(), "primary" => true}],
           "active" => true
         })
 

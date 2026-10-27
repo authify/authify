@@ -198,7 +198,7 @@ defmodule AuthifyWeb.SetupControllerTest do
       user_params = %{
         "first_name" => "Test",
         "last_name" => "User",
-        "email" => "test@example.com",
+        "email" => unique_user_email(),
         "password" => "SecureP@ssw0rd!",
         "password_confirmation" => "SecureP@ssw0rd!"
       }

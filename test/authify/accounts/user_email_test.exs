@@ -61,7 +61,7 @@ defmodule Authify.Accounts.UserEmailTest do
       for type <- ["work", "home", "other"] do
         changeset =
           UserEmail.changeset(%UserEmail{}, %{
-            value: "test@example.com",
+            value: unique_user_email(),
             user_id: user.id,
             type: type
           })
@@ -73,7 +73,7 @@ defmodule Authify.Accounts.UserEmailTest do
     test "rejects invalid type", %{user: user} do
       changeset =
         UserEmail.changeset(%UserEmail{}, %{
-          value: "test@example.com",
+          value: unique_user_email(),
           user_id: user.id,
           type: "personal"
         })
@@ -84,7 +84,7 @@ defmodule Authify.Accounts.UserEmailTest do
 
     test "defaults type to work when not specified", %{user: user} do
       changeset =
-        UserEmail.changeset(%UserEmail{}, %{value: "test@example.com", user_id: user.id})
+        UserEmail.changeset(%UserEmail{}, %{value: unique_user_email(), user_id: user.id})
 
       # Default is set on the schema, not the changeset change
       assert Ecto.Changeset.get_field(changeset, :type) == "work"
@@ -111,7 +111,7 @@ defmodule Authify.Accounts.UserEmailTest do
 
     test "validates type inclusion" do
       changeset =
-        UserEmail.nested_changeset(%UserEmail{}, %{value: "test@example.com", type: "invalid"})
+        UserEmail.nested_changeset(%UserEmail{}, %{value: unique_user_email(), type: "invalid"})
 
       refute changeset.valid?
       assert "is invalid" in errors_on(changeset).type

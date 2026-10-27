@@ -360,7 +360,7 @@ defmodule AuthifyWeb.API.InvitationsControllerTest do
 
       invitation_attrs = %{
         "invitation" => %{
-          "email" => "test@example.com",
+          "email" => unique_user_email(),
           "role" => "user"
         }
       }

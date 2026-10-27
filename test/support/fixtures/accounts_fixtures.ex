@@ -10,9 +10,11 @@ defmodule Authify.AccountsFixtures do
 
   # Random key material scatters concurrent fixture inserts across the unique
   # indexes. System.unique_integer/0 is monotonic, so parallel sandbox
-  # transactions generate adjacent organization keys and maximize InnoDB
-  # insert-intention lock collisions. Eight random bytes encode to 13 Base32
-  # characters, which stay within the slug's [a-z0-9-] format.
+  # transactions generate adjacent keys ("user1", "user2", ...) that land on the
+  # same InnoDB leaf page and maximize insert-intention lock collisions. Eight
+  # random bytes encode to 13 Base32 characters, which stay within the slug's
+  # [a-z0-9-] format, the username's [a-zA-Z0-9._-] format, and an email's
+  # local part.
   defp unique_suffix do
     :crypto.strong_rand_bytes(8)
     |> Base.encode32(case: :lower, padding: false)
@@ -31,9 +33,12 @@ defmodule Authify.AccountsFixtures do
   @doc """
   Generate a unique user email.
   """
-  def unique_user_email, do: "user#{System.unique_integer()}@example.com"
+  def unique_user_email, do: "user#{unique_suffix()}@example.com"
 
-  def unique_user_username, do: "testuser#{System.unique_integer()}"
+  @doc """
+  Generate a unique user username.
+  """
+  def unique_user_username, do: "testuser#{unique_suffix()}"
 
   @doc """
   Generate a unique organization domain.
@@ -227,7 +232,7 @@ defmodule Authify.AccountsFixtures do
   @doc """
   Generate a unique group name.
   """
-  def unique_group_name, do: "Test Group #{System.unique_integer()}"
+  def unique_group_name, do: "Test Group #{unique_suffix()}"
 
   @doc """
   Generate a group.
