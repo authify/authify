@@ -69,6 +69,12 @@ config :phoenix_live_view,
 # Individual tests can enable it using the RateLimitTest helper module
 config :authify, :rate_limiting_enabled, false
 
+# Widen rate limit windows in tests so count-based assertions are deterministic.
+# Hammer's fixed window is aligned to absolute time; with the default 60s window a
+# burst of 61 requests can straddle a boundary and reset the counter mid-test.
+# The org-configurable *limit* is unchanged (60 for oauth); only the window grows.
+config :authify, :rate_limit_scale_ms, %{oauth: 3_600_000}
+
 # Disable metrics in test environment
 config :authify, :metrics_enabled, false
 

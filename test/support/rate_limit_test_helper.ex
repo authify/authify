@@ -84,6 +84,9 @@ defmodule Authify.RateLimitTestHelper do
   or during a test that makes multiple rate-limited requests.
 
   Uses Authify.RateLimit.set/3 function to reset all known bucket counters to 0.
+  Resets every window scale the plug may use: the default 60s window plus any
+  per-scope windows configured via `:rate_limit_scale_ms` (the test environment
+  widens the oauth window to one hour to keep count-based assertions deterministic).
   """
   def clear_rate_limits do
     # Reset all known bucket types to 0
@@ -91,12 +94,18 @@ defmodule Authify.RateLimitTestHelper do
     scopes = ["auth", "oauth", "saml", "api", "generic", "custom"]
     identifiers = ["127.0.0.1"]
 
-    for scope <- scopes, identifier <- identifiers do
+    configured_scales =
+      :authify
+      |> Application.get_env(:rate_limit_scale_ms, %{})
+      |> Map.values()
+
+    scales = Enum.uniq([60_000 | configured_scales])
+
+    for scope <- scopes, identifier <- identifiers, scale_ms <- scales do
       bucket_key = "#{scope}:#{identifier}"
       # Set the count to 0 for each bucket
       # Authify.RateLimit.set/3 takes (key, scale_ms, count)
-      # Using 60_000ms to match our typical rate limit windows
-      Authify.RateLimit.set(bucket_key, 60_000, 0)
+      Authify.RateLimit.set(bucket_key, scale_ms, 0)
     end
 
     :ok
