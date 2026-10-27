@@ -519,13 +519,20 @@ defmodule Authify.MFA.WebAuthn do
       sign_count_valid =
         cond do
           # Both are 0 - authenticator doesn't support sign counters (OK for synced credentials)
-          new_sign_count == 0 and credential.sign_count == 0 -> true
+          new_sign_count == 0 and credential.sign_count == 0 ->
+            true
+
           # New counter is 0 but old was non-zero - possible attack or authenticator changed behavior
-          new_sign_count == 0 and credential.sign_count > 0 -> false
+          new_sign_count == 0 and credential.sign_count > 0 ->
+            false
+
           # Counter is increasing - normal behavior for hardware keys
-          new_sign_count > credential.sign_count -> true
+          new_sign_count > credential.sign_count ->
+            true
+
           # Counter didn't increase - possible cloned authenticator
-          true -> false
+          true ->
+            false
         end
 
       if sign_count_valid do
