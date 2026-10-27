@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Bump `jose` from 1.11.12 to 1.11.13 in the lock, clearing all eight open advisories — EEF-CVE-2026-65625 through -65632, including the HIGH EEF-CVE-2026-65629 (weak PBKDF2 parameters for password-encrypted private-key export). Lock-only bump (jose is transitive via joken; `~> 1.11` admits the fix)
+
 ## [0.28.0] - 2026-10-27
 
 ### Security
