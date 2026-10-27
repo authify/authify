@@ -4,7 +4,17 @@ defmodule AuthifyWeb.MfaControllerTest do
   alias Authify.{Accounts, MFA, Repo}
   alias Authify.Accounts.User
 
+  # Fixed instant (2026-01-01T00:00:00Z) that the TOTP code generator and the
+  # server-side verifier share, so a generated code cannot cross a 30-second
+  # window boundary mid-test.
+  @totp_now_ms 1_767_225_600_000
+
   setup do
+    # Pin the TOTP clock for this test process. The pin is process-scoped rather
+    # than Application env because this module is `async: true` and sibling TOTP
+    # tests run concurrently against the real clock.
+    Process.put(:authify_mfa_totp_now_ms, @totp_now_ms)
+
     # Create organization
     n = System.unique_integer([:positive])
 
@@ -787,6 +797,6 @@ defmodule AuthifyWeb.MfaControllerTest do
   end
 
   defp generate_valid_totp(secret) do
-    NimbleTOTP.verification_code(secret)
+    NimbleTOTP.verification_code(secret, time: div(@totp_now_ms, 1000))
   end
 end

@@ -33,7 +33,7 @@ defmodule Authify.MFA do
   def complete_totp_setup(%User{} = user, verification_code, plaintext_secret)
       when is_binary(verification_code) and is_binary(plaintext_secret) do
     # Verify the code against the secret
-    if NimbleTOTP.valid?(plaintext_secret, verification_code) do
+    if NimbleTOTP.valid?(plaintext_secret, verification_code, time: totp_now()) do
       # Encrypt the secret for storage
       encrypted_secret = Encryption.encrypt(plaintext_secret)
 
@@ -81,7 +81,7 @@ defmodule Authify.MFA do
     case Encryption.decrypt(encrypted_secret) do
       {:ok, plaintext_secret} ->
         # Verify the code
-        if NimbleTOTP.valid?(plaintext_secret, code) do
+        if NimbleTOTP.valid?(plaintext_secret, code, time: totp_now()) do
           {:ok, user}
         else
           {:error, :invalid_code}
@@ -93,6 +93,20 @@ defmodule Authify.MFA do
   end
 
   def verify_totp(%User{totp_secret: nil}, _code), do: {:error, :totp_not_enabled}
+
+  # Test seam: pins the TOTP clock (unix seconds) so a code generated in one
+  # 30-second window cannot cross a window boundary before it is verified.
+  # Unset by default, so production behaviour is unchanged. The process-scoped
+  # form keeps `async: true` tests isolated from each other; the application-env
+  # form is available for non-async callers.
+  defp totp_now do
+    now_ms =
+      Process.get(:authify_mfa_totp_now_ms) ||
+        Application.get_env(:authify, :mfa_totp_now_ms) ||
+        System.os_time(:millisecond)
+
+    div(now_ms, 1000)
+  end
 
   @doc """
   Disables TOTP for a user by clearing TOTP data.
