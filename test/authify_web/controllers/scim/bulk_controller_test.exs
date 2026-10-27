@@ -424,7 +424,7 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
             "method" => "POST",
             "path" => "/Users",
             "bulkId" => "myuser1",
-            "data" => %{"userName" => "test@example.com"}
+            "data" => %{"userName" => unique_user_email()}
           },
           %{
             "method" => "POST",
@@ -461,7 +461,7 @@ defmodule AuthifyWeb.SCIM.BulkControllerTest do
           %{
             "method" => "POST",
             "path" => "/Users",
-            "data" => %{"userName" => "test@example.com"}
+            "data" => %{"userName" => unique_user_email()}
           }
         ]
       }

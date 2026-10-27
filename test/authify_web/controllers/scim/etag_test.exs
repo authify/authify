@@ -22,7 +22,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
 
   describe "ETag support for Users" do
     test "GET /scim/v2/Users/:id returns ETag header", %{conn: conn, organization: organization} do
-      user = user_fixture(organization: organization, email: "test@example.com")
+      user = user_fixture(organization: organization, email: unique_user_email())
 
       conn = get(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}")
 
@@ -72,7 +72,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       organization: organization,
       admin_user: admin_user
     } do
-      user = user_fixture(organization: organization, email: "test@example.com")
+      user = user_fixture(organization: organization, email: unique_user_email())
 
       # Get initial ETag
       conn = get(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}")
@@ -111,7 +111,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       conn: conn,
       organization: organization
     } do
-      user = user_fixture(organization: organization, email: "test@example.com")
+      user = user_fixture(organization: organization, email: unique_user_email())
 
       patch_params = %{
         "schemas" => ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
@@ -139,7 +139,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       organization: organization,
       admin_user: admin_user
     } do
-      user = user_fixture(organization: organization, email: "test@example.com")
+      user = user_fixture(organization: organization, email: unique_user_email())
 
       # Get the resource and its ETag
       conn = get(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}")
@@ -167,7 +167,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       conn: conn,
       organization: organization
     } do
-      user = user_fixture(organization: organization, email: "test@example.com")
+      user = user_fixture(organization: organization, email: unique_user_email())
 
       # Use a different ETag
       wrong_etag = "W/\"999-1234567890-abcdef\""
@@ -188,7 +188,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       organization: organization,
       admin_user: admin_user
     } do
-      user = user_fixture(organization: organization, email: "test@example.com")
+      user = user_fixture(organization: organization, email: unique_user_email())
 
       # Get current ETag
       conn = get(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}")
@@ -222,7 +222,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       conn: conn,
       organization: organization
     } do
-      user = user_fixture(organization: organization, email: "test@example.com")
+      user = user_fixture(organization: organization, email: unique_user_email())
 
       # Use wrong ETag
       wrong_etag = "W/\"999-1234567890-abcdef\""
@@ -250,7 +250,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       conn: conn,
       organization: organization
     } do
-      user = user_fixture(organization: organization, email: "test@example.com")
+      user = user_fixture(organization: organization, email: unique_user_email())
 
       wrong_etag = "W/\"999-1234567890-abcdef\""
 
@@ -279,7 +279,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       conn: conn,
       organization: organization
     } do
-      user = user_fixture(organization: organization, email: "test@example.com")
+      user = user_fixture(organization: organization, email: unique_user_email())
 
       wrong_etag = "W/\"999-1234567890-abcdef\""
 
@@ -298,7 +298,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       organization: organization,
       admin_user: admin_user
     } do
-      user = user_fixture(organization: organization, email: "test@example.com")
+      user = user_fixture(organization: organization, email: unique_user_email())
 
       # Initialize scim_updated_at by doing an initial SCIM update
       {:ok, user} = Provisioning.update_user_scim(user, %{active: true})
@@ -376,7 +376,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
       organization: organization,
       admin_user: admin_user
     } do
-      user = user_fixture(organization: organization, email: "test@example.com")
+      user = user_fixture(organization: organization, email: unique_user_email())
 
       # Get initial version
       conn = get(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}")
@@ -407,7 +407,7 @@ defmodule AuthifyWeb.SCIM.ETagTest do
     end
 
     test "ETag format is correct weak ETag", %{conn: conn, organization: organization} do
-      user = user_fixture(organization: organization, email: "test@example.com")
+      user = user_fixture(organization: organization, email: unique_user_email())
 
       conn = get(conn, "/#{organization.slug}/scim/v2/Users/#{user.id}")
       [etag] = get_resp_header(conn, "etag")

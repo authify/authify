@@ -1108,7 +1108,7 @@ defmodule AuthifyWeb.SCIM.UsersControllerTest do
       conn_create =
         post(conn, "/#{organization.slug}/scim/v2/Users", %{
           "schemas" => ["urn:ietf:params:scim:schemas:core:2.0:User"],
-          "userName" => "test@example.com"
+          "userName" => unique_user_email()
         })
 
       assert conn_create.status == 404

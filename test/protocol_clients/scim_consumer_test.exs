@@ -57,7 +57,7 @@ defmodule AuthifyTest.SCIMConsumerTest do
                SCIMConsumer.create_user(consumer, %{
                  userName: "schemas-#{System.monotonic_time()}",
                  name: %{givenName: "Test", familyName: "User"},
-                 emails: [%{value: "test@example.com", primary: true}]
+                 emails: [%{value: unique_user_email(), primary: true}]
                })
 
       assert map["schemas"] == ["urn:ietf:params:scim:schemas:core:2.0:User"]
