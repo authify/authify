@@ -84,7 +84,11 @@ defmodule Authify.MixProject do
       {:x509, "~> 0.9"},
       # Static analysis & security (dev/test only)
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false}
+      # 0.17.0 fixed sobelow's mix.lock parsing: it now reads Mix's quoted
+      # keys as atoms (so lockfile dependency advisories actually match) and
+      # no longer prints a "found quoted keyword" warning per dependency.
+      # Keep the floor at 0.18 so a re-resolution cannot land back on 0.16.x.
+      {:sobelow, "~> 0.18", only: [:dev, :test], runtime: false}
     ]
   end
 
