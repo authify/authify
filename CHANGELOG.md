@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `mix sobelow` no longer prints 69 `found quoted keyword "..." but the quotes are not required` warnings. They were never in `lib/` or `test/`: sobelow parses `mix.lock` to resolve dependency advisories, and Mix writes that file with quoted atom keys (`"plug": {...}`). Sobelow 0.16.0 parsed the lockfile without `emit_warnings: false`, so Elixir's tokenizer flagged every key. Bumping sobelow to 0.18.1 fixes it at the source and also repairs the lockfile lookup itself — 0.16.0 compared a string key against atom keys, so every dependency advisory check matched nothing and passed silently whenever `deps/` was absent
+
 ## [0.28.1] - 2026-10-27
 
 ### Security
