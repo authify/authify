@@ -78,7 +78,7 @@ defmodule Authify.MixProject do
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_metrics_prometheus, "~> 1.1"},
       {:telemetry_poller, "~> 1.0"},
-      {:uniq, "~> 0.6.2"},
+      {:uniq, "~> 0.7.0"},
       {:cbor, "~> 1.0", override: true},
       {:wax_, "~> 0.7"},
       {:x509, "~> 0.9"},
