@@ -77,12 +77,34 @@ defmodule Authify.SAML.XML do
     now = DateTime.utc_now()
     # 5 minutes
     expires_at = DateTime.add(now, 300, :second)
-
-    # Build attribute statements
-    attributes = build_attribute_statements(user, sp)
-
-    # Get issuer URL
     issuer_url = get_issuer_url()
+
+    # Honor the SP's sign_assertions flag: when the SP requests signing and a
+    # signing certificate is available, sign the assertion itself (not the whole
+    # Response). When sign_assertions is false, issue an unsigned assertion.
+    assertion_xml = build_assertion(session, sp, user, assertion_id, issuer_url, now, expires_at)
+
+    assertion =
+      if sign_assertion?(sp, options) do
+        case get_signing_certificate_struct(sp.organization_id) do
+          %Authify.Accounts.Certificate{} = cert ->
+            case Authify.SAML.XMLSignature.sign_xml(assertion_xml, cert,
+                   reference_uri: "#" <> assertion_id,
+                   insertion_point: :after_issuer
+                 ) do
+              {:ok, signed_assertion} ->
+                signed_assertion
+
+              {:error, reason} ->
+                {:error, "Failed to sign SAML assertion: #{reason}"}
+            end
+
+          nil ->
+            assertion_xml
+        end
+      else
+        assertion_xml
+      end
 
     saml_response = """
     <?xml version="1.0" encoding="UTF-8"?>
@@ -96,53 +118,61 @@ defmodule Authify.SAML.XML do
       <saml2p:Status>
         <saml2p:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
       </saml2p:Status>
-      <saml2:Assertion xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion"
-                       ID="#{assertion_id}"
-                       IssueInstant="#{DateTime.to_iso8601(now)}"
-                       Version="2.0">
-        <saml2:Issuer>#{issuer_url}</saml2:Issuer>
-        <saml2:Subject>
-          <saml2:NameID Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">#{session.subject_id}</saml2:NameID>
-          <saml2:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
-            <saml2:SubjectConfirmationData InResponseTo="#{session.request_id}"
-                                           NotOnOrAfter="#{DateTime.to_iso8601(expires_at)}"
-                                           Recipient="#{sp.acs_url}"/>
-          </saml2:SubjectConfirmation>
-        </saml2:Subject>
-        <saml2:Conditions NotBefore="#{DateTime.to_iso8601(now)}"
-                          NotOnOrAfter="#{DateTime.to_iso8601(expires_at)}">
-          <saml2:AudienceRestriction>
-            <saml2:Audience>#{sp.entity_id}</saml2:Audience>
-          </saml2:AudienceRestriction>
-        </saml2:Conditions>
-        <saml2:AuthnStatement AuthnInstant="#{DateTime.to_iso8601(now)}"
-                              SessionIndex="#{session.session_id}">
-          <saml2:AuthnContext>
-            <saml2:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml2:AuthnContextClassRef>
-          </saml2:AuthnContext>
-        </saml2:AuthnStatement>#{if attributes != "", do: "\n        #{attributes}", else: ""}
-      </saml2:Assertion>
+      #{assertion}
     </saml2p:Response>
     """
 
-    unsigned_response = String.trim(saml_response)
+    {:ok, String.trim(saml_response)}
+  end
 
-    # Check if signing is requested and certificate is available
-    if Keyword.get(options, :sign, false) do
-      case get_signing_certificate_struct(sp.organization_id) do
-        %Authify.Accounts.Certificate{} = cert ->
-          case Authify.SAML.XMLSignature.sign_xml(unsigned_response, cert) do
-            {:ok, signed_response} -> {:ok, signed_response}
-            {:error, reason} -> {:error, "Failed to sign SAML response: #{reason}"}
-          end
+  # Build the (unsigned) SAML assertion element. Signing, if requested, is applied
+  # separately so the assertion can be embedded into the Response as a whole.
+  defp build_assertion(
+         %Session{} = session,
+         %ServiceProvider{} = sp,
+         %User{} = user,
+         assertion_id,
+         issuer_url,
+         now,
+         expires_at
+       ) do
+    attributes = build_attribute_statements(user, sp)
 
-        nil ->
-          # Return unsigned if no certificate available
-          {:ok, unsigned_response}
-      end
-    else
-      {:ok, unsigned_response}
-    end
+    """
+    <saml2:Assertion xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion"
+                     ID="#{assertion_id}"
+                     IssueInstant="#{DateTime.to_iso8601(now)}"
+                     Version="2.0">
+      <saml2:Issuer>#{issuer_url}</saml2:Issuer>
+      <saml2:Subject>
+        <saml2:NameID Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">#{session.subject_id}</saml2:NameID>
+        <saml2:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
+          <saml2:SubjectConfirmationData InResponseTo="#{session.request_id}"
+                                         NotOnOrAfter="#{DateTime.to_iso8601(expires_at)}"
+                                         Recipient="#{sp.acs_url}"/>
+        </saml2:SubjectConfirmation>
+      </saml2:Subject>
+      <saml2:Conditions NotBefore="#{DateTime.to_iso8601(now)}"
+                        NotOnOrAfter="#{DateTime.to_iso8601(expires_at)}">
+        <saml2:AudienceRestriction>
+          <saml2:Audience>#{sp.entity_id}</saml2:Audience>
+        </saml2:AudienceRestriction>
+      </saml2:Conditions>
+      <saml2:AuthnStatement AuthnInstant="#{DateTime.to_iso8601(now)}"
+                            SessionIndex="#{session.session_id}">
+        <saml2:AuthnContext>
+          <saml2:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml2:AuthnContextClassRef>
+        </saml2:AuthnContext>
+      </saml2:AuthnStatement>#{if attributes != "", do: "\n          #{attributes}", else: ""}
+    </saml2:Assertion>
+    """
+  end
+
+  # Signing is requested when the caller opts in AND the SP's sign_assertions flag
+  # is set. sign_assertions defaults to true, so assertions are signed unless the
+  # SP explicitly opts out.
+  defp sign_assertion?(%ServiceProvider{sign_assertions: sign_assertions}, options) do
+    sign_assertions and Keyword.get(options, :sign, false)
   end
 
   @doc """
