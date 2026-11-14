@@ -343,7 +343,8 @@ defmodule Authify.SAML do
   Generates a SAML response with assertion.
 
   Options:
-  - `:sign` — when true, signs the response assertion if a signing certificate is available
+  - `:sign` — when true, signs the assertion if a signing certificate is available and the
+    SP's `sign_assertions` flag is set (the flag defaults to true)
   """
   def generate_saml_response(
         %Session{} = session,

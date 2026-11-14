@@ -403,6 +403,37 @@ defmodule Authify.SAMLTest do
     end
   end
 
+  describe "generate_saml_response/4 assertion signing" do
+    test "signs the assertion when sign_assertions is enabled and a cert is available" do
+      organization = organization_fixture()
+
+      {:ok, _cert} =
+        Authify.Certificates.generate_saml_signing_certificate(organization, %{
+          "name" => "Assertion Signing Cert",
+          "is_active" => true
+        })
+
+      user = user_for_organization_fixture(organization)
+      sp = service_provider_fixture(%{organization: organization, sign_assertions: true})
+      session = saml_session_fixture(%{user: user, service_provider: sp})
+
+      {:ok, response} = SAML.generate_saml_response(session, sp, user, sign: true)
+
+      assert String.contains?(response, "<ds:Signature")
+      assert String.contains?(response, "<ds:SignatureValue>")
+    end
+
+    test "does not sign the assertion when sign_assertions is disabled" do
+      user = user_for_organization_fixture(organization_fixture())
+      sp = service_provider_fixture(%{sign_assertions: false})
+      session = saml_session_fixture(%{user: user, service_provider: sp})
+
+      {:ok, response} = SAML.generate_saml_response(session, sp, user, sign: true)
+
+      refute String.contains?(response, "<ds:Signature")
+    end
+  end
+
   describe "session cleanup" do
     test "cleanup_expired_sessions/0 removes only expired sessions" do
       organization = organization_fixture()
