@@ -223,12 +223,11 @@ defmodule Authify.SAML.XML do
         <md:KeyDescriptor use="signing">
           <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
             <ds:X509Data>
-              <ds:X509Certificate>#{get_signing_certificate(organization)}</ds:X509Certificate>
+              #{signing_certificate_data(organization)}
             </ds:X509Data>
           </ds:KeyInfo>
         </md:KeyDescriptor>
         <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:persistent</md:NameIDFormat>
-        <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</md:NameIDFormat>
         <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
                                 Location="#{sso_url}"/>
         <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
@@ -481,9 +480,7 @@ defmodule Authify.SAML.XML do
     AuthifyWeb.Endpoint.url() <> "/#{organization.slug}/saml/metadata"
   end
 
-  defp get_signing_certificate(organization) when is_nil(organization) do
-    "NO_SAML_SIGNING_CERTIFICATE_CONFIGURED_PLEASE_GENERATE_OR_UPLOAD_ONE"
-  end
+  defp get_signing_certificate(nil), do: nil
 
   defp get_signing_certificate(organization) do
     case Authify.Certificates.get_active_saml_signing_certificate(organization) do
@@ -491,8 +488,21 @@ defmodule Authify.SAML.XML do
         Authify.Accounts.Certificate.certificate_data(cert)
 
       nil ->
-        # Return a placeholder indicating no certificate is configured
-        "NO_SAML_SIGNING_CERTIFICATE_CONFIGURED_PLEASE_GENERATE_OR_UPLOAD_ONE"
+        nil
+    end
+  end
+
+  # Emits the signing certificate body for metadata. When no signing certificate is
+  # configured we return an empty string so the metadata still advertises a signing
+  # KeyDescriptor (without an invalid empty X509Certificate element) instead of a
+  # placeholder string that SPs cannot parse.
+  defp signing_certificate_data(organization) do
+    case get_signing_certificate(organization) do
+      nil ->
+        ""
+
+      cert_data ->
+        "<ds:X509Certificate>#{cert_data}</ds:X509Certificate>"
     end
   end
 

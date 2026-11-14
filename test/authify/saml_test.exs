@@ -699,4 +699,39 @@ defmodule Authify.SAMLTest do
       refute String.contains?(response, "&Co")
     end
   end
+
+  describe "generate_metadata/1" do
+    test "does not emit a placeholder signing certificate when none is configured" do
+      organization = organization_fixture()
+
+      {:ok, xml} = SAML.generate_metadata(organization)
+
+      refute String.contains?(xml, "NO_SAML_SIGNING_CERTIFICATE_CONFIGURED")
+      assert String.contains?(xml, "<md:KeyDescriptor use=\"signing\">")
+    end
+
+    test "advertises only the NameIDFormat the IdP actually emits" do
+      organization = organization_fixture()
+
+      {:ok, xml} = SAML.generate_metadata(organization)
+
+      assert String.contains?(xml, "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent")
+      refute String.contains?(xml, "urn:oasis:names:tc:SAML:2.0:nameid-format:transient")
+    end
+
+    test "includes the configured signing certificate" do
+      organization = organization_fixture()
+
+      {:ok, cert} =
+        Authify.Certificates.generate_saml_signing_certificate(organization, %{
+          "name" => "Metadata Signing Cert",
+          "is_active" => true
+        })
+
+      {:ok, xml} = SAML.generate_metadata(organization)
+
+      assert String.contains?(xml, "<ds:X509Certificate>")
+      assert String.contains?(xml, Authify.Accounts.Certificate.certificate_data(cert))
+    end
+  end
 end
