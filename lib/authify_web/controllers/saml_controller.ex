@@ -195,6 +195,10 @@ defmodule AuthifyWeb.SAMLController do
     session_id = SAML.Session.generate_session_id()
     current_user = Authify.Guardian.Plug.current_resource(conn)
 
+    # Honor ForceAuthn: an SP that requests re-authentication must not reuse the
+    # user's existing IdP session, so ignore any logged-in user and force login.
+    current_user = if request_info.force_authn, do: nil, else: current_user
+
     # Set default expiration (1 hour from now)
     expires_at = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
 
