@@ -223,7 +223,7 @@ defmodule Authify.SAML.XML do
         <md:KeyDescriptor use="signing">
           <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
             <ds:X509Data>
-              <ds:X509Certificate>#{signing_certificate_data(organization)}</ds:X509Certificate>
+              #{signing_certificate_data(organization)}
             </ds:X509Data>
           </ds:KeyInfo>
         </md:KeyDescriptor>
@@ -493,9 +493,18 @@ defmodule Authify.SAML.XML do
   end
 
   # Emits the signing certificate body for metadata. When no signing certificate is
-  # configured we return an empty string so the metadata still advertises a well-formed
-  # (but empty) signing KeyDescriptor instead of a placeholder string that SPs cannot parse.
-  defp signing_certificate_data(organization), do: get_signing_certificate(organization) || ""
+  # configured we return an empty string so the metadata still advertises a signing
+  # KeyDescriptor (without an invalid empty X509Certificate element) instead of a
+  # placeholder string that SPs cannot parse.
+  defp signing_certificate_data(organization) do
+    case get_signing_certificate(organization) do
+      nil ->
+        ""
+
+      cert_data ->
+        "<ds:X509Certificate>#{cert_data}</ds:X509Certificate>"
+    end
+  end
 
   defp get_signing_certificate_struct(organization_id) do
     organization = %Authify.Accounts.Organization{id: organization_id}
