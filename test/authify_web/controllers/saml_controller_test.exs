@@ -120,6 +120,26 @@ defmodule AuthifyWeb.SAMLControllerTest do
       assert redirected_to(conn) =~ "/saml/continue/"
     end
 
+    test "GET /saml/sso with ForceAuthn re-redirects to login even when authenticated", %{
+      conn: conn,
+      user: user,
+      service_provider: _sp,
+      organization: organization
+    } do
+      conn = log_in_user(conn, user)
+      saml_request = encoded_saml_request_with_force_authn()
+
+      conn =
+        get(conn, ~p"/#{organization.slug}/saml/sso", %{
+          "SAMLRequest" => saml_request,
+          "RelayState" => "test_relay"
+        })
+
+      # ForceAuthn must not reuse the existing IdP session.
+      assert redirected_to(conn) =~ "/login"
+      assert redirected_to(conn) =~ "saml_session="
+    end
+
     test "POST /saml/sso works with HTTP-POST binding", %{
       conn: conn,
       user: user,
