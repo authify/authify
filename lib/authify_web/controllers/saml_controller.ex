@@ -362,6 +362,7 @@ defmodule AuthifyWeb.SAMLController do
     redirect(conn, to: "/logout?slo_complete=true")
   end
 
+  # sobelow_skip ["XSS.SendResp"]  # All interpolated values are pre-escaped via html_escape_to_string/1.
   defp handle_local_logout(conn) do
     # Direct logout without SAML - perform IdP-initiated logout to all SPs
     current_user = Authify.Guardian.Plug.current_resource(conn)
@@ -440,6 +441,7 @@ defmodule AuthifyWeb.SAMLController do
     end
   end
 
+  # sobelow_skip ["XSS.SendResp"]  # All interpolated values are pre-escaped via html_escape_to_string/1.
   defp send_saml_logout_response(conn, sp, encoded_response, relay_state) do
     # Send SAML logout response back to service provider
     destination_url = sp.sls_url || sp.acs_url
