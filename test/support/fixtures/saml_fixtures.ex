@@ -184,6 +184,32 @@ defmodule Authify.SAMLFixtures do
   end
 
   @doc """
+  Generate a SAML AuthnRequest that requests re-authentication (ForceAuthn).
+  """
+  def sample_saml_request_with_force_authn(issuer \\ "https://sp.example.com") do
+    """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <saml2p:AuthnRequest xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
+                         xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion"
+                         ID="test_request_id_#{:crypto.strong_rand_bytes(8) |> Base.hex_encode32(case: :lower)}"
+                         IssueInstant="#{DateTime.utc_now() |> DateTime.to_iso8601()}"
+                         Version="2.0"
+                         ForceAuthn="true"
+                         AssertionConsumerServiceURL="https://sp.example.com/saml/acs"
+                         Destination="https://idp.example.com/saml/sso">
+      <saml2:Issuer>#{issuer}</saml2:Issuer>
+    </saml2p:AuthnRequest>
+    """
+  end
+
+  @doc """
+  Generate Base64-encoded SAML AuthnRequest with ForceAuthn="true".
+  """
+  def encoded_saml_request_with_force_authn(issuer \\ "https://sp.example.com") do
+    sample_saml_request_with_force_authn(issuer) |> Base.encode64()
+  end
+
+  @doc """
   Generate Base64-encoded SAML logout request.
   """
   def encoded_saml_logout_request(issuer \\ "https://sp.example.com") do

@@ -403,6 +403,37 @@ defmodule Authify.SAMLTest do
     end
   end
 
+  describe "generate_saml_response/4 assertion signing" do
+    test "signs the assertion when sign_assertions is enabled and a cert is available" do
+      organization = organization_fixture()
+
+      {:ok, _cert} =
+        Authify.Certificates.generate_saml_signing_certificate(organization, %{
+          "name" => "Assertion Signing Cert",
+          "is_active" => true
+        })
+
+      user = user_for_organization_fixture(organization)
+      sp = service_provider_fixture(%{organization: organization, sign_assertions: true})
+      session = saml_session_fixture(%{user: user, service_provider: sp})
+
+      {:ok, response} = SAML.generate_saml_response(session, sp, user, sign: true)
+
+      assert String.contains?(response, "<ds:Signature")
+      assert String.contains?(response, "<ds:SignatureValue>")
+    end
+
+    test "does not sign the assertion when sign_assertions is disabled" do
+      user = user_for_organization_fixture(organization_fixture())
+      sp = service_provider_fixture(%{sign_assertions: false})
+      session = saml_session_fixture(%{user: user, service_provider: sp})
+
+      {:ok, response} = SAML.generate_saml_response(session, sp, user, sign: true)
+
+      refute String.contains?(response, "<ds:Signature")
+    end
+  end
+
   describe "session cleanup" do
     test "cleanup_expired_sessions/0 removes only expired sessions" do
       organization = organization_fixture()
@@ -697,6 +728,41 @@ defmodule Authify.SAMLTest do
       assert String.contains?(response, "John&lt;script&gt; Doe&amp;Co")
       refute String.contains?(response, "<script>")
       refute String.contains?(response, "&Co")
+    end
+  end
+
+  describe "generate_metadata/1" do
+    test "does not emit a placeholder signing certificate when none is configured" do
+      organization = organization_fixture()
+
+      {:ok, xml} = SAML.generate_metadata(organization)
+
+      refute String.contains?(xml, "NO_SAML_SIGNING_CERTIFICATE_CONFIGURED")
+      assert String.contains?(xml, "<md:KeyDescriptor use=\"signing\">")
+    end
+
+    test "advertises only the NameIDFormat the IdP actually emits" do
+      organization = organization_fixture()
+
+      {:ok, xml} = SAML.generate_metadata(organization)
+
+      assert String.contains?(xml, "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent")
+      refute String.contains?(xml, "urn:oasis:names:tc:SAML:2.0:nameid-format:transient")
+    end
+
+    test "includes the configured signing certificate" do
+      organization = organization_fixture()
+
+      {:ok, cert} =
+        Authify.Certificates.generate_saml_signing_certificate(organization, %{
+          "name" => "Metadata Signing Cert",
+          "is_active" => true
+        })
+
+      {:ok, xml} = SAML.generate_metadata(organization)
+
+      assert String.contains?(xml, "<ds:X509Certificate>")
+      assert String.contains?(xml, Authify.Accounts.Certificate.certificate_data(cert))
     end
   end
 end
