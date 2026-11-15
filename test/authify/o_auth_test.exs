@@ -547,4 +547,93 @@ defmodule Authify.OAuthTest do
                Keyword.fetch!(changeset.errors, :nonce)
     end
   end
+
+  describe "revoke_all_tokens_for_user/1" do
+    setup do
+      org = organization_fixture()
+      user = user_for_organization_fixture(org)
+      other_user = user_for_organization_fixture(org)
+      app = application_fixture(organization: org)
+      %{org: org, user: user, other_user: other_user, app: app}
+    end
+
+    test "revokes the user's access tokens, refresh tokens, and grants", %{
+      user: user,
+      other_user: other_user,
+      app: app
+    } do
+      # Two access tokens, two refresh tokens, and two grants for the target
+      # user, plus one active item for a different user.
+      for _ <- 1..2 do
+        {:ok, _} =
+          %OAuth.AccessToken{}
+          |> OAuth.AccessToken.changeset(%{
+            user_id: user.id,
+            application_id: app.id,
+            scopes: "openid"
+          })
+          |> Repo.insert()
+      end
+
+      for _ <- 1..2 do
+        {:ok, _} = OAuth.create_refresh_token(app, user, "openid")
+      end
+
+      {:ok, grant} = OAuth.create_or_update_user_grant(user, app, ["openid"])
+
+      {:ok, other_at} =
+        %OAuth.AccessToken{}
+        |> OAuth.AccessToken.changeset(%{
+          user_id: other_user.id,
+          application_id: app.id,
+          scopes: "openid"
+        })
+        |> Repo.insert()
+
+      assert {:ok, result} = OAuth.revoke_all_tokens_for_user(user)
+
+      assert result.access_tokens == 2
+      assert result.refresh_tokens == 2
+      assert result.user_grants == 1
+
+      # Reloaded grant is marked revoked.
+      assert Repo.get!(OAuth.UserGrant, grant.id).revoked_at
+
+      # The other user's credentials are untouched.
+      refute Repo.get!(OAuth.AccessToken, other_at.id).revoked_at
+    end
+
+    test "skips already-revoked tokens", %{user: user, app: app} do
+      {:ok, active} =
+        %OAuth.AccessToken{}
+        |> OAuth.AccessToken.changeset(%{
+          user_id: user.id,
+          application_id: app.id,
+          scopes: "openid"
+        })
+        |> Repo.insert()
+
+      {:ok, revoked} =
+        %OAuth.AccessToken{}
+        |> OAuth.AccessToken.changeset(%{
+          user_id: user.id,
+          application_id: app.id,
+          scopes: "openid"
+        })
+        |> Repo.insert!()
+        |> then(&OAuth.revoke_access_token/1)
+
+      # Only the not-yet-revoked token is counted/re-issued; the already
+      # revoked one is skipped by the `is_nil(revoked_at)` filter.
+      assert {:ok, %{access_tokens: 1}} = OAuth.revoke_all_tokens_for_user(user)
+
+      assert Repo.get!(OAuth.AccessToken, active.id).revoked_at
+      assert Repo.get!(OAuth.AccessToken, revoked.id).revoked_at
+    end
+
+    test "is a no-op for a user with no credentials", %{user: user} do
+      assert {:ok, %{access_tokens: 0, refresh_tokens: 0, user_grants: 0}} =
+               OAuth.revoke_all_tokens_for_user(user)
+    end
+  end
 end

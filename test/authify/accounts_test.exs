@@ -7,9 +7,12 @@ defmodule Authify.AccountsTest do
   alias Authify.Groups
   alias Authify.Invitations
   alias Authify.OAuth
+  alias Authify.PersonalAccessTokens
+  alias Authify.Repo
   alias Authify.SAML
 
   import Authify.AccountsFixtures
+  import Authify.OAuthFixtures
 
   describe "organizations" do
     @invalid_org_attrs %{name: "", slug: ""}
@@ -1126,6 +1129,44 @@ defmodule Authify.AccountsTest do
                })
 
       assert updated_user.session_version == original_version + 1
+    end
+
+    test "force_password_reset/1 also revokes OAuth tokens and grants", %{user: user} do
+      app = application_fixture(organization: user.organization)
+
+      {:ok, access_token} =
+        %OAuth.AccessToken{}
+        |> OAuth.AccessToken.changeset(%{
+          user_id: user.id,
+          application_id: app.id,
+          scopes: "openid"
+        })
+        |> Repo.insert()
+
+      {:ok, refresh_token} = OAuth.create_refresh_token(app, user, "openid")
+      {:ok, grant} = OAuth.create_or_update_user_grant(user, app, ["openid"])
+
+      {:ok, _} = Accounts.force_password_reset(user)
+
+      assert Repo.get!(OAuth.AccessToken, access_token.id).revoked_at
+      assert Repo.get!(OAuth.RefreshToken, refresh_token.id).revoked_at
+      assert Repo.get!(OAuth.UserGrant, grant.id).revoked_at
+    end
+
+    test "update_user_password/2 also deactivates personal access tokens", %{user: user} do
+      {:ok, pat} =
+        PersonalAccessTokens.create_personal_access_token(user, user.organization, %{
+          "name" => "Token",
+          "scopes" => ["users:read"]
+        })
+
+      {:ok, _} =
+        Accounts.update_user_password(user, %{
+          "password" => "NewSecureP@ssw0rd!",
+          "password_confirmation" => "NewSecureP@ssw0rd!"
+        })
+
+      assert PersonalAccessTokens.get_personal_access_token!(pat.id, user).is_active == false
     end
   end
 

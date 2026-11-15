@@ -805,6 +805,7 @@ defmodule Authify.Accounts do
       session_version: (user.session_version || 0) + 1
     })
     |> Repo.update()
+    |> revoke_additional_credentials()
   end
 
   @doc """
@@ -1204,7 +1205,21 @@ defmodule Authify.Accounts do
     user
     |> User.password_changeset(attrs, resolve_password_policy_for_user(user))
     |> Repo.update()
+    |> revoke_additional_credentials()
   end
+
+  # After a password is reset or changed, revoke the user's non-session
+  # credentials (OAuth access/refresh tokens, grants, and personal access
+  # tokens) in addition to the session-version bump. A compromised password
+  # would otherwise keep those bearer credentials usable until they expire.
+  # Returns the original success/error tuple unchanged on failure.
+  defp revoke_additional_credentials({:ok, user}) do
+    Authify.OAuth.revoke_all_tokens_for_user(user)
+    Authify.PersonalAccessTokens.revoke_all_for_user(user)
+    {:ok, user}
+  end
+
+  defp revoke_additional_credentials(error), do: error
 
   @doc """
   Generates password reset token.
