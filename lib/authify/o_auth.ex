@@ -883,6 +883,50 @@ defmodule Authify.OAuth do
     |> Repo.update()
   end
 
+  @doc """
+  Revokes all of a user's OAuth credentials in a single pass.
+
+  Marks every outstanding access token, refresh token, and user grant for the
+  user as revoked, so that any bearer tokens or consents issued to the account
+  can no longer be used. This is intended to be run when a user's password is
+  changed or reset, since a compromised password would otherwise keep those
+  credentials usable until their natural expiry.
+
+  Unlike `revoke_access_token/1`, `revoke_refresh_token/1`, and
+  `revoke_user_grant/1`, this performs bulk updates and does not load each
+  record individually. It returns the number of rows revoked for each type.
+  """
+  def revoke_all_tokens_for_user(%User{id: user_id}) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    {access_tokens, _} =
+      Repo.update_all(
+        from(at in AccessToken,
+          where: at.user_id == ^user_id and is_nil(at.revoked_at)
+        ),
+        set: [revoked_at: now]
+      )
+
+    {refresh_tokens, _} =
+      Repo.update_all(
+        from(rt in RefreshToken,
+          where: rt.user_id == ^user_id and is_nil(rt.revoked_at)
+        ),
+        set: [revoked_at: now]
+      )
+
+    {user_grants, _} =
+      Repo.update_all(
+        from(ug in UserGrant,
+          where: ug.user_id == ^user_id and is_nil(ug.revoked_at)
+        ),
+        set: [revoked_at: now]
+      )
+
+    {:ok,
+     %{access_tokens: access_tokens, refresh_tokens: refresh_tokens, user_grants: user_grants}}
+  end
+
   # Private helper to normalize scopes to a space-separated string
   defp normalize_scopes(scopes) when is_list(scopes), do: Enum.join(scopes, " ")
   defp normalize_scopes(scopes) when is_binary(scopes), do: scopes

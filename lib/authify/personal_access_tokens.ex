@@ -128,6 +128,24 @@ defmodule Authify.PersonalAccessTokens do
     end
   end
 
+  @doc """
+  Deactivates all of a user's personal access tokens in a single pass.
+
+  Sets `is_active` to `false` for every active token owned by the user so that
+  the Management API credentials can no longer be used. Intended to be run when
+  a user's password is changed or reset. Returns the number of tokens
+  deactivated.
+  """
+  def revoke_all_for_user(%Authify.Accounts.User{id: user_id}) do
+    Repo.update_all(
+      from(p in PersonalAccessToken,
+        where: p.user_id == ^user_id and p.is_active == true
+      ),
+      set: [is_active: false]
+    )
+    |> elem(0)
+  end
+
   defp update_token_last_used(token) do
     token
     |> Ecto.Changeset.change(last_used_at: DateTime.utc_now() |> DateTime.truncate(:second))

@@ -210,4 +210,74 @@ defmodule Authify.Accounts.PersonalAccessTokenHashingTest do
       assert DateTime.diff(reloaded.last_used_at, DateTime.utc_now(), :second) < 5
     end
   end
+
+  describe "revoke_all_for_user/1" do
+    setup do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      other_user = user_for_organization_fixture(organization)
+      %{organization: organization, user: user, other_user: other_user}
+    end
+
+    test "deactivates all of the user's active tokens", %{
+      organization: organization,
+      user: user,
+      other_user: other_user
+    } do
+      {:ok, active1} =
+        PersonalAccessTokens.create_personal_access_token(user, organization, %{
+          "name" => "Token 1",
+          "scopes" => ["users:read"]
+        })
+
+      {:ok, active2} =
+        PersonalAccessTokens.create_personal_access_token(user, organization, %{
+          "name" => "Token 2",
+          "scopes" => ["users:read", "users:write"]
+        })
+
+      {:ok, other} =
+        PersonalAccessTokens.create_personal_access_token(other_user, organization, %{
+          "name" => "Other Token",
+          "scopes" => ["users:read"]
+        })
+
+      assert deactivated = PersonalAccessTokens.revoke_all_for_user(user)
+      assert deactivated == 2
+
+      # Reloaded tokens are inactive.
+      refute PersonalAccessTokens.get_personal_access_token!(active1.id, user).is_active
+      refute PersonalAccessTokens.get_personal_access_token!(active2.id, user).is_active
+
+      # A token owned by another user is untouched and still authenticates.
+      assert PersonalAccessTokens.get_personal_access_token!(other.id, other_user).is_active
+
+      assert {:ok, _} =
+               PersonalAccessTokens.authenticate_personal_access_token(other.plaintext_token)
+    end
+
+    test "skips already-inactive tokens", %{organization: organization, user: user} do
+      {:ok, inactive} =
+        PersonalAccessTokens.create_personal_access_token(user, organization, %{
+          "name" => "Inactive",
+          "scopes" => ["users:read"],
+          "is_active" => false
+        })
+
+      {:ok, active} =
+        PersonalAccessTokens.create_personal_access_token(user, organization, %{
+          "name" => "Active",
+          "scopes" => ["users:read"]
+        })
+
+      assert PersonalAccessTokens.revoke_all_for_user(user) == 1
+
+      assert PersonalAccessTokens.get_personal_access_token!(active.id, user).is_active == false
+      refute PersonalAccessTokens.get_personal_access_token!(inactive.id, user).is_active
+    end
+
+    test "is a no-op for a user with no tokens", %{user: user} do
+      assert PersonalAccessTokens.revoke_all_for_user(user) == 0
+    end
+  end
 end
