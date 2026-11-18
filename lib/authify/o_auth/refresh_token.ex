@@ -14,6 +14,12 @@ defmodule Authify.OAuth.RefreshToken do
     field :revoked_at, :utc_datetime
     # OIDC nonce — propagated from the original authorization code
     field :nonce, :string
+    # Groups a token with all of its rotations for reuse detection.
+    field :token_family_id, :string
+    # Why the token was revoked: "rotated", "manual", "password_change",
+    # "family_reuse", etc. Lets reuse detection tell a replayed rotated token
+    # apart from a deliberately revoked one.
+    field :revoke_reason, :string
 
     belongs_to :application, Authify.OAuth.Application
     belongs_to :user, Authify.Accounts.User
@@ -31,6 +37,8 @@ defmodule Authify.OAuth.RefreshToken do
       :expires_at,
       :revoked_at,
       :nonce,
+      :token_family_id,
+      :revoke_reason,
       :application_id,
       :user_id,
       :access_token_id
@@ -77,6 +85,13 @@ defmodule Authify.OAuth.RefreshToken do
 
   defp put_expires_at(changeset), do: changeset
 
+  @doc """
+  Generates a new, opaque token family identifier.
+  """
+  def generate_family_id do
+    :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
+  end
+
   defp generate_token do
     :crypto.strong_rand_bytes(48) |> Base.url_encode64(padding: false)
   end
@@ -104,10 +119,21 @@ defmodule Authify.OAuth.RefreshToken do
 
   @doc """
   Marks a refresh token as revoked.
+
+  `reason` records why it was revoked (e.g. `"manual"`, `"password_change"`) so
+  reuse detection can distinguish a deliberate revocation from a rotated token
+  that was then replayed.
   """
-  def revoke(changeset) do
-    put_change(changeset, :revoked_at, DateTime.utc_now() |> DateTime.truncate(:second))
+  def revoke(changeset, reason \\ nil) do
+    changeset
+    |> put_change(:revoked_at, DateTime.utc_now() |> DateTime.truncate(:second))
+    |> maybe_put_revoke_reason(reason)
   end
+
+  defp maybe_put_revoke_reason(changeset, nil), do: changeset
+
+  defp maybe_put_revoke_reason(changeset, reason),
+    do: put_change(changeset, :revoke_reason, reason)
 
   @doc """
   Returns the scopes as a list.

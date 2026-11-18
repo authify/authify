@@ -42,6 +42,7 @@ defmodule Authify.AuditLog.Event do
     rate_limit_exceeded
     permission_denied scope_denied
     api_access api_key_created api_key_revoked
+    refresh_token_reuse_detected
     suspicious_activity
   )a
 

@@ -710,6 +710,18 @@ defmodule AuthifyWeb.OAuthController do
     })
   end
 
+  # A detected reuse (a rotated token replayed) is reported with the *identical*
+  # generic `invalid_grant` response as any other bad token, so an attacker
+  # cannot learn that reuse detection fired. See OAuth.exchange_refresh_token/2.
+  defp handle_refresh_token_error(conn, :refresh_token_reuse_detected) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{
+      error: "invalid_grant",
+      error_description: "Invalid or expired refresh token"
+    })
+  end
+
   defp handle_refresh_token_error(conn, _error) do
     conn
     |> put_status(:bad_request)

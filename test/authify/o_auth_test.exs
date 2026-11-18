@@ -489,6 +489,174 @@ defmodule Authify.OAuthTest do
     end
   end
 
+  describe "refresh token families and reuse detection" do
+    alias Authify.AuditLog
+
+    setup do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      application = application_fixture(organization: organization)
+      %{organization: organization, user: user, application: application}
+    end
+
+    test "rotated refresh tokens inherit the same family id", %{
+      application: application,
+      user: user
+    } do
+      {:ok, rt1} = OAuth.create_refresh_token(application, user, "openid profile")
+      family_id = rt1.token_family_id
+      assert is_binary(family_id)
+
+      {:ok, r1} = OAuth.exchange_refresh_token(Repo.preload(rt1, [:application, :user]))
+      assert r1.refresh_token.token_family_id == family_id
+
+      {:ok, r2} = OAuth.exchange_refresh_token(r1.refresh_token)
+      assert r2.refresh_token.token_family_id == family_id
+    end
+
+    test "replaying a consumed rotated token is detected as reuse", %{
+      application: application,
+      user: user
+    } do
+      {:ok, rt1} = OAuth.create_refresh_token(application, user, "openid profile")
+      family_id = rt1.token_family_id
+
+      {:ok, r1} = OAuth.exchange_refresh_token(Repo.preload(rt1, [:application, :user]))
+      rotated_id = r1.refresh_token.id
+
+      # Present the same (now-consumed) token again.
+      assert {:error, :refresh_token_reuse_detected} =
+               OAuth.exchange_refresh_token(Repo.preload(rt1, [:application, :user]))
+
+      # The rest of the family is revoked with reason "family_reuse".
+      rotated = Repo.get!(OAuth.RefreshToken, rotated_id)
+      assert rotated.revoked_at
+      assert rotated.revoke_reason == "family_reuse"
+
+      # No still-active token remains in the family.
+      active =
+        from(r in OAuth.RefreshToken,
+          where: r.token_family_id == ^family_id and is_nil(r.revoked_at)
+        )
+        |> Repo.all()
+
+      assert active == []
+
+      # And the theft is audited.
+      events = AuditLog.list_events(event_type: "refresh_token_reuse_detected")
+      assert length(events) == 1
+      event = hd(events)
+      assert event.outcome == "failure"
+      assert event.resource_type == "oauth_refresh_token"
+      # Metadata round-trips through the database as string keys.
+      assert event.metadata["token_family_id"] == family_id
+      assert event.metadata["revoked_count"] == 1
+      assert event.metadata["revoked_token_id"] == rt1.id
+    end
+
+    test "a deliberately revoked token is not mistaken for reuse", %{
+      application: application,
+      user: user
+    } do
+      {:ok, rt1} = OAuth.create_refresh_token(application, user, "openid profile")
+
+      # Deliberate revocation (e.g. logout / admin revocation), not a rotation.
+      {:ok, _} = OAuth.revoke_refresh_token(rt1)
+
+      # Re-presenting it is a stale but benign request, not theft.
+      assert {:error, :invalid_refresh_token} =
+               OAuth.exchange_refresh_token(Repo.preload(rt1, [:application, :user]))
+
+      reloaded = Repo.get!(OAuth.RefreshToken, rt1.id)
+      assert reloaded.revoked_at
+      assert reloaded.revoke_reason == "manual"
+
+      # No theft alarm is raised.
+      assert AuditLog.list_events(event_type: "refresh_token_reuse_detected") == []
+    end
+
+    test "rotate: false preserves the legacy behaviour (no consumption)", %{
+      application: application,
+      user: user
+    } do
+      {:ok, rt1} = OAuth.create_refresh_token(application, user, "openid profile")
+
+      {:ok, result} = OAuth.exchange_refresh_token(rt1, false)
+      assert result.refresh_token.id == rt1.id
+
+      # The original token is not consumed.
+      reloaded = Repo.get!(OAuth.RefreshToken, rt1.id)
+      refute reloaded.revoked_at
+    end
+
+    test "a legacy token with no family id rotates to a fresh family", %{
+      application: application,
+      user: user
+    } do
+      {:ok, rt1} = OAuth.create_refresh_token(application, user, "openid profile")
+
+      # Simulate a pre-migration row: no family id.
+      Repo.update_all(
+        from(r in OAuth.RefreshToken, where: r.id == ^rt1.id),
+        set: [token_family_id: nil]
+      )
+
+      rt1 = Repo.get!(OAuth.RefreshToken, rt1.id)
+      assert is_nil(rt1.token_family_id)
+
+      {:ok, r1} = OAuth.exchange_refresh_token(Repo.preload(rt1, [:application, :user]))
+      assert is_binary(r1.refresh_token.token_family_id)
+      assert r1.refresh_token.token_family_id != rt1.token_family_id
+    end
+  end
+
+  describe "refresh token reuse detection under concurrency" do
+    setup do
+      organization = organization_fixture()
+      user = user_for_organization_fixture(organization)
+      application = application_fixture(organization: organization)
+      %{organization: organization, user: user, application: application}
+    end
+
+    test "concurrent replays of the same token allow exactly one exchange", %{
+      application: application,
+      user: user
+    } do
+      # The async:false DataCase already starts the sandbox in shared mode, so
+      # the tasks share one connection. The atomic conditional UPDATE below is
+      # what enforces single-claim, so we assert the invariant rather than timing.
+      {:ok, rt1} = OAuth.create_refresh_token(application, user, "openid")
+
+      family_id = rt1.token_family_id
+
+      n = 5
+
+      tasks =
+        for _ <- 1..n,
+            do:
+              Task.async(fn ->
+                OAuth.exchange_refresh_token(Repo.preload(rt1, [:application, :user]))
+              end)
+
+      results = Enum.map(tasks, &Task.await(&1, 30_000))
+
+      ok_count = Enum.count(results, &match?({:ok, _}, &1))
+      reuse_count = Enum.count(results, &(&1 == {:error, :refresh_token_reuse_detected}))
+
+      assert ok_count == 1
+      assert reuse_count == n - 1
+
+      # The whole family ends up revoked.
+      active =
+        from(r in OAuth.RefreshToken,
+          where: r.token_family_id == ^family_id and is_nil(r.revoked_at)
+        )
+        |> Repo.all()
+
+      assert active == []
+    end
+  end
+
   describe "authorization_codes nonce" do
     setup do
       organization = organization_fixture()

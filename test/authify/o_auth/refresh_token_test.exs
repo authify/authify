@@ -226,4 +226,25 @@ defmodule Authify.OAuth.RefreshTokenTest do
       refute RefreshToken.verify_token(nil, nil)
     end
   end
+
+  describe "revoke/2 with a reason" do
+    test "records the revoke reason on the changeset" do
+      changeset = Ecto.Changeset.change(%RefreshToken{})
+      result = RefreshToken.revoke(changeset, "manual")
+      assert Ecto.Changeset.get_change(result, :revoke_reason) == "manual"
+    end
+
+    test "leaves revoke_reason unset when no reason is given" do
+      changeset = Ecto.Changeset.change(%RefreshToken{})
+      result = RefreshToken.revoke(changeset)
+      refute Ecto.Changeset.get_change(result, :revoke_reason)
+    end
+  end
+
+  describe "generate_family_id/0" do
+    test "returns an opaque, unique identifier" do
+      assert is_binary(RefreshToken.generate_family_id())
+      assert RefreshToken.generate_family_id() != RefreshToken.generate_family_id()
+    end
+  end
 end

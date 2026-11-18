@@ -5,6 +5,7 @@ defmodule Authify.OAuth do
 
   import Ecto.Query, warn: false
   alias Authify.Accounts.{Organization, User}
+  alias Authify.AuditLog
   alias Authify.FilterSort
   alias Authify.OAuth.{AccessToken, Application, AuthorizationCode, RefreshToken, UserGrant}
   alias Authify.Repo
@@ -643,14 +644,19 @@ defmodule Authify.OAuth do
         %User{} = user,
         scopes,
         access_token_id \\ nil,
-        nonce \\ nil
+        nonce \\ nil,
+        token_family_id \\ nil
       ) do
     attrs = %{
       application_id: application.id,
       user_id: user.id,
       scopes: scopes,
       access_token_id: access_token_id,
-      nonce: nonce
+      nonce: nonce,
+      # A rotated token inherits its parent's family id; a fresh token (no family
+      # id given) starts its own so it can be tracked for reuse detection.
+      token_family_id:
+        if(is_nil(token_family_id), do: RefreshToken.generate_family_id(), else: token_family_id)
     }
 
     %RefreshToken{}
@@ -676,51 +682,187 @@ defmodule Authify.OAuth do
   Optionally rotates the refresh token (recommended for security).
   """
   def exchange_refresh_token(%RefreshToken{} = refresh_token, rotate \\ true) do
-    if RefreshToken.valid?(refresh_token) do
-      Repo.transaction(fn ->
-        # Create new access token
-        access_token_attrs = %{
-          application_id: refresh_token.application_id,
-          user_id: refresh_token.user_id,
-          scopes: refresh_token.scopes
-        }
+    cond do
+      RefreshToken.expired?(refresh_token) ->
+        {:error, :invalid_refresh_token}
 
-        access_token =
-          %AccessToken{}
-          |> AccessToken.changeset(access_token_attrs)
-          |> Repo.insert!()
-          |> Repo.preload([:application, :user])
+      not rotate ->
+        # Preserve legacy behaviour: no consumption, no rotation, no reuse concept.
+        if RefreshToken.valid?(refresh_token) do
+          Repo.transaction(fn ->
+            %{access_token: create_access_token(refresh_token), refresh_token: refresh_token}
+          end)
+        else
+          {:error, :invalid_refresh_token}
+        end
 
-        # Optionally rotate refresh token
-        new_refresh_token =
-          if rotate do
-            # Revoke old refresh token
-            refresh_token
-            |> Ecto.Changeset.change()
-            |> RefreshToken.revoke()
-            |> Repo.update!()
-
-            # Create new refresh token
-            {:ok, new_rt} =
-              create_refresh_token(
-                refresh_token.application,
-                refresh_token.user,
-                refresh_token.scopes,
-                access_token.id,
-                refresh_token.nonce
-              )
-
-            Repo.preload(new_rt, [:application, :user])
-          else
-            refresh_token
-          end
-
-        %{access_token: access_token, refresh_token: new_refresh_token}
-      end)
-    else
-      {:error, :invalid_refresh_token}
+      true ->
+        # Rotation with reuse detection.
+        #
+        # The old token is consumed with an *atomic conditional UPDATE*
+        # (`WHERE id = ? AND revoked_at IS NULL`) instead of a read-then-write.
+        # Under InnoDB the row update serializes concurrent transactions: exactly
+        # one racer claims the row (`affected == 1`); the loser sees `0`, which is
+        # itself the reuse signal. This closes the race where two requests present
+        # the same live token and both pass a stale `valid?` check.
+        refresh_token
+        |> rotate_refresh_token()
+        |> log_reuse_event()
+        |> map_exchange_result()
     end
   end
+
+  # Logs a detected-reuse audit event OUTSIDE the rotation transaction, so a
+  # failed audit insert can never roll back the committed family revocation.
+  # Logs, then returns the outcome unchanged so the public result is unaffected.
+  defp log_reuse_event({:ok, %{event: attrs}} = outcome) when not is_nil(attrs),
+    do:
+      (
+        AuditLog.log_event(:refresh_token_reuse_detected, attrs)
+        outcome
+      )
+
+  defp log_reuse_event(outcome), do: outcome
+
+  # Runs the rotation transaction and maps its outcome to the public result.
+  #
+  # The transaction itself always *succeeds* so that the revocation and any audit
+  # event are committed — the reuse/invalid distinction is produced here at the
+  # Elixir layer rather than via a rollback, which would discard the audit row.
+  defp rotate_refresh_token(%RefreshToken{} = refresh_token) do
+    Repo.transaction(fn ->
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {claimed, _} =
+        Repo.update_all(
+          from(rt in RefreshToken,
+            where: rt.id == ^refresh_token.id and is_nil(rt.revoked_at)
+          ),
+          set: [revoked_at: now, revoke_reason: "rotated"]
+        )
+
+      case claimed do
+        1 -> issue_rotated_tokens(refresh_token, now)
+        _ -> handle_refresh_token_reuse(refresh_token, now)
+      end
+    end)
+  end
+
+  # Creates a fresh access token and a rotated refresh token for `refresh_token`.
+  #
+  # When the token belongs to a family the new refresh token inherits the family
+  # id, so the family chain is preserved across rotations. When it has no family
+  # id (a legacy row) the new token starts its own family.
+  defp issue_rotated_tokens(%RefreshToken{} = refresh_token, _now) do
+    access_token = create_access_token(refresh_token)
+
+    {:ok, new_rt} =
+      create_refresh_token(
+        refresh_token.application,
+        refresh_token.user,
+        refresh_token.scopes,
+        access_token.id,
+        refresh_token.nonce,
+        refresh_token.token_family_id
+      )
+
+    %{access_token: access_token, refresh_token: Repo.preload(new_rt, [:application, :user])}
+  end
+
+  defp create_access_token(%RefreshToken{} = refresh_token) do
+    %AccessToken{}
+    |> AccessToken.changeset(%{
+      application_id: refresh_token.application_id,
+      user_id: refresh_token.user_id,
+      scopes: refresh_token.scopes
+    })
+    |> Repo.insert!()
+    |> Repo.preload([:application, :user])
+  end
+
+  # Handles the case where a token could not be claimed because it was already
+  # revoked.
+  #
+  # Re-fetches the row and inspects `revoke_reason`:
+  #   * `"rotated"` — this token was consumed by a legitimate rotation and is now
+  #     being *replayed*. That is token theft, so the whole family is revoked. The
+  #     audit event is built here (while the preloaded row is in memory) but
+  #     logged OUTSIDE the transaction by `exchange_refresh_token/2`, so a failed
+  #     audit insert can never roll back the committed family revocation.
+  #   * anything else (`"manual"`, `"password_change"`, `nil`, …) — the token was
+  #     deliberately revoked, so a retry is a benign (if stale) client request,
+  #     not theft. No family is revoked and no theft event is raised.
+  defp handle_refresh_token_reuse(%RefreshToken{} = refresh_token, now) do
+    current =
+      Repo.get(refresh_token.__struct__, refresh_token.id) |> Repo.preload([:application, :user])
+
+    case current do
+      nil ->
+        # Row vanished between claim and fetch; treat as invalid, not theft.
+        %{kind: :invalid}
+
+      _ ->
+        if current.revoke_reason == "rotated" do
+          family_id = current.token_family_id
+          revoked_count = revoke_token_family(family_id, now)
+          event = reuse_event_attrs(current, family_id, revoked_count)
+          %{kind: :reuse, event: event}
+        else
+          %{kind: :invalid}
+        end
+    end
+  end
+
+  # Revokes every still-active token in `family_id`.
+  #
+  # Returns the number of newly revoked tokens. The conditional UPDATE is the same
+  # primitive used for claim/`revoke_all_tokens_for_user/1`; the first caller to
+  # run it against a family wins the active members, later callers see `0`, which
+  # keeps a single audit event per detected reuse even under a concurrent race.
+  defp revoke_token_family(nil, _now), do: 0
+
+  defp revoke_token_family(family_id, now) do
+    {revoked, _} =
+      Repo.update_all(
+        from(rt in RefreshToken,
+          where: rt.token_family_id == ^family_id and is_nil(rt.revoked_at)
+        ),
+        set: [revoked_at: now, revoke_reason: "family_reuse"]
+      )
+
+    revoked
+  end
+
+  # Builds the audit event attributes for a detected refresh-token reuse.
+  defp reuse_event_attrs(current, family_id, revoked_count) when is_map(current) do
+    application = current.application
+
+    %{
+      organization_id: application && application.organization_id,
+      actor_type: "application",
+      actor_id: current.application_id,
+      actor_name: application && application.name,
+      resource_type: "oauth_refresh_token",
+      resource_id: current.id,
+      outcome: "failure",
+      metadata: %{
+        token_family_id: family_id,
+        revoked_token_id: current.id,
+        revoked_count: revoked_count,
+        client_id: application && application.client_id,
+        scopes: current.scopes,
+        user_id: current.user_id
+      }
+    }
+  end
+
+  # Maps a rotation transaction outcome to the public `exchange_refresh_token/2`
+  # result.
+  # A failed rotation transaction: map to a graceful error instead of raising.
+  defp map_exchange_result({:error, _} = error), do: error
+  defp map_exchange_result({:ok, %{kind: :reuse}}), do: {:error, :refresh_token_reuse_detected}
+  defp map_exchange_result({:ok, %{kind: :invalid}}), do: {:error, :invalid_refresh_token}
+  defp map_exchange_result({:ok, result}), do: {:ok, result}
 
   @doc """
   Revokes a refresh token.
@@ -728,7 +870,7 @@ defmodule Authify.OAuth do
   def revoke_refresh_token(%RefreshToken{} = refresh_token) do
     refresh_token
     |> Ecto.Changeset.change()
-    |> RefreshToken.revoke()
+    |> RefreshToken.revoke("manual")
     |> Repo.update()
   end
 
@@ -912,7 +1054,7 @@ defmodule Authify.OAuth do
         from(rt in RefreshToken,
           where: rt.user_id == ^user_id and is_nil(rt.revoked_at)
         ),
-        set: [revoked_at: now]
+        set: [revoked_at: now, revoke_reason: "password_change"]
       )
 
     {user_grants, _} =
