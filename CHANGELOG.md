@@ -7,9 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-11-25
+
+### Security
+
+- OAuth tokens, OAuth grants, and personal access tokens are now revoked when a user resets or changes their password, so leaked credentials can no longer keep an attacker's sessions alive after rotation
+
 ### Fixed
 
+- SAML SSO now honors the service provider's `ForceAuthn` request attribute, forcing re-authentication instead of returning a cached assertion (issue #158)
+- SAML assertions are signed only when the service provider's metadata requests it via `WantAssertionsSigned`, instead of always signing (issue #158)
+- SAML metadata generation no longer emits an invalid empty `X509Certificate` element when no signing certificate is configured, drops the placeholder signing certificate, and advertises an honest `NameIDFormat`
 - `mix sobelow` no longer prints 69 `found quoted keyword "..." but the quotes are not required` warnings. They were never in `lib/` or `test/`: sobelow parses `mix.lock` to resolve dependency advisories, and Mix writes that file with quoted atom keys (`"plug": {...}`). Sobelow 0.16.0 parsed the lockfile without `emit_warnings: false`, so Elixir's tokenizer flagged every key. Bumping sobelow to 0.18.1 fixes it at the source and also repairs the lockfile lookup itself — 0.16.0 compared a string key against atom keys, so every dependency advisory check matched nothing and passed silently whenever `deps/` was absent
+- A measured MySQL deadlock (error 1213) on `user_emails` updates has been eliminated
+- Flaky MFA controller tests are now deterministic by pinning the TOTP clock, and organization fixture keys are randomized to avoid collisions under parallel execution
+- Suppressed a false-positive `XSS.SendResp` sobelow finding on the pre-escaped SAML logout HTML response
+
+### Changed
+
+- Dependency bumps: `bandit` 1.14.1 → 1.15.0, `phoenix` 1.8.16 → 1.8.17, `phoenix_live_view` 1.2.13 → 1.2.15, `phoenix_html` 4.3.0 → 4.4.0, `swoosh` 1.29.0 → 1.30.0, `hammer` 7.5.0 → 7.6.0, `libcluster` 3.5.0 → 3.6.0, `uniq` 0.6.3 → 0.7.0, `floki` 0.38.4 → 0.38.5, `lazy_html` 0.1.13 → 0.1.14, and dev-only `sobelow` 0.16.0 → 0.19.0
 
 ## [0.28.1] - 2026-10-27
 
@@ -968,7 +984,10 @@ Initial release of Authify - Multi-tenant Identity Provider
 - Req for HTTP client operations
 - Prometheus metrics with telemetry
 - Bandit web server
-[Unreleased]: https://github.com/authify/authify/compare/v0.27.0...HEAD
+[Unreleased]: https://github.com/authify/authify/compare/v0.28.2...HEAD
+[0.28.2]: https://github.com/authify/authify/compare/v0.28.1...v0.28.2
+[0.28.1]: https://github.com/authify/authify/compare/v0.28.0...v0.28.1
+[0.28.0]: https://github.com/authify/authify/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/authify/authify/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/authify/authify/compare/v0.25.0...v0.26.0
 [0.25.1]: https://github.com/authify/authify/compare/v0.25.0...v0.25.1
