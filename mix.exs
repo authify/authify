@@ -46,7 +46,7 @@ defmodule Authify.MixProject do
   defp deps do
     [
       {:bandit, "~> 1.14"},
-      {:bcrypt_elixir, "~> 3.0"},
+      {:bcrypt_elixir, "~> 4.0"},
       {:dns_cluster, "~> 0.3.0"},
       {:libcluster, "~> 3.4"},
       {:ecto_sql, "~> 3.13"},
